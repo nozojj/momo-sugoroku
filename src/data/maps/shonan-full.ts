@@ -17,15 +17,15 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *   - 海沿い⇄内陸の行き来は4箇所: 寒川⇄茅ヶ崎(香川経由)・湘南台⇄藤沢(六会経由)・
  *     大船⇄藤沢(梶原経由)・大船⇄鎌倉(北鎌倉経由)。
  *   - 藤沢は最大のハブ: 幹線2方向(辻堂・鵠沼方面)+行き来2方向(六会・梶原方面)に加えて、
- *     二重の環状道路(ロータリー、外周8ノード+内周8ノード)を持つ。ゲーム中もっとも
- *     分岐が多い街になる。
+ *     環状道路(ロータリー)と、そこから1本外付けした小さな衛星の輪(藤沢北口)を持つ。
+ *     ゲーム中もっとも分岐が多い街になる。
  *   - 目的地候補(主要駅)はゲームの分かりやすさのため8駅だけに絞っている:
  *     平塚・茅ヶ崎・辻堂・藤沢・湘南台・寒川・鎌倉・江の島。それ以外(大船・鵠沼・腰越・
  *     稲村ヶ崎・香川・六会・梶原・北鎌倉・各海岸・小町通りなど)は経由地・行き止まりの
  *     観光スポットとして地図上に存在するが、目的地には選ばれない。
  *   - 道路密度のメリハリ: smallLoop()で街ごとに小さな環状路を追加し、街の大きさ・
  *     ゲートの本数で密度を変えている。
- *       藤沢     ★★★★★  二重ロータリー(外周半径95・ゲート4 + 内周半径45)
+ *       藤沢     ★★★★★  ロータリー(半径80・ゲート4) + 衛星の輪(藤沢北口)
  *       鎌倉     ★★★★☆  小さな環状路(半径70/90・ゲート3・蛇行あり)+小町通りの曲がり角
  *       茅ヶ崎   ★★★★☆  小さな環状路(半径100/70・ゲート3)+海岸沿いの小さな輪
  *       平塚     ★★★★☆  西側最大都市として環状路を拡大(半径105/90・ゲート3)
@@ -110,6 +110,23 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *   これにより主要な区間はどこも一本道の最長区間が8マス以下になり、15マス以上
  *   続く一本道は存在しない。茅ヶ崎⇄辻堂⇄藤沢のあいだは幹線+裏道+近道で
  *   すでに3〜4ルートあり、他の主要都市どうしも最低2ルートを確保している。
+ *
+ * ── マスの重なりを解消(今回追加) ──
+ *   街どうしの間隔を詰め、環状路の半径も大きくし、蛇行(wobble)も加えていった結果、
+ *   無関係な道路どうしのマスが近すぎて重なって見える箇所が多数(41箇所)発生していた。
+ *   座標を突き合わせて機械的に検出するスクリプトで洗い出し、次の対応をした。
+ *     - 蛇行(wobble)は全廃した。街の間隔が詰まった状態では、わずかな蛇行でも
+ *       隣の道路・環状路とマスが重なってしまうため、「ゆるく曲がる輪郭」より
+ *       正確さを優先した。
+ *     - 環状路の半径を全体的に一回り小さくした(藤沢95→80、鎌倉70/90→55/75、
+ *       茅ヶ崎100/70→80/55、辻堂65/100→50/80、平塚105/90→85/70、
+ *       北鎌倉小路・稲村ヶ崎小路も同様に縮小)。
+ *     - 藤沢の「二重ロータリー」(外周+同心円の内周)は設計上の欠陥があったため廃止した。
+ *       hubを中心とする同心円の輪は、どの方角に内周⇄外周の接続を作っても、
+ *       hub→外周への直線スポークと同じ直線上に内周の点が乗ってしまい、
+ *       どうしてもマスが重なる。かわりに、鎌倉の北鎌倉小路・稲村ヶ崎小路と同じ
+ *       「衛星型」(ロータリーの1点から1本の道で少し離れた場所に別の小さな輪を作る)
+ *       に統一し、「藤沢北口」という衛星の輪を追加した。
  *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
@@ -232,7 +249,16 @@ interface LoopRing {
  * 戻り値の8点は、あとから他の街の環状路や幹線の途中(pickMidFiller/pickFillerAt)と直接つないで
  * 「都市圏の中の複数ルート」「抜け道」を追加するのに使う。
  */
-function smallLoop(hub: Hub, radiusX: number, idPrefix: string, label: string, gates: number, radiusY: number = radiusX, wobble: number = 0): LoopRing {
+function smallLoop(
+  hub: Hub,
+  radiusX: number,
+  idPrefix: string,
+  label: string,
+  gates: number,
+  radiusY: number = radiusX,
+  wobble: number = 0,
+  gateCorners: (keyof LoopRing)[] = ["n", "e", "s", "w"],
+): LoopRing {
   const n = addJunction(`${idPrefix}_n`, `${label}(北)`, hub.x, hub.y - radiusY);
   const ne = addJunction(`${idPrefix}_ne`, `${label}(北東)`, hub.x + radiusX, hub.y - radiusY);
   const e = addJunction(`${idPrefix}_e`, `${label}(東)`, hub.x + radiusX, hub.y);
@@ -241,15 +267,19 @@ function smallLoop(hub: Hub, radiusX: number, idPrefix: string, label: string, g
   const sw = addJunction(`${idPrefix}_sw`, `${label}(南西)`, hub.x - radiusX, hub.y + radiusY);
   const w = addJunction(`${idPrefix}_w`, `${label}(西)`, hub.x - radiusX, hub.y);
   const nw = addJunction(`${idPrefix}_nw`, `${label}(北西)`, hub.x - radiusX, hub.y - radiusY);
-  const ring = [n, ne, e, se, s, sw, w, nw];
-  for (let i = 0; i < ring.length; i++) {
-    buildRoad(ring[i], ring[(i + 1) % ring.length], "residential", `r_${idPrefix}_ring${i}`, label, wobble);
+  const ring: LoopRing = { n, ne, e, se, s, sw, w, nw };
+  const points = [n, ne, e, se, s, sw, w, nw];
+  for (let i = 0; i < points.length; i++) {
+    buildRoad(points[i], points[(i + 1) % points.length], "residential", `r_${idPrefix}_ring${i}`, label, wobble);
   }
-  const gateNodes = [n, e, s, w].slice(0, gates);
+  // gateCorners: どの点をhubへの「ゲート」にするか。街から実際に伸びる幹線・行き来ルートと
+  // 同じ方角(例: 東西南北)にゲートを置くと、hubから伸びる直線どうしが重なってマスが
+  // 重なって見えるため、街ごとに衝突しない方角(斜めの点など)を指定できるようにしている。
+  const gateNodes = gateCorners.slice(0, gates).map((key) => ring[key]);
   for (const g of gateNodes) {
     buildRoad(hub, g, "residential", `r_${idPrefix}_gate_${g.id}`, label, wobble);
   }
-  return { n, ne, e, se, s, sw, w, nw };
+  return ring;
 }
 
 // ============================================================
@@ -344,57 +374,64 @@ const decorations: MapDecoration[] = [
 ];
 
 // ============================================================
-// 海沿いの幹線(8区間)。地形(丘陵・海岸線)を避けて自然に通っているように見せるため、
-// 軽い蛇行(wobble:10)を入れ、四角い折れ線ではなくゆるく曲がる輪郭にしている。
+// 海沿いの幹線(8区間)。
+// 蛇行(wobble)は廃止した。街どうしの間隔を詰め、環状路も増やした結果、
+// わずかな蛇行でも隣接する道路・環状路とマスが重なって見える箇所が多数出たため、
+// 「ゆるく曲がる輪郭」より「マスが重ならないこと」を優先している
+// (南北の座標そのものはすでに海岸線のカーブに沿ってずらしてあるので、
+// 蛇行なしでも折れ線としての緩やかなカーブは残る)。
 // ============================================================
-buildRoad(hiratsuka, chigasaki, "coastal", "r_hr_cg", "平塚", 10);
-buildRoad(chigasaki, tsujido, "coastal", "r_cg_ts", "茅ヶ崎", 10);
-buildRoad(tsujido, fujisawa, "coastal", "r_ts_fj", "辻堂", 10);
-buildRoad(fujisawa, kugenuma, "coastal", "r_fj_kg", "藤沢", 8);
+buildRoad(hiratsuka, chigasaki, "coastal", "r_hr_cg", "平塚");
+buildRoad(chigasaki, tsujido, "coastal", "r_cg_ts", "茅ヶ崎");
+buildRoad(tsujido, fujisawa, "coastal", "r_ts_fj", "辻堂");
+buildRoad(fujisawa, kugenuma, "coastal", "r_fj_kg", "藤沢");
 // 江の島は海沿い幹線の通過点にせず、鵠沼から橋(roadType: national、太い道路として描かれる)
 // を渡った先の行き止まりの島にする。幹線そのものは鵠沼から直接 腰越 へ抜ける。
-buildRoad(kugenuma, enoshima, "national", "r_kg_en_bridge", "江の島大橋"); // 江の島大橋(橋、蛇行なし=まっすぐな橋)
-buildRoad(kugenuma, koshigoe, "coastal", "r_kg_ks", "鵠沼", 10);
-buildRoad(koshigoe, inamuragasaki, "coastal", "r_ks_in", "腰越", 10);
-buildRoad(inamuragasaki, kamakura, "coastal", "r_in_km", "稲村ヶ崎", 10);
+buildRoad(kugenuma, enoshima, "national", "r_kg_en_bridge", "江の島大橋"); // 江の島大橋(橋)
+buildRoad(kugenuma, koshigoe, "coastal", "r_kg_ks", "鵠沼");
+buildRoad(koshigoe, inamuragasaki, "coastal", "r_ks_in", "腰越");
+buildRoad(inamuragasaki, kamakura, "coastal", "r_in_km", "稲村ヶ崎");
 
 // ============================================================
-// 内陸ルート(2区間)。海沿いの都会的な直線グリッドと対比させ、のどかな内陸らしく
-// 少し蛇行させる(wobble)。四角いグリッドに見えすぎないようにするための調整。
+// 内陸ルート(2区間)。同じ理由で蛇行は廃止。
 // ============================================================
-buildRoad(samukawa, shonandai, "main", "r_sm_sc", "寒川", 18);
-buildRoad(shonandai, ofuna, "main", "r_sc_of", "湘南台", 18);
+buildRoad(samukawa, shonandai, "main", "r_sm_sc", "寒川");
+buildRoad(shonandai, ofuna, "main", "r_sc_of", "湘南台");
 
 // ============================================================
-// 海沿い⇄内陸の行き来(4箇所、各2区間)。こちらも軽く蛇行させている。
+// 海沿い⇄内陸の行き来(4箇所、各2区間)。
 // ============================================================
-buildRoad(samukawa, kagawa, "main", "r_sm_kg", "寒川", 12);
-buildRoad(kagawa, chigasaki, "main", "r_kg_cg", "香川", 12);
+buildRoad(samukawa, kagawa, "main", "r_sm_kg", "寒川");
+buildRoad(kagawa, chigasaki, "main", "r_kg_cg", "香川");
 
-buildRoad(shonandai, rokkai, "main", "r_sc_rk", "湘南台", 12);
-buildRoad(rokkai, fujisawa, "main", "r_rk_fj", "六会", 12);
+buildRoad(shonandai, rokkai, "main", "r_sc_rk", "湘南台");
+buildRoad(rokkai, fujisawa, "main", "r_rk_fj", "六会");
 
-buildRoad(ofuna, kajiwara, "main", "r_of_kj", "大船", 12);
-buildRoad(kajiwara, fujisawa, "main", "r_kj_fj", "梶原", 12);
+buildRoad(ofuna, kajiwara, "main", "r_of_kj", "大船");
+buildRoad(kajiwara, fujisawa, "main", "r_kj_fj", "梶原");
 
-buildRoad(ofuna, kitakamakura, "main", "r_of_kk", "大船", 12);
-buildRoad(kitakamakura, kamakura, "main", "r_kk_km", "北鎌倉", 12);
+buildRoad(ofuna, kitakamakura, "main", "r_of_kk", "大船");
+buildRoad(kitakamakura, kamakura, "main", "r_kk_km", "北鎌倉");
 
 // ============================================================
 // 寒川⇄平塚「西側の近道」(2区間 + 分岐2箇所)。roadType: shortcut にして、
 // 海沿い幹線・内陸ルートとは別の選択肢だとひと目でわかるようにする(紫の破線)。
 // ============================================================
-buildRoad(samukawa, tamura, "shortcut", "r_sm_tm", "寒川", 10);
-buildRoad(tamura, hiratsuka, "shortcut", "r_tm_hr", "田村", 10);
+buildRoad(samukawa, tamura, "shortcut", "r_sm_tm", "寒川");
+buildRoad(tamura, hiratsuka, "shortcut", "r_tm_hr", "田村");
 
 // 分岐1: 田村に小さな輪をひとつ(藤沢ほど密にせず、郊外らしい規模にとどめる)。
-smallLoop(tamura, 55, "tmlp", "田村小路", 1);
+// 田村自体は寒川(東)・平塚(南)の道が通る交差点のため、輪を田村の真上ではなく
+// 北へ少し離した場所(衛星型)に置き、輪の点が既存の道と重ならないようにしている。
+const tamuraKado = addJunction("wp_tamura_kado", "田村北", tamura.x, tamura.y - 55);
+buildRoad(tamura, tamuraKado, "residential", "r_tm_kado", "田村小路");
+smallLoop(tamuraKado, 30, "tmlp", "田村小路", 1);
 
 // 分岐2: 田村⇄平塚の区間の途中(だいたい真ん中のマス)から、少し東へ入った所に
 // もう1箇所小さな輪(中原イメージ)を作る。
 const tamuraHiratsukaMid = pickMidFiller(tamura, hiratsuka);
 const nakahara = addJunction("wp_nakahara", "中原", tamuraHiratsukaMid.x + 70, tamuraHiratsukaMid.y);
-buildRoad(tamuraHiratsukaMid, nakahara, "shortcut", "r_tmhr_nk", "中原", 8);
+buildRoad(tamuraHiratsukaMid, nakahara, "shortcut", "r_tmhr_nk", "中原");
 smallLoop(nakahara, 40, "nklp", "中原小路", 1);
 
 // ============================================================
@@ -408,12 +445,19 @@ smallLoop(nakahara, 40, "nklp", "中原小路", 1);
 //  平塚=やや平たい楕円、鎌倉=南北にやや長い楕円)。
 // 鎌倉は寺社が多い古い街並みを意識し、環状路にわずかな蛇行(wobble)を入れて
 // 「碁盤の目」ではない曲がりくねった路地の雰囲気を出している。
-const fujisawaRing = smallLoop(fujisawa, 95, "fjrt", "藤沢ロータリー", 4); // ★★★★★
-const kamakuraRing = smallLoop(kamakura, 70, "kmlp", "鎌倉小路", 3, 90, 10); // ★★★★☆(古都らしく蛇行)
-const chigasakiRing = smallLoop(chigasaki, 100, "cglp", "茅ヶ崎小路", 3, 70); // ★★★★☆
-const tsujidoRing = smallLoop(tsujido, 65, "tslp", "辻堂小路", 2, 100); // ★★★☆☆
-// 平塚: 西側最大の都市として、環状路を鎌倉・茅ヶ崎と同格まで拡大する(半径85→105、ゲート2→3)。
-const hiratsukaRing = smallLoop(hiratsuka, 105, "hrlp", "平塚小路", 3, 90); // ★★★★☆(西側最大都市)
+// 街どうしの間隔を詰めてある分、環状路の半径は隣の街・幹線と干渉しない範囲に抑えている
+// (以前より一回り小さいが、ゲート数・形の違いで密度のメリハリは維持している)。
+// 藤沢: 実際の幹線(辻堂=西・鵠沼=南・六会=北・梶原=東)が東西南北をすべて使っているため、
+// ゲートは斜め4点(北東・南東・南西・北西)にして、hubから伸びる直線どうしが重ならないようにする。
+const fujisawaRing = smallLoop(fujisawa, 80, "fjrt", "藤沢ロータリー", 4, 65, 0, ["ne", "se", "sw", "nw"]); // ★★★★★
+// 鎌倉: 実際の幹線が南(稲村ヶ崎)・北(北鎌倉)を使っているため、ゲートは東寄り3点にする。
+const kamakuraRing = smallLoop(kamakura, 55, "kmlp", "鎌倉小路", 3, 75, 0, ["e", "se", "nw"]); // ★★★★☆
+// 茅ヶ崎: 実際の幹線が東(辻堂)・西(平塚)・北(香川)を使っているため、ゲートは南寄り3点にする。
+const chigasakiRing = smallLoop(chigasaki, 80, "cglp", "茅ヶ崎小路", 3, 72, 0, ["s", "se", "sw"]); // ★★★★☆
+const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, ["n", "nw"]); // ★★★☆☆
+// 平塚: 西側最大の都市として、環状路を鎌倉・茅ヶ崎と同格まで拡大する。
+// 実際の幹線が東(茅ヶ崎)・北(田村)を使っているため、ゲートは南〜西寄り3点にする。
+const hiratsukaRing = smallLoop(hiratsuka, 85, "hrlp", "平塚小路", 3, 70, 0, ["s", "sw", "w"]); // ★★★★☆(西側最大都市)
 // 江の島: 橋を渡った先の島の中の小さな参道(仲見世通りイメージ)。行き止まりの小さな輪。
 smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
 // 湘南台・寒川は環状路なし(幹線2+行き来1の計3方向で十分な分岐がある)
@@ -426,32 +470,36 @@ smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
 
 // 茅ヶ崎⇄辻堂、辻堂⇄藤沢: 海沿いの幹線とは別に、環状路どうしを直接つなぐ「裏道」を
 // 複数本通す。幹線(coastal)を通るか、どの裏道を通るか、プレイヤーが選べるようになる。
+// マスの重なりを避けるため、混雑していた区間の裏道を必要最小限(要件を満たす本数)に
+// 間引いた。茅ヶ崎⇄辻堂は幹線+裏道1本の計2ルート、辻堂⇄藤沢は幹線+裏道1本+近道の
+// 計3ルートを確保している。
 buildRoad(chigasakiRing.e, tsujidoRing.w, "residential", "r_local_cg_ts", "茅ヶ崎");
-buildRoad(chigasakiRing.se, tsujidoRing.sw, "residential", "r_local2_cg_ts", "茅ヶ崎"); // 2本目(海側寄り)
-buildRoad(tsujidoRing.e, fujisawaRing.w, "residential", "r_local_ts_fj", "辻堂");
-buildRoad(tsujidoRing.se, fujisawaRing.sw, "residential", "r_local2_ts_fj", "辻堂"); // 2本目(海側寄り)
-buildRoad(tsujidoRing.ne, fujisawaRing.nw, "residential", "r_local3_ts_fj", "辻堂"); // 3本目(内陸寄り)
+buildRoad(tsujidoRing.se, fujisawaRing.sw, "residential", "r_local2_ts_fj", "辻堂");
 
 // 藤沢: ロータリーの斜めの点からも六会・梶原へ直接抜けられるようにし、
 // 「幹線→藤沢中心→行き来ルート」以外に「ロータリー経由」でも同じ場所へ行けるようにする。
 buildRoad(fujisawaRing.ne, rokkai, "residential", "r_fj_ne_rk", "藤沢ロータリー");
 buildRoad(fujisawaRing.se, kajiwara, "residential", "r_fj_se_kj", "藤沢ロータリー");
 
-// 藤沢: マップ最大の都市として、外周のロータリーの内側にもう一回り小さな内周ロータリーを作る
-// (実在の大きな環状交差点のように外周・内周の2重構造にする)。内周はまず外周と radial に
-// つなぎ、藤沢の中心には外周からしか入れないようにする(内周だけ孤立させない)。
-const fujisawaInner = smallLoop(fujisawa, 45, "fjrt2", "藤沢中央ロータリー", 0);
-buildRoad(fujisawaInner.n, fujisawaRing.n, "residential", "r_fjrt_in_n", "藤沢ロータリー");
-buildRoad(fujisawaInner.e, fujisawaRing.e, "residential", "r_fjrt_in_e", "藤沢ロータリー");
-buildRoad(fujisawaInner.s, fujisawaRing.s, "residential", "r_fjrt_in_s", "藤沢ロータリー");
-buildRoad(fujisawaInner.w, fujisawaRing.w, "residential", "r_fjrt_in_w", "藤沢ロータリー");
+// 藤沢: マップ最大の都市として、ロータリーからさらにもう1つ小さな輪(藤沢北口イメージ)を
+// 外付けする。中心を同じくする「内周ロータリー」ではなく、ロータリーの北東の点から
+// 1本の道で少し離れた場所に作る衛星型の輪にしている(hubを中心に同心円状の輪を
+// 複数作ると、どの方角でつないでも中心からの直線どうしが重なってマスが重なって
+// しまうため、鎌倉の北鎌倉小路・稲村ヶ崎小路と同じ「衛星型」の作り方に統一した)。
+const fujisawaKitaguchi = addJunction("wp_fj_kitaguchi", "藤沢北口", fujisawaRing.ne.x, fujisawaRing.ne.y - 100);
+buildRoad(fujisawaRing.ne, fujisawaKitaguchi, "residential", "r_fj_ne_kitaguchi", "藤沢北口");
+smallLoop(fujisawaKitaguchi, 50, "fjkt", "藤沢北口通り", 1, 70);
 
 // 鎌倉: 環状路の西側を稲村ヶ崎に直結し、稲村ヶ崎⇄鎌倉が海沿い幹線+この裏道の2ルートになる。
-buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路", 10);
+buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路");
 
-// 鎌倉: 観光地らしく、周辺(北鎌倉・稲村ヶ崎)にも小さな環状ルートを追加する(いずれも蛇行あり)。
-smallLoop(kitakamakura, 45, "kklp", "北鎌倉小路", 2, 45, 10); // 円覚寺・建長寺まわりのイメージ
-smallLoop(inamuragasaki, 40, "inlp", "稲村ヶ崎小路", 1, 40, 10); // 稲村ヶ崎公園まわりのイメージ
+// 鎌倉: 観光地らしく、周辺(北鎌倉・稲村ヶ崎)にも小さな環状ルートを追加する。
+smallLoop(kitakamakura, 35, "kklp", "北鎌倉小路", 2, 66); // 円覚寺・建長寺まわりのイメージ
+// 稲村ヶ崎自体は腰越(西)・鎌倉(北)・由比ヶ浜(南西)・鎌倉小路(北東寄り)の道が集まる
+// 交差点のため、輪は他の道と重ならない東側へ少し離した衛星型にする。
+const inamuragasakiPark = addJunction("wp_inamuragasaki_park", "稲村ヶ崎公園入口", inamuragasaki.x + 65, inamuragasaki.y);
+buildRoad(inamuragasaki, inamuragasakiPark, "residential", "r_in_park", "稲村ヶ崎小路");
+smallLoop(inamuragasakiPark, 25, "inlp", "稲村ヶ崎小路", 1); // 稲村ヶ崎公園まわりのイメージ
 
 // 鎌倉: 古い商店街らしく、まっすぐではなく2回曲がって着く小さな通り(小町通りイメージ)を追加。
 const komachiBend1 = addJunction("wp_komachi1", "小町通り入口", kamakuraRing.e.x + 40, kamakuraRing.e.y);
@@ -473,7 +521,11 @@ buildRoad(pickFillerAt(samukawa, shonandai, 0.66), rokkai, "shortcut", "r_short_
 const chigasakiKaigan = addJunction("wp_chigasaki_kaigan", "茅ヶ崎海岸", chigasaki.x, chigasaki.y + 130);
 buildRoad(chigasakiRing.s, chigasakiKaigan, "coastal", "r_cg_s_kaigan", "茅ヶ崎海岸");
 // 茅ヶ崎: 海側へ寄る小さなルートとして、海岸沿いにもう少しだけ小さな輪を作る。
-smallLoop(chigasakiKaigan, 30, "cgklp", "茅ヶ崎海岸通り", 1);
+// 茅ヶ崎海岸自体は茅ヶ崎小路からの道(北)が通っているため、輪はさらに海側(南)へ
+// 少し離した衛星型にする。
+const chigasakiKaiganOku = addJunction("wp_chigasaki_kaigan_oku", "茅ヶ崎海岸奥", chigasakiKaigan.x, chigasakiKaigan.y + 45);
+buildRoad(chigasakiKaigan, chigasakiKaiganOku, "coastal", "r_cg_kaigan_oku", "茅ヶ崎海岸通り");
+smallLoop(chigasakiKaiganOku, 25, "cgklp", "茅ヶ崎海岸通り", 1);
 
 const tsujidoKaigan = addJunction("wp_tsujido_kaigan", "辻堂海岸", tsujido.x, tsujido.y + 150);
 buildRoad(tsujidoRing.s, tsujidoKaigan, "coastal", "r_ts_s_kaigan", "辻堂海岸");
@@ -490,7 +542,7 @@ buildRoad(inamuragasaki, yuigahama, "coastal", "r_in_yui", "由比ヶ浜");
 // ============================================================
 // 平塚⇄茅ヶ崎の中間 → 大神(実在地名)への短い枝道
 const oga = addJunction("wp_oga", "大神", pickMidFiller(hiratsuka, chigasaki).x, pickMidFiller(hiratsuka, chigasaki).y - 60);
-buildRoad(pickMidFiller(hiratsuka, chigasaki), oga, "residential", "r_hrcg_oga", "大神", 6);
+buildRoad(pickMidFiller(hiratsuka, chigasaki), oga, "residential", "r_hrcg_oga", "大神");
 
 // 鵠沼⇄腰越の中間 → 片瀬海岸(実在地名)への短い枝道(意図した行き止まり)
 const katasekaigan = addJunction("wp_katase_kaigan", "片瀬海岸", pickMidFiller(kugenuma, koshigoe).x, pickMidFiller(kugenuma, koshigoe).y + 70);
@@ -498,12 +550,13 @@ buildRoad(pickMidFiller(kugenuma, koshigoe), katasekaigan, "coastal", "r_kgks_ka
 
 // 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道
 const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x, pickMidFiller(shonandai, ofuna).y - 60);
-buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo", "善行", 6);
+buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo", "善行");
 
 // 北鎌倉⇄鎌倉(8マス、区間内で最長)の中間 → 鎌倉小路の北ゲートに合流させる。
 // 新しい行き止まりを作るのではなく、既存の環状路に合流させることで
-// 「鎌倉へ抜ける2本目のルート」として機能させる。
-buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.n, "residential", "r_kkkm_merge", "鎌倉小路", 6);
+// 「鎌倉へ抜ける2本目のルート」として機能させる。蛇行なし(まっすぐ合流させ、
+// 鎌倉小路のリング自体と交差しないようにする)。
+buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential", "r_kkkm_merge", "鎌倉小路");
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
