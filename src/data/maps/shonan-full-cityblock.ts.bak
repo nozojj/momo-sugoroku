@@ -1,0 +1,258 @@
+import type { MapData, MapNode, MapDecoration, NodeType, PropertyDef, RoadType } from "@/types/game";
+import { windingFiller } from "@/lib/game/mapBuilder";
+
+/**
+ * 湘南すごろく 全域マップ(街区グリッド版)
+ *
+ * 前バージョン(拠点+ウェイポイントを直接つなぐだけの「路線図」構造)は、拠点間が
+ * 一本道(15〜36マス、分岐なし)になってしまい、「街中の道路網」らしさに欠けていた。
+ * このバージョンでは、拠点どうしの400px四方をひとつの「街区(block)」とみなし、
+ * 街区ごとに(1)4辺それぞれの中間点、(2)街区の中心、を実ノードとして追加し、
+ * 中心から4辺の中間点へ十字にスポーク道路を通す。
+ * これにより、
+ *   - どの1本道も最長9マス程度(400px区間を中間点で2分割、中心へのスポークも同程度)で、
+ *     15マス以上続く一本道が存在しない
+ *   - 中間点(3〜4差路)・街区中心(4差路)によって、経路の途中で他ルートへ抜けられる
+ *   - 街区どうしが辺を共有するため、地図全体が9つの街区がびっしり連結した
+ *     ループだらけのメッシュになり、目的地には常に複数の行き方がある
+ * という「街の道路網」らしい構造になる。斜め道路は一切使わない(街区の中心⇄中間点の
+ * スポークもすべて縦横のみ)。道路が交わる場所は、この案でもすべて実ノード=実際に
+ * 移動可能な交差点で、見た目だけの交差はない。
+ *
+ * 拠点(10、指定分): 平塚・茅ヶ崎・寒川・辻堂・湘南台・藤沢・江の島・大船・鎌倉・逗子。
+ * ウェイポイント(9、実在地名の街区の角): 四之宮・六会・善行・北鎌倉・鵠沼・梶原・名越・腰越・稲村ヶ崎。
+ * 街区中心(9、実在地名): 一之宮・萩園・円行・亀井野・石川・羽鳥・山ノ内・極楽寺・小坪。
+ *
+ * 400px四方の街区が9つ、隙間なく連結:
+ *   B1(四之宮-寒川-茅ヶ崎-平塚, 中心=一之宮) / B2(寒川-六会-辻堂-茅ヶ崎, 中心=萩園) /
+ *   B3(六会-湘南台-藤沢-辻堂, 中心=円行) / B7(湘南台-善行-大船-藤沢, 中心=亀井野) /
+ *   B4a(藤沢-大船-梶原-鵠沼, 中心=石川) / B4b(鵠沼-梶原-腰越-江の島, 中心=羽鳥) /
+ *   B5a(大船-北鎌倉-鎌倉-梶原, 中心=山ノ内) / B5b(梶原-鎌倉-稲村ヶ崎-腰越, 中心=極楽寺) /
+ *   B6(鎌倉-名越-逗子-稲村ヶ崎, 中心=小坪)
+ *
+ * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
+ * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
+ */
+
+interface NodeSpec {
+  id: string;
+  name: string;
+  type: NodeType;
+  area: string;
+  x: number;
+  y: number;
+  propertyId?: string;
+  dest?: true;
+  majorHub?: true;
+}
+
+interface EdgeSpec {
+  from: string;
+  to: string;
+  roadType: RoadType;
+  requiresCardId?: string;
+}
+
+const generatedProperties: PropertyDef[] = [];
+const nodeSpecs: NodeSpec[] = [];
+const edgeSpecs: EdgeSpec[] = [];
+
+interface Hub {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+}
+
+/** 名前のある拠点・ウェイポイント・街区中心(目的地候補になる)。 */
+function addHub(id: string, name: string, x: number, y: number, isMajorHub?: true): Hub {
+  nodeSpecs.push({ id, name, type: "normal", area: name, x, y, dest: true, majorHub: isMajorHub });
+  return { id, name, x, y };
+}
+
+/** 街区の辺の中間点(単なる交差点。目的地候補にはしない)。 */
+function addJunction(id: string, name: string, x: number, y: number): Hub {
+  nodeSpecs.push({ id, name, type: "normal", area: name, x, y });
+  return { id, name, x, y };
+}
+
+/** y>=1200(海沿いの行)に触れる区間は coastal、それ以外は main。 */
+function roadTypeFor(a: Hub, b: Hub): RoadType {
+  return a.y >= 1200 || b.y >= 1200 ? "coastal" : "main";
+}
+
+/**
+ * 拠点(ウェイポイント・街区中心含む)どうしを道でつなぐ。マス間隔(scale)を基準に
+ * 距離から自動でマス数を決めるため区間ごとに一定間隔になる。wobble:0で完全な直線にし、
+ * 道路同士の絡まりを防ぐ。plain:trueにより生成マスはすべて type: "normal"。
+ * 拠点間の道の途中でフォーク&合流(自動生成の支線)は作らない。
+ */
+function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string) {
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  const scale = 22;
+  const spineCount = Math.max(5, Math.round(dist / scale));
+
+  const spine = windingFiller(
+    { id: a.id, x: a.x, y: a.y },
+    { id: b.id, x: b.x, y: b.y },
+    { count: spineCount, roadType, area, idPrefix, wobble: 0, plain: true },
+    generatedProperties,
+  );
+  for (const n of spine.nodes) nodeSpecs.push({ id: n.id, name: n.name, type: n.type, area: n.area, x: n.x, y: n.y, propertyId: n.propertyId });
+  for (const e of spine.edges) edgeSpecs.push(e);
+}
+
+// 街区の辺(2拠点間)を中間点で2分割してつなぐ。同じ辺は2つの街区から共有されうるので、
+// 一度作った中間点はキャッシュして再利用する(重複道路を作らない)。
+const midpointCache = new Map<string, Hub>();
+function midpoint(a: Hub, b: Hub): Hub {
+  const key = [a.id, b.id].sort().join("__");
+  const cached = midpointCache.get(key);
+  if (cached) return cached;
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const mid = addJunction(`wp_mid_${key}`, `${a.name}⇄${b.name}間`, mx, my);
+  midpointCache.set(key, mid);
+  const rt = roadTypeFor(a, b);
+  buildRoad(a, mid, rt, `r_${key}_a`, a.name);
+  buildRoad(mid, b, rt, `r_${key}_b`, b.name);
+  return mid;
+}
+
+/** 400px四方の街区ひとつ分。4辺の中間点を作り、街区中心から十字にスポークを通す。 */
+function block(nw: Hub, ne: Hub, se: Hub, sw: Hub, centerId: string, centerName: string) {
+  const top = midpoint(nw, ne);
+  const right = midpoint(ne, se);
+  const bottom = midpoint(sw, se);
+  const left = midpoint(nw, sw);
+  const cx = (nw.x + ne.x) / 2;
+  const cy = (nw.y + sw.y) / 2;
+  const center = addHub(centerId, centerName, cx, cy);
+  buildRoad(center, top, roadTypeFor(center, top), `r_${centerId}_n`, centerName);
+  buildRoad(center, right, roadTypeFor(center, right), `r_${centerId}_e`, centerName);
+  buildRoad(center, bottom, roadTypeFor(center, bottom), `r_${centerId}_s`, centerName);
+  buildRoad(center, left, roadTypeFor(center, left), `r_${centerId}_w`, centerName);
+}
+
+// ============================================================
+// 拠点(10) + ウェイポイント(9) — 400px間隔のグリッドに配置
+// ============================================================
+
+const yotsunomiya = addHub("wp_yotsunomiya", "四之宮", 0, 0);
+const samukawa = addHub("hub_samukawa", "寒川", 400, 0);
+const rokkai = addHub("wp_rokkai", "六会", 800, 0);
+const shonandai = addHub("hub_shonandai", "湘南台", 1200, 0);
+const zengyo = addHub("wp_zengyo", "善行", 1600, 0);
+
+const hiratsuka = addHub("hub_hiratsuka", "平塚", 0, 400);
+const chigasaki = addHub("hub_chigasaki", "茅ヶ崎", 400, 400);
+const tsujido = addHub("hub_tsujido", "辻堂", 800, 400);
+const fujisawa = addHub("hub_fujisawa", "藤沢", 1200, 400, true);
+const ofuna = addHub("hub_ofuna", "大船", 1600, 400);
+const kitakamakura = addHub("wp_kitakamakura", "北鎌倉", 2000, 400);
+
+const kugenuma = addHub("wp_kugenuma", "鵠沼", 1200, 800);
+const kajiwara = addHub("wp_kajiwara", "梶原", 1600, 800);
+const kamakura = addHub("hub_kamakura", "鎌倉", 2000, 800);
+const nagoe = addHub("wp_nagoe", "名越", 2400, 800);
+
+const enoshima = addHub("hub_enoshima", "江の島", 1200, 1200);
+const koshigoe = addHub("wp_koshigoe", "腰越", 1600, 1200);
+const inamuragasaki = addHub("wp_inamuragasaki", "稲村ヶ崎", 2000, 1200);
+const zushi = addHub("hub_zushi", "逗子", 2400, 1200);
+
+const decorations: MapDecoration[] = [
+  { kind: "parkBlob", cx: 700, cy: 340, rx: 100, ry: 70 }, // 辻堂海浜公園イメージ
+  { kind: "sea", edge: "bottom", pos: 1280 },
+];
+
+// ============================================================
+// 街区(9) — それぞれ block() が「4辺の中間点+中心の十字スポーク」を自動生成する
+// ============================================================
+
+block(yotsunomiya, samukawa, chigasaki, hiratsuka, "hub_ichinomiya", "一之宮");
+block(samukawa, rokkai, tsujido, chigasaki, "hub_hagizono", "萩園");
+block(rokkai, shonandai, fujisawa, tsujido, "hub_engyo", "円行");
+block(shonandai, zengyo, ofuna, fujisawa, "hub_kameinou", "亀井野");
+block(fujisawa, ofuna, kajiwara, kugenuma, "hub_ishikawa", "石川");
+block(kugenuma, kajiwara, koshigoe, enoshima, "hub_hatori", "羽鳥");
+block(ofuna, kitakamakura, kamakura, kajiwara, "hub_yamanouchi", "山ノ内");
+block(kajiwara, kamakura, inamuragasaki, koshigoe, "hub_gokurakuji", "極楽寺");
+block(kamakura, nagoe, zushi, inamuragasaki, "hub_kotsubo", "小坪");
+
+export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
+  const nodeMap = new Map<string, MapNode>();
+  for (const spec of nodeSpecs) {
+    if (nodeMap.has(spec.id)) {
+      throw new Error(`shonan-full map: duplicate node id "${spec.id}"`);
+    }
+    nodeMap.set(spec.id, {
+      id: spec.id,
+      name: spec.name,
+      type: spec.type,
+      x: spec.x,
+      y: spec.y,
+      connections: [],
+      propertyId: spec.propertyId,
+      isDestinationCandidate: spec.dest,
+      area: spec.area,
+      isMajorHub: spec.majorHub,
+    });
+  }
+
+  for (const edge of edgeSpecs) {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) {
+      throw new Error(`shonan-full map: edge references unknown node (${edge.from} -> ${edge.to})`);
+    }
+    from.connections.push({ to: to.id, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+    to.connections.push({ to: from.id, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+  }
+
+  const nodes = Array.from(nodeMap.values());
+
+  for (const node of nodes) {
+    if (node.type === "property" && !node.propertyId) {
+      throw new Error(`shonan-full map: property node "${node.id}" is missing propertyId`);
+    }
+    if (node.connections.length === 0) {
+      throw new Error(`shonan-full map: node "${node.id}" is isolated (no connections)`);
+    }
+  }
+
+  // 開始地点から辿れないノードがないか(バラバラに分断された部分がないか)を確認する
+  const reachable = new Set<string>([fujisawa.id]);
+  const queue = [fujisawa.id];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const node = nodeMap.get(id);
+    if (!node) continue;
+    for (const edge of node.connections) {
+      if (!reachable.has(edge.to)) {
+        reachable.add(edge.to);
+        queue.push(edge.to);
+      }
+    }
+  }
+  const unreachable = nodes.filter((n) => !reachable.has(n.id));
+  if (unreachable.length > 0) {
+    throw new Error(
+      `shonan-full map: ${unreachable.length} node(s) unreachable from start (e.g. "${unreachable[0].id}")`,
+    );
+  }
+
+  const map: MapData = {
+    id: "shonan-full",
+    name: "湘南すごろく(街区グリッド)",
+    nodes,
+    startNodeId: fujisawa.id,
+    decorations,
+  };
+
+  return { map, properties: generatedProperties };
+}
+
+const built = buildShonanFullMap();
+export const shonanFullMap: MapData = built.map;
+export const generatedPropertyDefs: PropertyDef[] = built.properties;

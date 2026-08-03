@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#bfe3f5"/>
+      <stop offset="60%" stop-color="#e6f4fa"/>
+      <stop offset="100%" stop-color="#fdf6e7"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5ea8c9"/>
+      <stop offset="45%" stop-color="#3f86ab"/>
+      <stop offset="100%" stop-color="#2b6d92"/>
+    </linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f2e2b6"/>
+      <stop offset="100%" stop-color="#e8d29a"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff3d6" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fff3d6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="900" fill="url(#sky)"/>
+  <circle cx="1180" cy="220" r="160" fill="url(#sun)"/>
+
+  <!-- Mt. Fuji, far background -->
+  <g opacity="0.55">
+    <path d="M 260 400 L 470 400 L 400 250 Q 385 225 370 250 L 340 300 L 320 270 Z" fill="#7f97ab"/>
+    <path d="M 355 275 L 400 250 Q 385 225 370 250 L 350 283 Z" fill="#f4f8fb"/>
+  </g>
+
+  <!-- Sea -->
+  <rect x="0" y="380" width="1600" height="330" fill="url(#sea)"/>
+  <g stroke="#eaf6ff" stroke-opacity="0.45" stroke-width="4" fill="none">
+    <path d="M 0 440 Q 90 428 180 440 T 360 440 T 540 440"/>
+    <path d="M 700 480 Q 800 468 900 480 T 1100 480"/>
+    <path d="M 1150 420 Q 1250 408 1350 420 T 1550 420"/>
+    <path d="M 0 560 Q 120 546 240 560 T 480 560 T 720 560"/>
+  </g>
+
+  <!-- Enoshima island -->
+  <g transform="translate(1130,470)">
+    <path d="M -140 130 Q -150 40 -60 -10 Q 20 -55 110 -20 Q 175 5 170 70 Q 165 130 90 140 Q -30 155 -140 130 Z" fill="#5f8a5a"/>
+    <path d="M -140 130 Q -150 40 -60 -10 Q -10 -35 30 -35 Q -20 0 -35 60 Q -50 110 -140 130 Z" fill="#4d7548"/>
+    <!-- torii accent -->
+    <g transform="translate(-25,-40)" stroke="#b1402c" stroke-width="6" fill="none" stroke-linecap="round">
+      <path d="M -22 26 L -22 -8 M 22 26 L 22 -8"/>
+      <path d="M -30 -8 L 30 -8 M -26 -18 L 26 -18"/>
+    </g>
+  </g>
+
+  <!-- causeway bridge to Enoshima -->
+  <path d="M 940 620 Q 1010 600 1000 590" stroke="#cbb37a" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- beach / coastline -->
+  <path d="M 0 640 Q 250 600 520 630 Q 800 662 1000 618 Q 1250 580 1600 630 L 1600 900 L 0 900 Z" fill="url(#sand)"/>
+
+  <!-- pine silhouettes along the shore -->
+  <g fill="#3f5f3a" opacity="0.85">
+    <g transform="translate(120,650) scale(1.1)">
+      <rect x="-4" y="10" width="8" height="26" fill="#5b4a34"/>
+      <path d="M 0 -34 L 22 12 L -22 12 Z"/>
+      <path d="M 0 -18 L 16 14 L -16 14 Z"/>
+    </g>
+    <g transform="translate(210,662) scale(0.85)">
+      <rect x="-4" y="10" width="8" height="24" fill="#5b4a34"/>
+      <path d="M 0 -30 L 20 10 L -20 10 Z"/>
+      <path d="M 0 -16 L 14 12 L -14 12 Z"/>
+    </g>
+    <g transform="translate(1420,650) scale(1.05)">
+      <rect x="-4" y="10" width="8" height="26" fill="#5b4a34"/>
+      <path d="M 0 -34 L 22 12 L -22 12 Z"/>
+      <path d="M 0 -18 L 16 14 L -16 14 Z"/>
+    </g>
+    <g transform="translate(1500,666) scale(0.8)">
+      <rect x="-4" y="10" width="8" height="22" fill="#5b4a34"/>
+      <path d="M 0 -28 L 18 10 L -18 10 Z"/>
+      <path d="M 0 -14 L 13 12 L -13 12 Z"/>
+    </g>
+  </g>
+
+  <!-- seagulls -->
+  <g stroke="#4a5a63" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6">
+    <path d="M 500 150 Q 514 138 528 150 Q 542 138 556 150"/>
+    <path d="M 760 210 Q 771 201 782 210 Q 793 201 804 210"/>
+    <path d="M 900 130 Q 911 121 922 130 Q 933 121 944 130"/>
+  </g>
+</svg>

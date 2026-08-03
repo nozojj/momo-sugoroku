@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 湘南すごろく
 
-## Getting Started
+湘南エリア(湘南台・六会日大前・江の島方面…)を舞台にした、車で移動する桃鉄風のご当地すごろくゲーム。
+電車・駅ではなく、実際の道路を参考にデフォルメした「マスのグラフ」を車で走る。
 
-First, run the development server:
+現在は **MVP(ローカル2人対戦)** の段階。
+
+- マップ: 湘南台駅前 〜 六会日大前駅(60マス弱、分岐2箇所・近道1箇所を含む仮マップ)
+- サイコロを振ってマスを移動し、分岐点では進む道を選択
+- 通常/お金増減/カード/物件購入マスなどのマス効果
+- 物件購入・カード(もう一度サイコロ/移動2倍/近道用の鍵カード)
+- 目的地にランダムで挑戦し、一番乗りでボーナス
+- 規定ターン終了後、総資産(現金+所有物件)が一番多い人の勝ち
+- ブラウザの`localStorage`にゲーム状態を自動保存(リロードしても続きから)
+
+## 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run dev` は `--hostname 0.0.0.0` でLAN内の全インターフェースにバインドされる。同じWi-Fiに繋いだスマホから `http://<このPCのLAN IP>:3000` でアクセスできる(画面を回して2人で覗き込むローカル対戦を想定)。PCのLAN IPは `ipconfig` (Windows) で確認できる。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## プロジェクト構成
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+  types/game.ts          ゲーム全体の型定義(マップ/プレイヤー/状態)
+  data/
+    maps/                 マップデータ(グラフ構造)。新エリアはここに追加していく
+    properties.ts          物件の静的データ
+    cards.ts                カードの静的データ
+    events.ts               お金増減・ご当地イベントの抽選テーブル
+  lib/
+    game/engine.ts          初期状態生成・資産計算などの純粋関数
+    game/mapGraph.ts         グラフ探索(次の道路候補・目的地抽選など)
+    game/mapStyle.ts         マス/道路の見た目定義
+    format.ts                お金の表示フォーマット
+  store/gameStore.ts       Zustandのゲーム状態ストア(移動・購入・ターン管理などの全ロジック)
+  components/game/          UIコンポーネント(盤面SVG・サイコロ・HUD・各種モーダル)
+  app/page.tsx             エントリーポイント(GameScreenを描画)
+```
 
-## Learn More
+マップを拡張するときは `src/data/maps/` に新しいマップファイルを追加し、既存の `shonandai-rokkai.ts` と同じ形式(`nodeSpecs` / `edgeSpecs` を書いて `buildMap()` に渡す)で作ると、孤立ノードなどの整合性エラーがビルド時に検出される。
 
-To learn more about Next.js, take a look at the following resources:
+## 今後の拡張予定
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- マップを藤沢駅・江の島方面へ拡張(300〜500マス規模)
+- ガソリン残量・車種による特性
+- 台風/花火大会などの地域全体イベント(物件収益への影響)
+- Supabase Realtimeを使ったオンライン対戦
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 本番ビルドの確認
 
-## Deploy on Vercel
+```bash
+npm run build
+npm run start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## PWA
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`@serwist/next` でService Workerを生成(`src/app/sw.ts`)。開発中は無効化されており(`next.config.ts`)、`npm run build && npm run start` で有効になる。スマホでインストール確認する場合はHTTPS経由が望ましい(LANのHTTPアクセスだとインストールバナーが出ないことがある)。
