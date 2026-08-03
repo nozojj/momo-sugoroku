@@ -82,8 +82,8 @@ function roadTypeFor(a: Hub, b: Hub): RoadType {
  */
 function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
-  const scale = 32; // マス間隔(px)。大きいほどマス数が減り、マス同士の間隔が空く
-  const spineCount = Math.max(5, Math.round(dist / scale));
+  const scale = 60; // マス間隔(px)。大きいほどマス数が減り、マス同士のあいだに道路がはっきり見える間隔になる
+  const spineCount = Math.max(3, Math.round(dist / scale));
 
   const spine = windingFiller(
     { id: a.id, x: a.x, y: a.y },
