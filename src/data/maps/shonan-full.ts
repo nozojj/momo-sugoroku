@@ -101,6 +101,16 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *   途中に小さな輪を2箇所(田村小路・中原小路)作り、完全な一本道にはしていないが、
  *   藤沢のような密な街区にはせず、郊外らしいシンプルな構成にとどめた。
  *
+ * ── 都市間の一本道を道路網へ(今回追加) ──
+ *   幹線・行き来ルートの主要区間はすべて距離を確認し、「5〜8マス進むごとに分岐」を
+ *   満たすようにした。すでに分岐のあった区間(寒川⇄湘南台、茅ヶ崎⇄辻堂、辻堂⇄藤沢、
+ *   田村⇄平塚など)はそのまま、両端にしか分岐のなかった区間(平塚⇄茅ヶ崎、鵠沼⇄腰越、
+ *   湘南台⇄大船、北鎌倉⇄鎌倉)には区間の真ん中あたりから短い枝道・合流を追加した
+ *   (大神・片瀬海岸・善行への短い枝道、北鎌倉⇄鎌倉は鎌倉小路への合流)。
+ *   これにより主要な区間はどこも一本道の最長区間が8マス以下になり、15マス以上
+ *   続く一本道は存在しない。茅ヶ崎⇄辻堂⇄藤沢のあいだは幹線+裏道+近道で
+ *   すでに3〜4ルートあり、他の主要都市どうしも最低2ルートを確保している。
+ *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
  *
@@ -470,6 +480,30 @@ buildRoad(tsujidoRing.s, tsujidoKaigan, "coastal", "r_ts_s_kaigan", "辻堂海�
 
 const yuigahama = addJunction("wp_yuigahama", "由比ヶ浜", inamuragasaki.x - 100, inamuragasaki.y + 90);
 buildRoad(inamuragasaki, yuigahama, "coastal", "r_in_yui", "由比ヶ浜");
+
+// ============================================================
+// 「都市間の一本道」から「道路網」へ: まだ途中に分岐のなかった区間
+// (5〜8マスは超えていないが、区間の両端にしか分岐がなかった箇所)に、
+// 区間の真ん中あたりから短い枝道・合流をもう一段追加する。
+// これで幹線・行き来ルートのどの区間も「5〜8マス進むごとに必ずどこかで
+// 進路を選べる」状態になる。
+// ============================================================
+// 平塚⇄茅ヶ崎の中間 → 大神(実在地名)への短い枝道
+const oga = addJunction("wp_oga", "大神", pickMidFiller(hiratsuka, chigasaki).x, pickMidFiller(hiratsuka, chigasaki).y - 60);
+buildRoad(pickMidFiller(hiratsuka, chigasaki), oga, "residential", "r_hrcg_oga", "大神", 6);
+
+// 鵠沼⇄腰越の中間 → 片瀬海岸(実在地名)への短い枝道(意図した行き止まり)
+const katasekaigan = addJunction("wp_katase_kaigan", "片瀬海岸", pickMidFiller(kugenuma, koshigoe).x, pickMidFiller(kugenuma, koshigoe).y + 70);
+buildRoad(pickMidFiller(kugenuma, koshigoe), katasekaigan, "coastal", "r_kgks_katase", "片瀬海岸");
+
+// 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道
+const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x, pickMidFiller(shonandai, ofuna).y - 60);
+buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo", "善行", 6);
+
+// 北鎌倉⇄鎌倉(8マス、区間内で最長)の中間 → 鎌倉小路の北ゲートに合流させる。
+// 新しい行き止まりを作るのではなく、既存の環状路に合流させることで
+// 「鎌倉へ抜ける2本目のルート」として機能させる。
+buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.n, "residential", "r_kkkm_merge", "鎌倉小路", 6);
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
