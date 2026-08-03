@@ -94,6 +94,13 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *   (江の島大橋だけはまっすぐな橋のイメージで蛇行なし)。「ゲームのための道路」ではなく
  *   「街の中に道路がある」見た目を目標にしている。
  *
+ * ── 寒川⇄平塚「西側の近道」(今回追加) ──
+ *   寒川と平塚を直接つなぐルートを新設した(田村経由、roadType: shortcut)。
+ *   海沿いルート(平塚→茅ヶ崎→辻堂→藤沢)はそのまま維持し、これとは別に
+ *   内陸(寒川・湘南台方面)から直接平塚へ抜けられる選択肢を追加している。
+ *   途中に小さな輪を2箇所(田村小路・中原小路)作り、完全な一本道にはしていないが、
+ *   藤沢のような密な街区にはせず、郊外らしいシンプルな構成にとどめた。
+ *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
  *
@@ -260,6 +267,11 @@ const kamakura = addHub("hub_kamakura", "鎌倉", 1565, 802);
 // 道にわずかな蛇行(wobble)を入れている(海沿いの都会的な直線グリッドとの対比)。
 const samukawa = addHub("hub_samukawa", "寒川", 420, 200);
 const shonandai = addHub("hub_shonandai", "湘南台", 1080, 150);
+
+// 寒川⇄平塚を直接つなぐ「西側の近道」。海沿いルート(平塚→茅ヶ崎→辻堂→藤沢)は
+// そのまま残し、これとは別に内陸から直接平塚へ抜けられる選択肢を追加する。
+// 郊外らしいシンプルな構成にするため、藤沢のような密な街区にはしない。
+const tamura = addJunction("wp_tamura", "田村", 0, 200); // 寒川⇄平塚の曲がり角
 const ofuna = addJunction("wp_ofuna", "大船", 1320, 350); // 目的地候補ではなく経由地(内陸⇄海沿いの結節点)
 
 // 海沿い⇄内陸の行き来ポイント(4箇所)。完全な縦横グリッドに見えすぎないよう、
@@ -357,6 +369,23 @@ buildRoad(kajiwara, fujisawa, "main", "r_kj_fj", "梶原", 12);
 
 buildRoad(ofuna, kitakamakura, "main", "r_of_kk", "大船", 12);
 buildRoad(kitakamakura, kamakura, "main", "r_kk_km", "北鎌倉", 12);
+
+// ============================================================
+// 寒川⇄平塚「西側の近道」(2区間 + 分岐2箇所)。roadType: shortcut にして、
+// 海沿い幹線・内陸ルートとは別の選択肢だとひと目でわかるようにする(紫の破線)。
+// ============================================================
+buildRoad(samukawa, tamura, "shortcut", "r_sm_tm", "寒川", 10);
+buildRoad(tamura, hiratsuka, "shortcut", "r_tm_hr", "田村", 10);
+
+// 分岐1: 田村に小さな輪をひとつ(藤沢ほど密にせず、郊外らしい規模にとどめる)。
+smallLoop(tamura, 55, "tmlp", "田村小路", 1);
+
+// 分岐2: 田村⇄平塚の区間の途中(だいたい真ん中のマス)から、少し東へ入った所に
+// もう1箇所小さな輪(中原イメージ)を作る。
+const tamuraHiratsukaMid = pickMidFiller(tamura, hiratsuka);
+const nakahara = addJunction("wp_nakahara", "中原", tamuraHiratsukaMid.x + 70, tamuraHiratsukaMid.y);
+buildRoad(tamuraHiratsukaMid, nakahara, "shortcut", "r_tmhr_nk", "中原", 8);
+smallLoop(nakahara, 40, "nklp", "中原小路", 1);
 
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
