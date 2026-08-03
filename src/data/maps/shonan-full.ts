@@ -19,7 +19,7 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *   - 道路密度のメリハリ: smallLoop()で街ごとに小さな環状路を追加し、街の大きさ・
  *     ゲートの本数で密度を変えている。
  *       藤沢     ★★★★★  ロータリー(半径100・ゲート4)
- *       鎌倉     ★★★★☆  小さな環状路(半径75・ゲート2)
+ *       鎌倉     ★★★★☆  小さな環状路(半径90・ゲート3)
  *       茅ヶ崎   ★★★★☆  小さな環状路(半径75・ゲート2)
  *       辻堂     ★★★☆☆  小さな環状路(半径55・ゲート1)
  *       平塚     ★★★☆☆  小さな環状路(半径55・ゲート2、終着点で幹線側の接続が1本しかない分を補う)
@@ -29,6 +29,16 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *
  * 斜め道路は使わない(すべての道は buildRoad で結ぶ、縦横または前バージョンと同程度の
  * ごく緩やかな傾き)。道路が交わる場所はすべて実ノード=実際に移動可能な交差点。
+ *
+ * ── ゲーム性強化(今回追加) ──
+ *   - 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として、海沿いの幹線とは別に環状路どうしを直結する
+ *     「裏道」(residential)を通した。幹線を直進するか裏道を回るか選べる。
+ *   - 藤沢のロータリーの斜めの点(北東・南東)からも六会・梶原へ直接抜けられるようにし、
+ *     行き来ルートに「ロータリー経由」という別ルートを追加した。
+ *   - 鎌倉の環状路を強化(半径75→90、ゲート2→3)し、西側を稲村ヶ崎に直結する裏道も追加した。
+ *   - 茅ヶ崎⇄辻堂、辻堂⇄藤沢という長い一本道の途中(pickMidFillerで拾った区間の真ん中の
+ *     マス)から、内陸へ抜ける近道(shortcut)を2本追加した。海沿いを直進するか、
+ *     内陸へ抜けて別ルートを回るかの選択肢が生まれる。
  *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
@@ -95,6 +105,10 @@ function addJunction(id: string, name: string, x: number, y: number): Hub {
  * (「マス・道・マス」のリズム)。wobble:0で完全な直線にし、道路同士の絡まりを防ぐ。
  * plain:trueにより生成マスはすべて type: "normal"。拠点間の道の途中でフォーク&合流は作らない。
  */
+// 生成したマスの並び(a→bの順)を覚えておき、あとから「この区間のだいたい真ん中のマス」を
+// 拾って新しい短い道(近道)をつなげられるようにする(区間を二重に作り直さずに分岐を増やすため)。
+const chainCache = new Map<string, Hub[]>();
+
 function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const scale = 50;
@@ -108,14 +122,31 @@ function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: s
   );
   for (const n of spine.nodes) nodeSpecs.push({ id: n.id, name: n.name, type: n.type, area: n.area, x: n.x, y: n.y, propertyId: n.propertyId });
   for (const e of spine.edges) edgeSpecs.push(e);
+
+  const fillers: Hub[] = spine.nodes.map((n) => ({ id: n.id, name: n.name, x: n.x, y: n.y }));
+  chainCache.set([a.id, b.id].sort().join("__"), fillers);
+}
+
+/** a⇄b の区間(すでに buildRoad 済みであること)の、だいたい真ん中のマスを1つ拾う。 */
+function pickMidFiller(a: Hub, b: Hub): Hub {
+  const key = [a.id, b.id].sort().join("__");
+  const chain = chainCache.get(key);
+  if (!chain || chain.length === 0) return a;
+  return chain[Math.floor(chain.length / 2)];
+}
+
+interface LoopRing {
+  n: Hub; ne: Hub; e: Hub; se: Hub; s: Hub; sw: Hub; w: Hub; nw: Hub;
 }
 
 /**
  * hubのまわりに小さな環状路(8ノードの輪)を作り、東西南北のゲートを介して
  * hub自身とつなぐ(gates本、1〜4)。ゲートが多いほど分岐が増える=街の道路密度が上がる。
  * 藤沢の「ロータリー」もこの関数(radius:100, gates:4)で作っている。
+ * 戻り値の8点は、あとから他の街の環状路や幹線の途中(pickMidFiller)と直接つないで
+ * 「都市圏の中の複数ルート」「抜け道」を追加するのに使う。
  */
-function smallLoop(hub: Hub, radius: number, idPrefix: string, label: string, gates: number) {
+function smallLoop(hub: Hub, radius: number, idPrefix: string, label: string, gates: number): LoopRing {
   const n = addJunction(`${idPrefix}_n`, `${label}(北)`, hub.x, hub.y - radius);
   const ne = addJunction(`${idPrefix}_ne`, `${label}(北東)`, hub.x + radius, hub.y - radius);
   const e = addJunction(`${idPrefix}_e`, `${label}(東)`, hub.x + radius, hub.y);
@@ -132,6 +163,7 @@ function smallLoop(hub: Hub, radius: number, idPrefix: string, label: string, ga
   for (const g of gateNodes) {
     buildRoad(hub, g, "residential", `r_${idPrefix}_gate_${g.id}`, label);
   }
+  return { n, ne, e, se, s, sw, w, nw };
 }
 
 // ============================================================
@@ -215,12 +247,36 @@ buildRoad(kitakamakura, kamakura, "main", "r_kk_km", "北鎌倉");
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
 // ============================================================
-smallLoop(fujisawa, 100, "fjrt", "藤沢ロータリー", 4); // ★★★★★
-smallLoop(kamakura, 75, "kmlp", "鎌倉小路", 2); // ★★★★☆
-smallLoop(chigasaki, 75, "cglp", "茅ヶ崎小路", 2); // ★★★★☆
-smallLoop(tsujido, 55, "tslp", "辻堂小路", 1); // ★★★☆☆
+const fujisawaRing = smallLoop(fujisawa, 100, "fjrt", "藤沢ロータリー", 4); // ★★★★★
+const kamakuraRing = smallLoop(kamakura, 90, "kmlp", "鎌倉小路", 3); // ★★★★☆(ゲーム性強化で85→90・2→3に増強)
+const chigasakiRing = smallLoop(chigasaki, 75, "cglp", "茅ヶ崎小路", 2); // ★★★★☆
+const tsujidoRing = smallLoop(tsujido, 55, "tslp", "辻堂小路", 1); // ★★★☆☆
 smallLoop(hiratsuka, 55, "hrlp", "平塚小路", 2); // ★★★☆☆(終着点のため幹線側の接続が1本しかない分を補う)
 // 湘南台・寒川・江の島は環状路なし(湘南台は幹線2+行き来1で計3方向、寒川・江の島は計2方向)
+
+// ============================================================
+// ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
+// 藤沢をさらに分岐の多いハブにする、鎌倉周辺を強化する、
+// 長い一本道の途中に内陸へ抜ける近道を作る
+// ============================================================
+
+// 茅ヶ崎⇄辻堂、辻堂⇄藤沢: 海沿いの幹線とは別に、環状路どうしを直接つなぐ「裏道」を通す。
+// 幹線(coastal)を通るか、街なかの裏道(residential)を通るか、プレイヤーが選べるようになる。
+buildRoad(chigasakiRing.e, tsujidoRing.w, "residential", "r_local_cg_ts", "茅ヶ崎");
+buildRoad(tsujidoRing.e, fujisawaRing.w, "residential", "r_local_ts_fj", "辻堂");
+
+// 藤沢: ロータリーの斜めの点からも六会・梶原へ直接抜けられるようにし、
+// 「幹線→藤沢中心→行き来ルート」以外に「ロータリー経由」でも同じ場所へ行けるようにする。
+buildRoad(fujisawaRing.ne, rokkai, "residential", "r_fj_ne_rk", "藤沢ロータリー");
+buildRoad(fujisawaRing.se, kajiwara, "residential", "r_fj_se_kj", "藤沢ロータリー");
+
+// 鎌倉: 環状路の西側を稲村ヶ崎に直結し、稲村ヶ崎⇄鎌倉が海沿い幹線+この裏道の2ルートになる。
+buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路");
+
+// 長い一本道(茅ヶ崎⇄辻堂、辻堂⇄藤沢)の途中から、内陸ルートへ抜ける近道を2本追加。
+// 海沿いを直進するか、内陸へ抜けて別ルートを回るか、の選択肢が生まれる。
+buildRoad(pickMidFiller(chigasaki, tsujido), kagawa, "shortcut", "r_short_cgts_kg", "茅ヶ崎"); // 茅ヶ崎-辻堂の中間→香川(寒川方面)
+buildRoad(pickMidFiller(tsujido, fujisawa), rokkai, "shortcut", "r_short_tsfj_rk", "辻堂"); // 辻堂-藤沢の中間→六会(湘南台方面)
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
