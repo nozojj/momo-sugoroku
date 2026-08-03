@@ -23,6 +23,12 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  * これにより一本道の最長は約9マス(400px区間を中間点で2分割)。斜め道路は一切使わない。
  * 道路が交わる場所はすべて実ノード=実際に移動可能な交差点で、見た目だけの交差はない。
  *
+ * さらに、街区ひとつひとつを4つの四半区画(北西・北東・南東・南西)に分け、それぞれの
+ * 真ん中にも小さな交差点(quarterCenter)を追加している。既存の区間を作り直すのではなく、
+ * すでにできているマスの並びから「だいたい真ん中のマス」を1つ拾って、そこから新しい短い道を
+ * 追加でつなげる方式(pickMidFiller)なので、道路が二重に重なることはない。
+ * これにより、一本道の途中のかなり多くの場所で実際に4方向へ分岐できるようになっている。
+ *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
  */
@@ -80,6 +86,10 @@ function roadTypeFor(a: Hub, b: Hub): RoadType {
  * 道路同士の絡まりを防ぐ。plain:trueにより生成マスはすべて type: "normal"。
  * 拠点間の道の途中でフォーク&合流(自動生成の支線)は作らない。
  */
+// 生成したマスの並び(a→bの順)を覚えておき、あとから「この区間のだいたい真ん中のマス」を
+// 拾って新しい短い道をつなげられるようにする(区間を二重に作り直さずに分岐を増やすため)。
+const chainCache = new Map<string, Hub[]>();
+
 function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const scale = 60; // マス間隔(px)。大きいほどマス数が減り、マス同士のあいだに道路がはっきり見える間隔になる
@@ -93,6 +103,17 @@ function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: s
   );
   for (const n of spine.nodes) nodeSpecs.push({ id: n.id, name: n.name, type: n.type, area: n.area, x: n.x, y: n.y, propertyId: n.propertyId });
   for (const e of spine.edges) edgeSpecs.push(e);
+
+  const fillers: Hub[] = spine.nodes.map((n) => ({ id: n.id, name: n.name, x: n.x, y: n.y }));
+  chainCache.set([a.id, b.id].sort().join("__"), fillers);
+}
+
+/** a⇄b の区間(すでに buildRoad 済みであること)の、だいたい真ん中のマスを1つ拾う。 */
+function pickMidFiller(a: Hub, b: Hub): Hub {
+  const key = [a.id, b.id].sort().join("__");
+  const chain = chainCache.get(key);
+  if (!chain || chain.length === 0) return a;
+  return chain[Math.floor(chain.length / 2)];
 }
 
 // 街区の辺(2拠点間)を中間点で2分割してつなぐ。同じ辺は2つの街区から共有されうるので、
@@ -112,7 +133,31 @@ function midpoint(a: Hub, b: Hub): Hub {
   return mid;
 }
 
-/** 400px四方の街区ひとつ分。4辺の中間点を作り、街区中心から十字にスポークを通す。 */
+/**
+ * 4つの角(a,b,c,d を反時計/時計まわりに)のあいだに、すでにできている4つの辺
+ * (a⇄b, b⇄c, c⇄d, d⇄a のいずれもbuildRoad済み)を使って、真ん中に小さな十字の
+ * 交差点をもう1つ増やす。新しい区間を重ねて作らず、既存の区間の途中のマスから
+ * 短い道を追加でつなげるだけなので、道路が二重に重なることはない。
+ */
+function quarterCenter(a: Hub, b: Hub, c: Hub, d: Hub, id: string, name: string) {
+  const pa = pickMidFiller(a, b);
+  const pb = pickMidFiller(b, c);
+  const pc = pickMidFiller(c, d);
+  const pd = pickMidFiller(d, a);
+  const cx = (a.x + b.x + c.x + d.x) / 4;
+  const cy = (a.y + b.y + c.y + d.y) / 4;
+  const center = addJunction(id, name, cx, cy);
+  buildRoad(center, pa, roadTypeFor(center, pa), `r_${id}_a`, name);
+  buildRoad(center, pb, roadTypeFor(center, pb), `r_${id}_b`, name);
+  buildRoad(center, pc, roadTypeFor(center, pc), `r_${id}_c`, name);
+  buildRoad(center, pd, roadTypeFor(center, pd), `r_${id}_d`, name);
+}
+
+/**
+ * 400px四方の街区ひとつ分。4辺の中間点を作り、街区中心から十字にスポークを通す。
+ * さらに、できた4つの四半区画(北西・北東・南東・南西)それぞれの真ん中にも
+ * 小さな交差点を追加し(quarterCenter)、一本道の途中でも4方向に分岐できる場所を増やす。
+ */
 function block(nw: Hub, ne: Hub, se: Hub, sw: Hub, centerId: string, centerName: string) {
   const top = midpoint(nw, ne);
   const right = midpoint(ne, se);
@@ -125,6 +170,11 @@ function block(nw: Hub, ne: Hub, se: Hub, sw: Hub, centerId: string, centerName:
   buildRoad(center, right, roadTypeFor(center, right), `r_${centerId}_e`, centerName);
   buildRoad(center, bottom, roadTypeFor(center, bottom), `r_${centerId}_s`, centerName);
   buildRoad(center, left, roadTypeFor(center, left), `r_${centerId}_w`, centerName);
+
+  quarterCenter(nw, top, center, left, `${centerId}_nw`, `${centerName}(北西)`);
+  quarterCenter(top, ne, right, center, `${centerId}_ne`, `${centerName}(北東)`);
+  quarterCenter(center, right, se, bottom, `${centerId}_se`, `${centerName}(南東)`);
+  quarterCenter(left, center, bottom, sw, `${centerId}_sw`, `${centerName}(南西)`);
 }
 
 // ============================================================
