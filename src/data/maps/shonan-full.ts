@@ -92,8 +92,12 @@ const chainCache = new Map<string, Hub[]>();
 
 function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
-  const scale = 60; // マス間隔(px)。大きいほどマス数が減り、マス同士のあいだに道路がはっきり見える間隔になる
-  const spineCount = Math.max(3, Math.round(dist / scale));
+  // マス間隔(scale, px)を基準に「区間の長さ ÷ 間隔 - 1」でマス数を決める(マスの数ではなく、
+  // マスとマスのあいだの間隔そのものを揃える計算式)。区間が長くても短くても
+  // 「マス・道・マス」のリズム(ピッチ)が一定になる。quarterCenter() が作る短い区間
+  // (元の区間の半分程度)でも、この式なら間隔が詰まらない。
+  const scale = 50;
+  const spineCount = Math.max(1, Math.round(dist / scale) - 1);
 
   const spine = windingFiller(
     { id: a.id, x: a.x, y: a.y },
