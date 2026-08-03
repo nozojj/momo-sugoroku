@@ -185,29 +185,32 @@ function block(nw: Hub, ne: Hub, se: Hub, sw: Hub, centerId: string, centerName:
 // 拠点(5) + ウェイポイント(10) — 400px間隔のグリッドに配置
 // ============================================================
 
-const samukawa = addHub("hub_samukawa", "寒川", 0, 0);
-const yotsunomiya = addHub("wp_yotsunomiya", "四之宮", 400, 0);
+// 外周の一部拠点は基準座標から50〜130pxずらし、街区(400px四方)が積み木のように
+// 綺麗に並んだ「長方形が2つくっついた」見た目にならないようにしている。
+// 内部(街区どうしが辺を共有する角)はグリッドのまま動かしていない。
+const samukawa = addHub("hub_samukawa", "寒川", -60, -70); // 基準(0,0)から(-60,-70)。全体の北西の角を外側に
+const yotsunomiya = addHub("wp_yotsunomiya", "四之宮", 450, -60); // 基準(400,0)から(+50,-60)
 
 const kagawa = addHub("wp_kagawa", "香川", 0, 400);
 const hagizono = addHub("wp_hagizono", "萩園", 400, 400);
 
-const chigasaki = addHub("hub_chigasaki", "茅ヶ崎", 0, 800);
+const chigasaki = addHub("hub_chigasaki", "茅ヶ崎", -70, 850); // 基準(0,800)から(-70,+50)。縦の腕と横の腕の継ぎ目を崩す
 const tsujido = addHub("wp_tsujido", "辻堂", 400, 800);
 const fujisawa = addHub("hub_fujisawa", "藤沢", 800, 800, true);
-const kitakamakura = addHub("wp_kitakamakura", "北鎌倉", 1200, 800);
-const kamakura = addHub("hub_kamakura", "鎌倉", 1600, 800);
+const kitakamakura = addHub("wp_kitakamakura", "北鎌倉", 1200, 730); // 基準(1200,800)から(0,-70)。横の腕の上辺に緩いジグザグを
+const kamakura = addHub("hub_kamakura", "鎌倉", 1690, 740); // 基準(1600,800)から(+90,-60)。東の角を外側に
 
-const hatori = addHub("wp_hatori", "羽鳥", 400, 1200);
+const hatori = addHub("wp_hatori", "羽鳥", 350, 1170); // 基準(400,1200)から(-50,-30)
 const kugenuma = addHub("wp_kugenuma", "鵠沼", 800, 1200);
 const kajiwara = addHub("wp_kajiwara", "梶原", 1200, 1200);
-const inamuragasaki = addHub("wp_inamuragasaki", "稲村ヶ崎", 1600, 1200);
+const inamuragasaki = addHub("wp_inamuragasaki", "稲村ヶ崎", 1670, 1270); // 基準(1600,1200)から(+70,+70)。南東の角を外側に
 
-const enoshima = addHub("hub_enoshima", "江の島", 800, 1600);
-const koshigoe = addHub("wp_koshigoe", "腰越", 1200, 1600);
+const enoshima = addHub("hub_enoshima", "江の島", 750, 1690); // 基準(800,1600)から(-50,+90)。南の先端を外側に
+const koshigoe = addHub("wp_koshigoe", "腰越", 1160, 1680); // 基準(1200,1600)から(-40,+80)
 
 const decorations: MapDecoration[] = [
   { kind: "parkBlob", cx: 300, cy: 700, rx: 90, ry: 60 },
-  { kind: "sea", edge: "bottom", pos: 1680 },
+  { kind: "sea", edge: "bottom", pos: 1750 },
 ];
 
 // ============================================================
