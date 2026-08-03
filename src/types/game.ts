@@ -58,7 +58,10 @@ export type MapDecoration =
   | { kind: "river"; points: { x: number; y: number }[] }
   | { kind: "parkBlob"; cx: number; cy: number; rx: number; ry: number }
   | { kind: "texture"; variant: "houses" | "city"; x: number; y: number; width: number; height: number }
-  | { kind: "sea"; edge: "bottom" | "right"; pos: number };
+  | { kind: "sea"; edge: "bottom" | "right"; pos: number }
+  /** 点列を滑らかにつないだ曲線の海岸線。曲線の外側(pointsの並び順に対してside側)を海として塗る。
+   * 道路自体には影響しない見た目だけの背景装飾(道路は縦横グリッドのまま)。 */
+  | { kind: "coastline"; points: { x: number; y: number }[]; side: "south" };
 
 export interface MapData {
   id: string;

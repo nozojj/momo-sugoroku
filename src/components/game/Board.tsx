@@ -330,6 +330,21 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
       <rect x={-2000} y={deco.pos - minY} width={6000} height={5000} fill="#3fa9dd" opacity={0.85} />
     );
   }
+  if (deco.kind === "coastline") {
+    const points = deco.points.map((p) => ({ x: p.x - minX, y: p.y - minY }));
+    if (points.length === 0) return null;
+    const curveD = smoothPathThroughPoints(points);
+    const first = points[0];
+    const last = points[points.length - 1];
+    const farY = 6000; // 曲線から十分下(海側)まで塗りつぶす
+    const fillD = `${curveD} L${last.x},${farY} L${first.x},${farY} Z`;
+    return (
+      <g>
+        <path d={fillD} fill="#3fa9dd" opacity={0.85} />
+        <path d={curveD} fill="none" stroke="#ffffff" strokeWidth={2} strokeDasharray="2 12" opacity={0.6} />
+      </g>
+    );
+  }
   return null;
 }
 
