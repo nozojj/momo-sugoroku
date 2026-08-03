@@ -148,6 +148,13 @@ function addJunction(id: string, name: string, x: number, y: number): Hub {
  * マス数を決めるため、区間の長さに関わらずマスとマスの間隔(ピッチ)が一定になる
  * (「マス・道・マス」のリズム)。wobble:0で完全な直線にし、道路同士の絡まりを防ぐ。
  * plain:trueにより生成マスはすべて type: "normal"。拠点間の道の途中でフォーク&合流は作らない。
+ *
+ * マス数の下限は0(=マスを1つも挟まず、2点を直接1本の道でつなぐ)にしている。
+ * 昔は下限1だったため、半径の小さい環状路(小さな輪)の1辺のように区間そのものが
+ * 短い場合に、無理にマスを1つ詰め込んでしまい他の区間よりマス間隔が狭く見える
+ * 問題があった。下限を0にすることで、短い区間はマスなしの1本道になり、他の区間と
+ * 同じ「マス・道・マス」のピッチが保たれる。今後、環状路や近道を追加するときも
+ * この関数(buildRoad)を通して作ればこのルールが自動的に適用される。
  */
 // 生成したマスの並び(a→bの順)を覚えておき、あとから「この区間のだいたい真ん中のマス」を
 // 拾って新しい短い道(近道)をつなげられるようにする(区間を二重に作り直さずに分岐を増やすため)。
@@ -156,7 +163,7 @@ const chainCache = new Map<string, Hub[]>();
 function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: string, wobble: number = 0) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const scale = 50;
-  const spineCount = Math.max(1, Math.round(dist / scale) - 1);
+  const spineCount = Math.max(0, Math.round(dist / scale) - 1);
 
   const spine = windingFiller(
     { id: a.id, x: a.x, y: a.y },
