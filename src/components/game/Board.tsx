@@ -142,6 +142,16 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                 <rect x="3" y="4" width="9" height="22" rx="1.5" fill="#c98fa0" opacity="0.35" />
                 <rect x="16" y="10" width="10" height="16" rx="1.5" fill="#c98fa0" opacity="0.28" />
               </pattern>
+              <pattern id="board-forest" width="34" height="34" patternUnits="userSpaceOnUse">
+                <circle cx="8" cy="10" r="6" fill="#2f6b47" opacity="0.55" />
+                <circle cx="24" cy="6" r="5" fill="#2f6b47" opacity="0.45" />
+                <circle cx="18" cy="22" r="7" fill="#2f6b47" opacity="0.5" />
+                <circle cx="30" cy="26" r="5" fill="#2f6b47" opacity="0.4" />
+              </pattern>
+              <pattern id="board-farmland" width="40" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(8)">
+                <rect width="40" height="16" fill="none" />
+                <rect y="0" width="40" height="7" fill="#c2b978" opacity="0.4" />
+              </pattern>
             </defs>
 
             {/* 背景装飾 */}
@@ -309,6 +319,29 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
         opacity={0.3}
         filter="url(#board-soft)"
       />
+    );
+  }
+  if (deco.kind === "terrain") {
+    const cx = deco.cx - minX;
+    const cy = deco.cy - minY;
+    const rotation = deco.rotation ?? 0;
+    if (deco.variant === "hills") {
+      // 少しずつずらした3つの楕円を重ね、なだらかな丘の輪郭に見せる
+      return (
+        <g opacity={0.5} filter="url(#board-soft)">
+          <ellipse cx={cx - deco.rx * 0.35} cy={cy + deco.ry * 0.15} rx={deco.rx * 0.7} ry={deco.ry * 0.55} fill="#8a9a5b" />
+          <ellipse cx={cx + deco.rx * 0.3} cy={cy + deco.ry * 0.2} rx={deco.rx * 0.6} ry={deco.ry * 0.5} fill="#7d8f52" />
+          <ellipse cx={cx} cy={cy} rx={deco.rx} ry={deco.ry} fill="#8fa363" />
+        </g>
+      );
+    }
+    const fill = deco.variant === "forest" ? "url(#board-forest)" : "url(#board-farmland)";
+    const baseFill = deco.variant === "forest" ? "#e3efe2" : "#f1ecd5";
+    return (
+      <g opacity={0.8} transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}>
+        <ellipse cx={cx} cy={cy} rx={deco.rx} ry={deco.ry} fill={baseFill} />
+        <ellipse cx={cx} cy={cy} rx={deco.rx} ry={deco.ry} fill={fill} />
+      </g>
     );
   }
   if (deco.kind === "texture") {

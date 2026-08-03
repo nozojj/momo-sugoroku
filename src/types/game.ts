@@ -61,7 +61,12 @@ export type MapDecoration =
   | { kind: "sea"; edge: "bottom" | "right"; pos: number }
   /** 点列を滑らかにつないだ曲線の海岸線。曲線の外側(pointsの並び順に対してside側)を海として塗る。
    * 道路自体には影響しない見た目だけの背景装飾(道路は縦横グリッドのまま)。 */
-  | { kind: "coastline"; points: { x: number; y: number }[]; side: "south" };
+  | { kind: "coastline"; points: { x: number; y: number }[]; side: "south" }
+  /** 道路のない空白エリアを「何もない」ではなく「地形」として見せるための背景装飾。
+   * forest=森、farmland=農地、hills=丘陵。parkBlobと同じ楕円形だが、種類ごとに
+   * 色・質感を変える。道路配置には影響しない(空白を埋めるための地形であって、
+   * 道路がこの上を通ってもよい/避けてもよい、あくまで背景)。 */
+  | { kind: "terrain"; variant: "forest" | "farmland" | "hills"; cx: number; cy: number; rx: number; ry: number; rotation?: number };
 
 export interface MapData {
   id: string;

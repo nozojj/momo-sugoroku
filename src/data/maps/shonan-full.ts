@@ -84,6 +84,16 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  *     addHubではなくaddJunctionに変更し、地図上には存在するが目的地には選ばれないように
  *     した(ゲームとしての分かりやすさを優先)。
  *
+ * ── 空白を地形で埋める(今回追加、道路構造はほぼ変更なし) ──
+ *   道路網の内側・外側にできる大きな空白を、道路を足して埋めるのではなく「地形エリア」
+ *   として扱った。MapDecorationに新しい種類"terrain"(variant: forest/farmland/hills)を
+ *   追加し、内陸ルートと海沿いの街のあいだの空白に丘陵を2箇所、寒川・北鎌倉まわりに森、
+ *   平塚まわりに農地を配置。あわせて引地川・相模川イメージの川(river)も2本追加した。
+ *   さらに、海沿いの幹線(平塚〜鎌倉)にごく軽い蛇行(wobble:8〜10)を入れ、地形を避けて
+ *   自然に通っているような、四角い折れ線ではなくゆるく曲がる輪郭にした
+ *   (江の島大橋だけはまっすぐな橋のイメージで蛇行なし)。「ゲームのための道路」ではなく
+ *   「街の中に道路がある」見た目を目標にしている。
+ *
  * このマップは「マスと移動の土台」のみを対象とし、money/card/property/eventの抽選は行わない
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
  *
@@ -259,8 +269,42 @@ const rokkai = addJunction("wp_rokkai", "六会", 1055, 420); // 湘南台⇄藤
 const kajiwara = addJunction("wp_kajiwara", "梶原", 1345, 630); // 大船⇄藤沢
 const kitakamakura = addJunction("wp_kitakamakura", "北鎌倉", 1540, 370); // 大船⇄鎌倉
 
+// 道路網の外側・内側にできる大きな空白を「何もない」ではなく「地形」として埋める。
+// 空白そのものを道路で埋めるのではなく、森・農地・丘陵・河川の背景を配置して、
+// 「道路が地形を避けて自然に通っている」ように見せる。道路データ自体は変更していない。
 const decorations: MapDecoration[] = [
   { kind: "parkBlob", cx: 770, cy: 820, rx: 70, ry: 45 }, // 辻堂海浜公園イメージ
+  // 内陸ルート(寒川・湘南台・大船)と海沿いの街(茅ヶ崎・辻堂・藤沢)のあいだの大きな空白 → 丘陵
+  { kind: "terrain", variant: "hills", cx: 720, cy: 430, rx: 190, ry: 140 },
+  // 大船・北鎌倉と鎌倉・稲村ヶ崎のあいだの空白(鎌倉アルプス・大船丘陵のイメージ) → 丘陵
+  { kind: "terrain", variant: "hills", cx: 1300, cy: 560, rx: 150, ry: 115 },
+  // 寒川の西側 → 森
+  { kind: "terrain", variant: "forest", cx: 220, cy: 300, rx: 95, ry: 75, rotation: -8 },
+  // 北鎌倉まわり(実際に寺社の緑が多いエリア) → 森
+  { kind: "terrain", variant: "forest", cx: 1470, cy: 470, rx: 75, ry: 95, rotation: 12 },
+  // 平塚まわり(実際に田畑が広がるエリア) → 農地
+  { kind: "terrain", variant: "farmland", cx: 130, cy: 850, rx: 105, ry: 65, rotation: -10 },
+  // 引地川イメージ(内陸から藤沢・辻堂方面の海へ流れる川)
+  {
+    kind: "river",
+    points: [
+      { x: 760, y: 160 },
+      { x: 730, y: 340 },
+      { x: 755, y: 520 },
+      { x: 800, y: 680 },
+      { x: 830, y: 850 },
+    ],
+  },
+  // 相模川イメージ(寒川・平塚の西側を流れる川)
+  {
+    kind: "river",
+    points: [
+      { x: 180, y: 120 },
+      { x: 210, y: 350 },
+      { x: 240, y: 560 },
+      { x: 270, y: 780 },
+    ],
+  },
   {
     kind: "coastline",
     side: "south",
@@ -278,18 +322,19 @@ const decorations: MapDecoration[] = [
 ];
 
 // ============================================================
-// 海沿いの幹線(8区間)
+// 海沿いの幹線(8区間)。地形(丘陵・海岸線)を避けて自然に通っているように見せるため、
+// 軽い蛇行(wobble:10)を入れ、四角い折れ線ではなくゆるく曲がる輪郭にしている。
 // ============================================================
-buildRoad(hiratsuka, chigasaki, "coastal", "r_hr_cg", "平塚");
-buildRoad(chigasaki, tsujido, "coastal", "r_cg_ts", "茅ヶ崎");
-buildRoad(tsujido, fujisawa, "coastal", "r_ts_fj", "辻堂");
-buildRoad(fujisawa, kugenuma, "coastal", "r_fj_kg", "藤沢");
+buildRoad(hiratsuka, chigasaki, "coastal", "r_hr_cg", "平塚", 10);
+buildRoad(chigasaki, tsujido, "coastal", "r_cg_ts", "茅ヶ崎", 10);
+buildRoad(tsujido, fujisawa, "coastal", "r_ts_fj", "辻堂", 10);
+buildRoad(fujisawa, kugenuma, "coastal", "r_fj_kg", "藤沢", 8);
 // 江の島は海沿い幹線の通過点にせず、鵠沼から橋(roadType: national、太い道路として描かれる)
 // を渡った先の行き止まりの島にする。幹線そのものは鵠沼から直接 腰越 へ抜ける。
-buildRoad(kugenuma, enoshima, "national", "r_kg_en_bridge", "江の島大橋"); // 江の島大橋(橋)
-buildRoad(kugenuma, koshigoe, "coastal", "r_kg_ks", "鵠沼");
-buildRoad(koshigoe, inamuragasaki, "coastal", "r_ks_in", "腰越");
-buildRoad(inamuragasaki, kamakura, "coastal", "r_in_km", "稲村ヶ崎");
+buildRoad(kugenuma, enoshima, "national", "r_kg_en_bridge", "江の島大橋"); // 江の島大橋(橋、蛇行なし=まっすぐな橋)
+buildRoad(kugenuma, koshigoe, "coastal", "r_kg_ks", "鵠沼", 10);
+buildRoad(koshigoe, inamuragasaki, "coastal", "r_ks_in", "腰越", 10);
+buildRoad(inamuragasaki, kamakura, "coastal", "r_in_km", "稲村ヶ崎", 10);
 
 // ============================================================
 // 内陸ルート(2区間)。海沿いの都会的な直線グリッドと対比させ、のどかな内陸らしく
