@@ -630,6 +630,35 @@ buildRoad(kitaJutakuJct, dansuiCenterMid, "residential", "r_kitacross_down_mid",
 buildRoad(kitaCrossBend2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.3), "residential", "r_kitacross_down_e", "北の横断路");
 
 // ============================================================
+// 外周通り(寒川外周通り⇄湘南台外周通り、特に外周通り北⇄湘南台外周通りの660px区間)が
+// まだ完全な一本道だったため、その途中2箇所から分岐を増やす。
+// 各分岐は「北の横断路へ降りる」「小さな住宅街へ寄り道する」の2択を持ち、
+// 一方は北の横断路を経由せず中央住宅街まで直接つながる、外周⇄中央の横断路そのものにする。
+// ============================================================
+const outerBranch1 = pickFillerAt(dansuiOuterBend, dansuiOuterE, 0.33);
+buildRoad(outerBranch1, kitaCrossBend1, "residential", "r_outer_branch1_down", "北の横断路");
+// 分岐先1: 小さな格子状の住宅街(寒川台)。
+const sagamidaiNw = addJunction("bsmesh2_nw", "寒川台(北西)", 620, -75);
+const sagamidaiNe = addJunction("bsmesh2_ne", "寒川台(北東)", 660, -75);
+const sagamidaiSw = addJunction("bsmesh2_sw", "寒川台(南西)", 620, -40);
+const sagamidaiSe = addJunction("bsmesh2_se", "寒川台(南東)", 660, -40);
+buildRoad(sagamidaiNw, sagamidaiNe, "residential", "r_sagamidai_row1", "寒川台");
+buildRoad(sagamidaiSw, sagamidaiSe, "residential", "r_sagamidai_row2", "寒川台");
+buildRoad(sagamidaiNw, sagamidaiSw, "residential", "r_sagamidai_col1", "寒川台");
+buildRoad(sagamidaiNe, sagamidaiSe, "residential", "r_sagamidai_col2", "寒川台");
+buildRoad(outerBranch1, sagamidaiSw, "residential", "r_outer_branch1_sagamidai", "寒川台");
+
+// 外周⇄中央の横断路そのもの(北の横断路を経由しない直通の降り口)。
+// 北の横断路(kitaCrossBend2まわり)と重ならないよう、外周通りのさらに東寄りの点から
+// 中央住宅街⇄湘南台ロータリー間の道の東寄りへ直接つなぐ。
+const outerBranch2 = pickFillerAt(dansuiOuterBend, dansuiOuterE, 0.85);
+buildRoad(outerBranch2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.9), "residential", "r_outer_branch2_center", "外周中央横断路");
+// 分岐先2: 小さな輪の住宅街(用田)。
+const yodaJct = addJunction("wp_yoda", "用田入口", outerBranch2.x, outerBranch2.y - 55);
+buildRoad(outerBranch2, yodaJct, "residential", "r_outer_branch2_yoda", "用田");
+smallLoop(yodaJct, 24, "ydlp", "用田住宅街", 1);
+
+// ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
 // 藤沢をさらに分岐の多いハブにする、鎌倉周辺を強化する、
 // 長い一本道の途中に内陸へ抜ける近道を作る
