@@ -432,7 +432,21 @@ smallLoop(tamuraKado, 30, "tmlp", "田村小路", 1);
 const tamuraHiratsukaMid = pickMidFiller(tamura, hiratsuka);
 const nakahara = addJunction("wp_nakahara", "中原", tamuraHiratsukaMid.x + 70, tamuraHiratsukaMid.y);
 buildRoad(tamuraHiratsukaMid, nakahara, "shortcut", "r_tmhr_nk", "中原");
-smallLoop(nakahara, 40, "nklp", "中原小路", 1);
+const nakaharaRing = smallLoop(nakahara, 40, "nklp", "中原小路", 1);
+// 600マス化・第6弾(残りエリア): 中原小路の東点から、もう1つ小さな輪(田村ヶ丘イメージ)。
+const tamuragaoka = addJunction("wp_tamuragaoka", "田村ヶ丘入口", nakaharaRing.e.x + 55, nakaharaRing.e.y + 25);
+buildRoad(nakaharaRing.e, tamuragaoka, "residential", "r_nklp_tamuragaoka", "田村ヶ丘");
+smallLoop(tamuragaoka, 25, "tmgo", "田村ヶ丘", 1);
+
+// 寒川: これまで環状路が1つもなかった(幹線2+行き来1の計3方向のみ)ため、
+// 北側の空いた方角に湘南台と同じ手法(衛星型ロータリー+住宅街)で追加する。
+// 大神は寒川エリアの一部として扱い、独立した輪は作らない。
+const samukawaKita = addJunction("wp_samukawa_kita", "寒川ロータリー入口", samukawa.x + 20, samukawa.y - 60);
+buildRoad(samukawa, samukawaKita, "residential", "r_sm_kita", "寒川ロータリー");
+const smrtRing = smallLoop(samukawaKita, 30, "smrt", "寒川ロータリー", 1);
+const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 30, smrtRing.e.y - 105);
+buildRoad(smrtRing.e, smResidential, "residential", "r_sm_residential", "寒川住宅街");
+smallLoop(smResidential, 24, "smrs", "寒川住宅街", 1);
 
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
@@ -487,6 +501,19 @@ const cgChuo = addJunction("wp_cg_chuo", "茅ヶ崎中央入口", chigasakiRing.
 buildRoad(chigasakiRing.w, cgChuo, "residential", "r_cg_w_chuo", "茅ヶ崎中央");
 smallLoop(cgChuo, 25, "cgcyu", "茅ヶ崎中央", 1);
 const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, ["n", "nw"]); // ★★★☆☆
+
+// 辻堂: 600マス化・第6弾。実際の幹線・行き来ルートが西(茅ヶ崎)・東(藤沢方面、
+// 裏道・近道含む)・南(辻堂海岸)・北(茅ヶ崎住宅街への裏道)を使っているため、
+// まだ空いている北東の点から衛星区画を作る。
+// 北東(藤沢本町・辻堂緑ヶ浜案①)・東(藤沢住宅街メッシュ)はどちらも他区画と
+// 近すぎるため、南西点から茅ヶ崎方面の空き地へ衛星区画を作る。
+const tsShop = addJunction("wp_ts_shop", "辻堂海浜商店街入口", tsujidoRing.sw.x - 50, tsujidoRing.sw.y + 20);
+buildRoad(tsujidoRing.sw, tsShop, "residential", "r_ts_sw_shop", "辻堂海浜商店街");
+const tsShopRing = smallLoop(tsShop, 26, "tssp", "辻堂海浜商店街", 1);
+// 商店街からさらに1本、小さな輪(辻堂緑ヶ浜イメージ)を足す。
+const tsMidori = addJunction("wp_ts_midori", "辻堂緑ヶ浜入口", tsShopRing.s.x, tsShopRing.s.y + 50);
+buildRoad(tsShopRing.s, tsMidori, "residential", "r_tssp_midori", "辻堂緑ヶ浜");
+smallLoop(tsMidori, 24, "tsmd", "辻堂緑ヶ浜", 1);
 // 茅ヶ崎住宅街メッシュから辻堂ロータリーの北西ゲートへ抜ける裏道(海沿い幹線・
 // 裏道(r_local_cg_ts)のどちらとも通らない北側のルート)。
 buildRoad(cgmNe, tsujidoRing.n, "residential", "r_cgmesh_tsujido", "茅ヶ崎住宅街");
@@ -527,7 +554,16 @@ buildRoad(hrmNe, hrmSe, "residential", "r_hrmesh_col3", "平塚住宅街");
 buildRoad(hiratsukaRing.se, hrmNw, "residential", "r_hr_se_mesh", "平塚住宅街");
 buildRoad(hrmSw, hiratsukaRing.s, "shortcut", "r_hrmesh_hrring_s", "平塚住宅街");
 // 江の島: 橋を渡った先の島の中の小さな参道(仲見世通りイメージ)。行き止まりの小さな輪。
-smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
+const enlpRing = smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
+// 600マス化・第6弾: 参道の輪から、島の別の場所(展望灯台・稚児ヶ淵イメージ)へ
+// 2本の小さな輪を足す。江の島は行き止まりの島なので、島の中でも通り方を
+// 選べるようにする。
+const enCandle = addJunction("wp_en_candle", "江の島シーキャンドル入口", enlpRing.n.x - 160, enlpRing.n.y + 35);
+buildRoad(enlpRing.n, enCandle, "residential", "r_enlp_candle", "江の島シーキャンドル通り");
+smallLoop(enCandle, 24, "encd", "江の島シーキャンドル通り", 1);
+const enChigo = addJunction("wp_en_chigo", "稚児ヶ淵入口", enlpRing.s.x, enlpRing.s.y + 55);
+buildRoad(enlpRing.s, enChigo, "coastal", "r_enlp_chigo", "稚児ヶ淵");
+smallLoop(enChigo, 24, "encg", "稚児ヶ淵", 1);
 
 // ============================================================
 // 湘南台: 600マス化・第3弾。これまで環状路が1つもなく、寒川・六会・大船の3方向が
@@ -743,6 +779,9 @@ buildRoad(pickMidFiller(hiratsuka, chigasaki), oga, "residential", "r_hrcg_oga",
 // 鵠沼⇄腰越の中間 → 片瀬海岸(実在地名)への短い枝道(意図した行き止まり)
 const katasekaigan = addJunction("wp_katase_kaigan", "片瀬海岸", pickMidFiller(kugenuma, koshigoe).x, pickMidFiller(kugenuma, koshigoe).y + 70);
 buildRoad(pickMidFiller(kugenuma, koshigoe), katasekaigan, "coastal", "r_kgks_katase", "片瀬海岸");
+// 600マス化・第6弾: 片瀬海岸は行き止まりの1マスだけだったため、小さな輪だけ追加する
+// (他の小地名と違い、水族館の想定地として指定されているため独立した輪にする)。
+smallLoop(katasekaigan, 24, "ktlp", "片瀬海岸通り", 1);
 
 // 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道
 const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x, pickMidFiller(shonandai, ofuna).y - 60);
