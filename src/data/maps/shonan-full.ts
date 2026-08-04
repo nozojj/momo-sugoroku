@@ -750,6 +750,9 @@ buildRoad(chigasakiRing.s, chigasakiKaigan, "coastal", "r_cg_s_kaigan", "茅ヶ�
 const chigasakiKaiganOku = addJunction("wp_chigasaki_kaigan_oku", "茅ヶ崎海岸奥", chigasakiKaigan.x, chigasakiKaigan.y + 45);
 buildRoad(chigasakiKaigan, chigasakiKaiganOku, "coastal", "r_cg_kaigan_oku", "茅ヶ崎海岸通り");
 smallLoop(chigasakiKaiganOku, 25, "cgklp", "茅ヶ崎海岸通り", 1);
+// 600マス化・第7弾(全体接続調整): 辻堂海浜商店街(南西の衛星区画)と茅ヶ崎海岸奥を
+// 直結し、海沿いの寄り道どうしを、幹線・ロータリーへ戻らずに移動できるようにする。
+buildRoad(tsShop, chigasakiKaiganOku, "shortcut", "r_ts_shop_cg_kaigan", "海沿い裏道");
 
 const tsujidoKaigan = addJunction("wp_tsujido_kaigan", "辻堂海岸", tsujido.x, tsujido.y + 150);
 buildRoad(tsujidoRing.s, tsujidoKaigan, "coastal", "r_ts_s_kaigan", "辻堂海岸");
