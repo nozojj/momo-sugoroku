@@ -490,6 +490,58 @@ const fujisawaKitaguchi = addJunction("wp_fj_kitaguchi", "藤沢北口", fujisaw
 buildRoad(fujisawaRing.ne, fujisawaKitaguchi, "residential", "r_fj_ne_kitaguchi", "藤沢北口");
 smallLoop(fujisawaKitaguchi, 50, "fjkt", "藤沢北口通り", 1, 70);
 
+// ============================================================
+// 藤沢: 街の中の選択肢を増やす拡張(600マス化・第1弾)。
+// ロータリーのうち、まだ何も生やしていない4点(北・東・南・西)から、それぞれ性格の
+// 違う衛星区画を1つずつ足す。北口と同じ「衛星型」(hubを中心にした同心円は作らない)
+// を徹底し、隣接する既存の道路・環状路とは60px以上離す。
+// ============================================================
+// 北: 商店街(藤沢名店街) — 小町通りと同じく2回曲がってから小さな輪に着く構成。
+const fjMeitenEnt = addJunction("wp_fj_meiten_ent", "藤沢名店街入口", fujisawaRing.n.x, fujisawaRing.n.y - 55);
+buildRoad(fujisawaRing.n, fjMeitenEnt, "residential", "r_fj_n_meiten1", "藤沢名店街");
+const fjMeitenNaka = addJunction("wp_fj_meiten_naka", "藤沢名店街仲通り", fjMeitenEnt.x - 90, fjMeitenEnt.y - 60);
+buildRoad(fjMeitenEnt, fjMeitenNaka, "residential", "r_fj_n_meiten2", "藤沢名店街");
+const fjMeitenOku = addJunction("wp_fj_meiten_oku", "藤沢名店街奥", fjMeitenNaka.x - 90, fjMeitenNaka.y - 15);
+buildRoad(fjMeitenNaka, fjMeitenOku, "residential", "r_fj_n_meiten3", "藤沢名店街");
+const fjMeitenRing = smallLoop(fjMeitenOku, 20, "fjmt", "藤沢名店街", 1);
+
+// 西: 藤沢本町(実在地名、老舗和菓子屋の想定地) — 名店街の輪からさらに南へ1本入った
+// 衛星の輪にする。ロータリー西点から直結すると寒川方面への近道(r_short_tsfj_rk)の
+// マスとほぼ重なってしまうため、ロータリーへの直結はあきらめ、名店街経由の1本道にした。
+const fjHonmachi = addJunction("wp_fj_honmachi", "藤沢本町", fjMeitenRing.s.x - 40, fjMeitenRing.s.y + 58);
+buildRoad(fjMeitenRing.s, fjHonmachi, "residential", "r_fj_meiten_honmachi", "藤沢本町");
+smallLoop(fjHonmachi, 30, "fjhm", "藤沢本町通り", 1);
+
+// 東: 藤沢東口 — 北口の対になる衛星の輪。梶原方面の2本の道(藤沢⇄梶原・ロータリー南東
+// ゲート⇄梶原)、鵠沼⇄腰越の海沿い幹線のどれとも重ならない隙間(ロータリー南東ゲートの
+// すぐ南)に、小さめの円形の輪として置く。
+const fjHigashiguchi = addJunction("wp_fj_higashiguchi", "藤沢東口", fujisawaRing.se.x + 80, fujisawaRing.se.y + 45);
+buildRoad(fujisawaRing.se, fjHigashiguchi, "residential", "r_fj_se_higashiguchi", "藤沢東口");
+smallLoop(fjHigashiguchi, 45, "fjhg", "藤沢東口通り", 1);
+
+// 南: 住宅街メッシュ — 単純な輪ではなく3列×2行の格子にし、格子の中でも道を選べるようにする。
+// 辻堂⇄藤沢の裏道(r_local2_ts_fj)より南、鵠沼への幹線より西の隙間に置き、
+// 入口をロータリー南西点、出口を鵠沼方面の幹線の途中への近道にすることで、
+// 「ロータリーを回らずに鵠沼側へ抜ける裏ルート」として機能させる。
+const fjmNw = addJunction("fjmesh_nw", "藤沢住宅街(北西)", 890, 815);
+const fjmN = addJunction("fjmesh_n", "藤沢住宅街(北)", 970, 815);
+const fjmNe = addJunction("fjmesh_ne", "藤沢住宅街(北東)", 1050, 815);
+const fjmSw = addJunction("fjmesh_sw", "藤沢住宅街(南西)", 890, 865);
+const fjmS = addJunction("fjmesh_s", "藤沢住宅街(南)", 970, 865);
+const fjmSe = addJunction("fjmesh_se", "藤沢住宅街(南東)", 1050, 865);
+buildRoad(fjmNw, fjmN, "residential", "r_fjmesh_row1a", "藤沢住宅街");
+buildRoad(fjmN, fjmNe, "residential", "r_fjmesh_row1b", "藤沢住宅街");
+buildRoad(fjmSw, fjmS, "residential", "r_fjmesh_row2a", "藤沢住宅街");
+buildRoad(fjmS, fjmSe, "residential", "r_fjmesh_row2b", "藤沢住宅街");
+buildRoad(fjmNw, fjmSw, "residential", "r_fjmesh_col1", "藤沢住宅街");
+buildRoad(fjmN, fjmS, "residential", "r_fjmesh_col2", "藤沢住宅街");
+buildRoad(fjmNe, fjmSe, "residential", "r_fjmesh_col3", "藤沢住宅街");
+buildRoad(fujisawaRing.sw, fjmNe, "residential", "r_fj_sw_mesh", "藤沢住宅街");
+// 出口はロータリー南西点(sw)からの入口とは別に、北西の角(nw)からロータリー南点(s)へ
+// 直接抜ける近道にする。格子を斜めに横切る形になるので、sw⇄nw⇄sで回るか、
+// nwから直接sへ抜けるかの選択が生まれる。
+buildRoad(fjmNw, fujisawaRing.s, "shortcut", "r_fj_mesh_exit", "藤沢住宅街");
+
 // 鎌倉: 環状路の西側を稲村ヶ崎に直結し、稲村ヶ崎⇄鎌倉が海沿い幹線+この裏道の2ルートになる。
 buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路");
 
