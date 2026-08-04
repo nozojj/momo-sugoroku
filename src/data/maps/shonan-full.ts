@@ -458,6 +458,39 @@ const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, ["n
 // 平塚: 西側最大の都市として、環状路を鎌倉・茅ヶ崎と同格まで拡大する。
 // 実際の幹線が東(茅ヶ崎)・北(田村)を使っているため、ゲートは南〜西寄り3点にする。
 const hiratsukaRing = smallLoop(hiratsuka, 85, "hrlp", "平塚小路", 3, 70, 0, ["s", "sw", "w"]); // ★★★★☆(西側最大都市)
+
+// ============================================================
+// 平塚: 600マス化・第4弾。実際の幹線が東(茅ヶ崎)・北(田村)を使っているため、
+// 北東の点(ne)から離して衛星区画を作る(茅ヶ崎方面の道・田村方面の道のどちらとも
+// 十分離れている)。
+// ============================================================
+const hrShop = addJunction("wp_hr_shop", "平塚銀座入口", hiratsukaRing.ne.x + 50, hiratsukaRing.ne.y - 40);
+buildRoad(hiratsukaRing.ne, hrShop, "residential", "r_hr_ne_shop", "平塚銀座");
+const hrShopRing = smallLoop(hrShop, 28, "hrsp", "平塚銀座", 1);
+
+// 平塚: 銀座の輪からさらに1本、小さな輪(桜ヶ丘イメージ)を足す。
+const hrSakura = addJunction("wp_hr_sakura", "平塚桜ヶ丘入口", hrShopRing.e.x + 60, hrShopRing.e.y + 20);
+buildRoad(hrShopRing.e, hrSakura, "residential", "r_hrsp_sakura", "平塚桜ヶ丘");
+smallLoop(hrSakura, 25, "hrsk", "平塚桜ヶ丘", 1);
+
+// 平塚: 住宅街メッシュ — ロータリー南東点から南側の空き地(農地の裏手)へ
+// 3列×2行の格子を作る。出口をロータリー南点へ直結し、格子内でも通り方を選べる
+// うえに、ロータリーを回らずに南側へ抜けられる裏ルートにする。
+const hrmNw = addJunction("hrmesh_nw", "平塚住宅街(北西)", 60, 830);
+const hrmN = addJunction("hrmesh_n", "平塚住宅街(北)", 130, 830);
+const hrmNe = addJunction("hrmesh_ne", "平塚住宅街(北東)", 200, 830);
+const hrmSw = addJunction("hrmesh_sw", "平塚住宅街(南西)", 60, 880);
+const hrmS = addJunction("hrmesh_s", "平塚住宅街(南)", 130, 880);
+const hrmSe = addJunction("hrmesh_se", "平塚住宅街(南東)", 200, 880);
+buildRoad(hrmNw, hrmN, "residential", "r_hrmesh_row1a", "平塚住宅街");
+buildRoad(hrmN, hrmNe, "residential", "r_hrmesh_row1b", "平塚住宅街");
+buildRoad(hrmSw, hrmS, "residential", "r_hrmesh_row2a", "平塚住宅街");
+buildRoad(hrmS, hrmSe, "residential", "r_hrmesh_row2b", "平塚住宅街");
+buildRoad(hrmNw, hrmSw, "residential", "r_hrmesh_col1", "平塚住宅街");
+buildRoad(hrmN, hrmS, "residential", "r_hrmesh_col2", "平塚住宅街");
+buildRoad(hrmNe, hrmSe, "residential", "r_hrmesh_col3", "平塚住宅街");
+buildRoad(hiratsukaRing.se, hrmNw, "residential", "r_hr_se_mesh", "平塚住宅街");
+buildRoad(hrmSw, hiratsukaRing.s, "shortcut", "r_hrmesh_hrring_s", "平塚住宅街");
 // 江の島: 橋を渡った先の島の中の小さな参道(仲見世通りイメージ)。行き止まりの小さな輪。
 smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
 
