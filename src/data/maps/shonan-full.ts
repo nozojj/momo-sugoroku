@@ -592,42 +592,50 @@ buildRoad(scResRing.s, rokkai, "shortcut", "r_sc_res_rokkai", "湘南台住宅�
 // 「街区の中に選択肢を作る」ことで行う)。
 // ============================================================
 
-// 四之宮: 寒川寄りの街区。寒川ロータリーの北東点から幹線道路で直結する。
-// 直通路(r_sm_sc)・その途中の近道群がy150〜200の帯を通っているため、
-// ゲートは西・東(幹線)のみにし、商店街・住宅街メッシュはどちらも
-// 北側(斜めのne/nw)から、さらに北へ離して置く。
-const shinomiyaTownJct = addJunction("wp_shinomiya_town", "四之宮", 650, 125);
-const shinomiyaTownRing = smallLoop(shinomiyaTownJct, 35, "snmt", "四之宮ロータリー", 2, 35, 0, ["w", "e"]);
-buildRoad(smrtRing.ne, shinomiyaTownRing.w, "residential", "r_smrt_shinomiya", "四之宮");
-// 商店街(北東側からさらに北へ)。
-const shinomiyaShopJct = addJunction("wp_shinomiya_shop", "四之宮銀座入口", shinomiyaTownRing.ne.x + 10, shinomiyaTownRing.ne.y - 45);
-buildRoad(shinomiyaTownRing.ne, shinomiyaShopJct, "residential", "r_shinomiya_shop", "四之宮銀座");
-smallLoop(shinomiyaShopJct, 24, "snsp", "四之宮銀座", 1);
-// 住宅街メッシュ(北西側からさらに北へ、2x2)。
-const shinomiyaMeshNw = addJunction("snmesh_nw", "四之宮住宅街(北西)", shinomiyaTownRing.nw.x - 35, shinomiyaTownRing.nw.y - 60);
-const shinomiyaMeshNe = addJunction("snmesh_ne", "四之宮住宅街(北東)", shinomiyaTownRing.nw.x + 5, shinomiyaTownRing.nw.y - 60);
-const shinomiyaMeshSw = addJunction("snmesh_sw", "四之宮住宅街(南西)", shinomiyaTownRing.nw.x - 35, shinomiyaTownRing.nw.y - 20);
-const shinomiyaMeshSe = addJunction("snmesh_se", "四之宮住宅街(南東)", shinomiyaTownRing.nw.x + 5, shinomiyaTownRing.nw.y - 20);
-buildRoad(shinomiyaMeshNw, shinomiyaMeshNe, "residential", "r_snmesh_row1", "四之宮住宅街");
-buildRoad(shinomiyaMeshSw, shinomiyaMeshSe, "residential", "r_snmesh_row2", "四之宮住宅街");
-buildRoad(shinomiyaMeshNw, shinomiyaMeshSw, "residential", "r_snmesh_col1", "四之宮住宅街");
-buildRoad(shinomiyaMeshNe, shinomiyaMeshSe, "residential", "r_snmesh_col2", "四之宮住宅街");
-buildRoad(shinomiyaTownRing.nw, shinomiyaMeshSe, "residential", "r_shinomiya_mesh", "四之宮住宅街");
+// 街区は「ロータリー+付属の寄り道」ではなく、3x3の格子そのものを街として扱う。
+// 幹線は格子の西端・東端に1本ずつ繋がるだけで、格子の中に入ったら
+// 上段/中段/下段のどの道を通るかで2〜4通りの抜け方を選べる
+// (=幹線ではなく街区そのものが主役になる構造)。
+function buildGridTown(
+  center: { x: number; y: number },
+  spacingX: number,
+  spacingY: number,
+  idPrefix: string,
+  area: string,
+): { w: Hub; e: Hub; nw: Hub; n: Hub; ne: Hub; sw: Hub; s: Hub; se: Hub; c: Hub } {
+  const nw = addJunction(`${idPrefix}_nw`, `${area}(北西)`, center.x - spacingX, center.y - spacingY);
+  const n = addJunction(`${idPrefix}_n`, `${area}(北)`, center.x, center.y - spacingY);
+  const ne = addJunction(`${idPrefix}_ne`, `${area}(北東)`, center.x + spacingX, center.y - spacingY);
+  const w = addJunction(`${idPrefix}_w`, `${area}(西)`, center.x - spacingX, center.y);
+  const c = addJunction(`${idPrefix}_c`, area, center.x, center.y);
+  const e = addJunction(`${idPrefix}_e`, `${area}(東)`, center.x + spacingX, center.y);
+  const sw = addJunction(`${idPrefix}_sw`, `${area}(南西)`, center.x - spacingX, center.y + spacingY);
+  const s = addJunction(`${idPrefix}_s`, `${area}(南)`, center.x, center.y + spacingY);
+  const se = addJunction(`${idPrefix}_se`, `${area}(南東)`, center.x + spacingX, center.y + spacingY);
+  buildRoad(nw, n, "residential", `r_${idPrefix}_row1a`, area);
+  buildRoad(n, ne, "residential", `r_${idPrefix}_row1b`, area);
+  buildRoad(w, c, "residential", `r_${idPrefix}_row2a`, area);
+  buildRoad(c, e, "residential", `r_${idPrefix}_row2b`, area);
+  buildRoad(sw, s, "residential", `r_${idPrefix}_row3a`, area);
+  buildRoad(s, se, "residential", `r_${idPrefix}_row3b`, area);
+  buildRoad(nw, w, "residential", `r_${idPrefix}_col1a`, area);
+  buildRoad(w, sw, "residential", `r_${idPrefix}_col1b`, area);
+  buildRoad(n, c, "residential", `r_${idPrefix}_col2a`, area);
+  buildRoad(c, s, "residential", `r_${idPrefix}_col2b`, area);
+  buildRoad(ne, e, "residential", `r_${idPrefix}_col3a`, area);
+  buildRoad(e, se, "residential", `r_${idPrefix}_col3b`, area);
+  return { w, e, nw, n, ne, sw, s, se, c };
+}
 
-// 用田: 湘南台寄りの街区。四之宮ロータリーの東点から幹線道路で直結する。
-// 同じ理由でゲートは西・東のみにし、神社・住宅街は北東/北西からさらに北へ離す。
-const yodaTownJct = addJunction("wp_yoda_town", "用田", 900, 105);
-const yodaTownRing = smallLoop(yodaTownJct, 32, "ydmt", "用田ロータリー", 2, 32, 0, ["w", "e"]);
-buildRoad(shinomiyaTownRing.e, yodaTownRing.w, "residential", "r_shinomiya_yoda", "四之宮用田間");
-buildRoad(yodaTownRing.e, scrtRing.w, "residential", "r_yoda_scrt", "用田");
-// 神社の輪(北東側からさらに北へ)。
-const yodaShrineJct = addJunction("wp_yoda_shrine", "用田神社入口", yodaTownRing.ne.x + 10, yodaTownRing.ne.y - 45);
-buildRoad(yodaTownRing.ne, yodaShrineJct, "residential", "r_yoda_shrine", "用田神社");
-smallLoop(yodaShrineJct, 24, "ydsr", "用田神社", 1);
-// 住宅街の輪(北西側からさらに北へ)。
-const yodaResJct = addJunction("wp_yoda_res", "用田住宅街入口", yodaTownRing.nw.x - 10, yodaTownRing.nw.y - 45);
-buildRoad(yodaTownRing.nw, yodaResJct, "residential", "r_yoda_res", "用田住宅街");
-smallLoop(yodaResJct, 24, "ydrs", "用田住宅街", 1);
+// 四之宮: 寒川寄りの街区。直通路(r_sm_sc)がy150〜200の帯を通っているため、
+// 街区全体をそれより北(中心y=95)に収め、南端でも直通路と40px以上離す。
+const shinomiyaTown = buildGridTown({ x: 650, y: 95 }, 70, 45, "snmt", "四之宮");
+buildRoad(smrtRing.ne, shinomiyaTown.w, "residential", "r_smrt_shinomiya", "四之宮");
+
+// 用田: 湘南台寄りの街区。四之宮と同じ帯の高さに置く。
+const yodaTown = buildGridTown({ x: 920, y: 90 }, 70, 45, "ydmt", "用田");
+buildRoad(shinomiyaTown.e, yodaTown.w, "residential", "r_shinomiya_yoda", "四之宮用田間");
+buildRoad(yodaTown.e, scrtRing.w, "residential", "r_yoda_scrt", "用田");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
@@ -853,45 +861,21 @@ buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential",
 // より一段南、藤沢の衛星区画群より一段北の隙間を通す。
 //   香川(既存の分岐点) → 幹線 → 打戻(街区) → 幹線 → 円蔵(街区) → 幹線 → 大船
 // ============================================================
-const uchimodoriJct = addJunction("wp_uchimodori", "打戻", 620, 470);
-const uchimodoriRing = smallLoop(uchimodoriJct, 30, "ucmr", "打戻ロータリー", 2, 30, 0, ["w", "e"]);
-buildRoad(kagawa, uchimodoriRing.w, "residential", "r_kagawa_uchimodori", "打戻");
-// 商店街(北東側からさらに北へ)。
-const uchimodoriShopJct = addJunction("wp_uchimodori_shop", "打戻商店街入口", uchimodoriRing.n.x + 30, uchimodoriRing.n.y - 90);
-buildRoad(uchimodoriRing.n, uchimodoriShopJct, "residential", "r_uchimodori_shop", "打戻商店街");
-smallLoop(uchimodoriShopJct, 24, "ucsp", "打戻商店街", 1);
-// 住宅街メッシュ(北西側からさらに北へ、2x2)。
-const uchimodoriMeshNw = addJunction("ucmesh_nw", "打戻住宅街(北西)", uchimodoriRing.nw.x - 40, uchimodoriRing.nw.y - 60);
-const uchimodoriMeshNe = addJunction("ucmesh_ne", "打戻住宅街(北東)", uchimodoriRing.nw.x, uchimodoriRing.nw.y - 60);
-const uchimodoriMeshSw = addJunction("ucmesh_sw", "打戻住宅街(南西)", uchimodoriRing.nw.x - 40, uchimodoriRing.nw.y - 20);
-const uchimodoriMeshSe = addJunction("ucmesh_se", "打戻住宅街(南東)", uchimodoriRing.nw.x, uchimodoriRing.nw.y - 20);
-buildRoad(uchimodoriMeshNw, uchimodoriMeshNe, "residential", "r_ucmesh_row1", "打戻住宅街");
-buildRoad(uchimodoriMeshSw, uchimodoriMeshSe, "residential", "r_ucmesh_row2", "打戻住宅街");
-buildRoad(uchimodoriMeshNw, uchimodoriMeshSw, "residential", "r_ucmesh_col1", "打戻住宅街");
-buildRoad(uchimodoriMeshNe, uchimodoriMeshSe, "residential", "r_ucmesh_col2", "打戻住宅街");
-buildRoad(uchimodoriRing.nw, uchimodoriMeshSe, "residential", "r_uchimodori_mesh", "打戻住宅街");
+const uchimodoriTown = buildGridTown({ x: 620, y: 470 }, 70, 60, "ucmr", "打戻");
+buildRoad(kagawa, uchimodoriTown.w, "residential", "r_kagawa_uchimodori", "打戻");
 
-const enzoJct = addJunction("wp_enzo", "円蔵", 780, 340);
-const enzoRing = smallLoop(enzoJct, 26, "enzr", "円蔵ロータリー", 2, 26, 0, ["w", "e"]);
-buildRoad(uchimodoriRing.e, enzoRing.w, "residential", "r_uchimodori_enzo", "打戻円蔵間");
-// 神社の輪(北東側からさらに北へ)。
-const enzoShrineJct = addJunction("wp_enzo_shrine", "円蔵神社入口", enzoRing.ne.x + 10, enzoRing.ne.y - 45);
-buildRoad(enzoRing.ne, enzoShrineJct, "residential", "r_enzo_shrine", "円蔵神社");
-smallLoop(enzoShrineJct, 24, "enzs", "円蔵神社", 1);
-// 住宅街の輪(北西側からさらに北へ)。
-const enzoResJct = addJunction("wp_enzo_res", "円蔵住宅街入口", enzoRing.nw.x - 10, enzoRing.nw.y - 45);
-buildRoad(enzoRing.nw, enzoResJct, "residential", "r_enzo_res", "円蔵住宅街");
-smallLoop(enzoResJct, 24, "enzrs", "円蔵住宅街", 1);
+const enzoTown = buildGridTown({ x: 780, y: 400 }, 70, 50, "enzr", "円蔵");
+buildRoad(uchimodoriTown.e, enzoTown.w, "residential", "r_uchimodori_enzo", "打戻円蔵間");
 
 // 円蔵から大船へは、内陸トランク・藤沢衛星区画群・大船周辺の道を避けて
 // 軽く曲がりながら抜ける(経由地は挟まない、単純な幹線)。
-const enzoOfunaBend1 = addJunction("wp_enzo_ofuna_bend1", "円蔵大船間(西)", 1000, 260);
-buildRoad(enzoRing.e, enzoOfunaBend1, "residential", "r_enzo_bend1", "円蔵大船間");
+const enzoOfunaBend1 = addJunction("wp_enzo_ofuna_bend1", "円蔵大船間(西)", 1000, 230);
+buildRoad(enzoTown.e, enzoOfunaBend1, "residential", "r_enzo_bend1", "円蔵大船間");
 // 円蔵⇄大船間が長い一本道(10マス以上)にならないよう、西側の曲がり角に
 // 短い行き止まりの寄り道(望地)を1つだけ挟んで分岐にする。
 const enzoOfunaSpur = addJunction("wp_enzo_ofuna_spur", "望地", enzoOfunaBend1.x, enzoOfunaBend1.y - 50);
 buildRoad(enzoOfunaBend1, enzoOfunaSpur, "residential", "r_enzo_bend1_spur", "望地");
-const enzoOfunaBend2 = addJunction("wp_enzo_ofuna_bend2", "円蔵大船間(東)", 1200, 340);
+const enzoOfunaBend2 = addJunction("wp_enzo_ofuna_bend2", "円蔵大船間(東)", 1200, 375);
 buildRoad(enzoOfunaBend1, enzoOfunaBend2, "residential", "r_enzo_bend2", "円蔵大船間");
 buildRoad(enzoOfunaBend2, ofuna, "residential", "r_bend_ofuna", "円蔵大船間");
 
