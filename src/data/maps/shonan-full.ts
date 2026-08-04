@@ -460,7 +460,21 @@ const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, ["n
 const hiratsukaRing = smallLoop(hiratsuka, 85, "hrlp", "平塚小路", 3, 70, 0, ["s", "sw", "w"]); // ★★★★☆(西側最大都市)
 // 江の島: 橋を渡った先の島の中の小さな参道(仲見世通りイメージ)。行き止まりの小さな輪。
 smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
-// 湘南台・寒川は環状路なし(幹線2+行き来1の計3方向で十分な分岐がある)
+
+// ============================================================
+// 湘南台: 600マス化・第3弾。これまで環状路が1つもなく、寒川・六会・大船の3方向が
+// 湘南台の1点で交わるだけだった(駅前に選択肢が無い)。3方向すべて駅のすぐ近くから
+// 出ているため、環状路は北側の空いた方角に衛星型で作る。
+// ============================================================
+const shonandaiKita = addJunction("wp_shonandai_kita", "湘南台北口", shonandai.x + 20, shonandai.y - 55);
+buildRoad(shonandai, shonandaiKita, "residential", "r_sc_kita", "湘南台北口");
+const scrtRing = smallLoop(shonandaiKita, 30, "scrt", "湘南台ロータリー", 1);
+// 住宅街: ロータリーの東点からさらに1本、小さな輪を足す。
+const scResidential = addJunction("wp_sc_residential", "湘南台住宅街入口", scrtRing.e.x + 110, scrtRing.e.y + 55);
+buildRoad(scrtRing.e, scResidential, "residential", "r_sc_residential", "湘南台住宅街");
+const scResRing = smallLoop(scResidential, 22, "scrs", "湘南台住宅街", 1);
+// 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
+buildRoad(scResRing.s, rokkai, "shortcut", "r_sc_res_rokkai", "湘南台住宅街");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
