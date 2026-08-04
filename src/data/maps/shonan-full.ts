@@ -603,6 +603,33 @@ buildRoad(dansuiOuterW, dansuiOuterBend, "residential", "r_outer_loop_a", "外�
 buildRoad(dansuiOuterBend, dansuiOuterE, "residential", "r_outer_loop_b", "外周通り");
 
 // ============================================================
+// 外周通り(寒川外周通り⇄湘南台外周通り)が完全な一本道だったため、その内側
+// (外周通りより南、中央住宅街より北の帯)に、ゆるく曲がる横断ルートをもう1本通す。
+// 途中に小さな住宅街(北住宅街)を1つ経由し、3箇所で中央住宅街の道へ降りられる
+// ようにすることで、「上側だけをまっすぐ抜ける」か「途中で中央へ降りる」かを
+// 選べるようにする(最短ルートと寄り道ルートの選択)。
+// ============================================================
+const kitaCrossW = addJunction("wp_kita_cross_w", "北の横断路入口", 480, 75);
+buildRoad(smrtRing.ne, kitaCrossW, "residential", "r_smrt_kitacross", "北の横断路");
+const kitaCrossBend1 = addJunction("wp_kita_cross_bend1", "北の横断路(西)", 600, 55);
+buildRoad(kitaCrossW, kitaCrossBend1, "residential", "r_kitacross_1", "北の横断路");
+
+const kitaJutakuJct = addJunction("wp_kita_jutaku", "北住宅街入口", 720, 70);
+buildRoad(kitaCrossBend1, kitaJutakuJct, "residential", "r_kitacross_2", "北の横断路");
+const kitaJutakuRing = smallLoop(kitaJutakuJct, 24, "kjrp", "北住宅街", 1);
+
+const kitaCrossBend2 = addJunction("wp_kita_cross_bend2", "北の横断路(東)", 850, 60);
+buildRoad(kitaJutakuRing.e, kitaCrossBend2, "residential", "r_kitacross_3", "北の横断路");
+const kitaCrossE = addJunction("wp_kita_cross_e", "北の横断路出口", 1080, 30);
+buildRoad(kitaCrossBend2, kitaCrossE, "residential", "r_kitacross_4", "北の横断路");
+buildRoad(kitaCrossE, scrtRing.ne, "residential", "r_scrt_kitacross", "北の横断路");
+
+// 中央住宅街への降り口を3箇所(西・中央・東)。
+buildRoad(kitaCrossBend1, pickFillerAt(smrtRing.e, dansuiCenterMid, 0.4), "residential", "r_kitacross_down_w", "北の横断路");
+buildRoad(kitaJutakuJct, dansuiCenterMid, "residential", "r_kitacross_down_mid", "北の横断路");
+buildRoad(kitaCrossBend2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.3), "residential", "r_kitacross_down_e", "北の横断路");
+
+// ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
 // 藤沢をさらに分岐の多いハブにする、鎌倉周辺を強化する、
 // 長い一本道の途中に内陸へ抜ける近道を作る
