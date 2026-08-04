@@ -454,7 +454,42 @@ const fujisawaRing = smallLoop(fujisawa, 80, "fjrt", "藤沢ロータリー", 4,
 const kamakuraRing = smallLoop(kamakura, 55, "kmlp", "鎌倉小路", 3, 75, 0, ["e", "se", "nw"]); // ★★★★☆
 // 茅ヶ崎: 実際の幹線が東(辻堂)・西(平塚)・北(香川)を使っているため、ゲートは南寄り3点にする。
 const chigasakiRing = smallLoop(chigasaki, 80, "cglp", "茅ヶ崎小路", 3, 72, 0, ["s", "se", "sw"]); // ★★★★☆
+
+// ============================================================
+// 茅ヶ崎: 600マス化・第5弾。実際の幹線・行き来ルートが西(平塚)・東(辻堂、裏道含む)・
+// 南(香川・茅ヶ崎海岸)を使っているため、北西・北東・西の空いた点から衛星区画を作る。
+// ============================================================
+const cgShop = addJunction("wp_cg_shop", "茅ヶ崎銀座入口", chigasakiRing.nw.x - 25, chigasakiRing.nw.y - 55);
+buildRoad(chigasakiRing.nw, cgShop, "residential", "r_cg_nw_shop", "茅ヶ崎銀座");
+smallLoop(cgShop, 26, "cgsp", "茅ヶ崎銀座", 1);
+
+// 住宅街メッシュ: ロータリー北東点から辻堂ロータリーの北西点(ゲート)へ抜ける
+// 3列×2行の格子。海沿い幹線・裏道(r_local_cg_ts)・寒川方面の近道
+// (r_short_cgts_kg)のいずれとも重ならない、さらに北東寄りの位置に置く。
+const cgmNw = addJunction("cgmesh_nw", "茅ヶ崎住宅街(北西)", 620, 600);
+const cgmN = addJunction("cgmesh_n", "茅ヶ崎住宅街(北)", 680, 600);
+const cgmNe = addJunction("cgmesh_ne", "茅ヶ崎住宅街(北東)", 710, 600);
+const cgmSw = addJunction("cgmesh_sw", "茅ヶ崎住宅街(南西)", 620, 680);
+const cgmS = addJunction("cgmesh_s", "茅ヶ崎住宅街(南)", 680, 680);
+const cgmSe = addJunction("cgmesh_se", "茅ヶ崎住宅街(南東)", 710, 680);
+buildRoad(cgmNw, cgmN, "residential", "r_cgmesh_row1a", "茅ヶ崎住宅街");
+buildRoad(cgmN, cgmNe, "residential", "r_cgmesh_row1b", "茅ヶ崎住宅街");
+buildRoad(cgmSw, cgmS, "residential", "r_cgmesh_row2a", "茅ヶ崎住宅街");
+buildRoad(cgmS, cgmSe, "residential", "r_cgmesh_row2b", "茅ヶ崎住宅街");
+buildRoad(cgmNw, cgmSw, "residential", "r_cgmesh_col1", "茅ヶ崎住宅街");
+buildRoad(cgmN, cgmS, "residential", "r_cgmesh_col2", "茅ヶ崎住宅街");
+buildRoad(cgmNe, cgmSe, "residential", "r_cgmesh_col3", "茅ヶ崎住宅街");
+buildRoad(chigasakiRing.ne, cgmNw, "residential", "r_cg_ne_mesh", "茅ヶ崎住宅街");
+// 辻堂ロータリーへの接続は、辻堂ロータリー定義後にまとめて追加する。
+
+// 茅ヶ崎: ロータリー西点から、もう1つ小さな輪(茅ヶ崎中央イメージ)を足す。
+const cgChuo = addJunction("wp_cg_chuo", "茅ヶ崎中央入口", chigasakiRing.w.x - 60, chigasakiRing.w.y + 30);
+buildRoad(chigasakiRing.w, cgChuo, "residential", "r_cg_w_chuo", "茅ヶ崎中央");
+smallLoop(cgChuo, 25, "cgcyu", "茅ヶ崎中央", 1);
 const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, ["n", "nw"]); // ★★★☆☆
+// 茅ヶ崎住宅街メッシュから辻堂ロータリーの北西ゲートへ抜ける裏道(海沿い幹線・
+// 裏道(r_local_cg_ts)のどちらとも通らない北側のルート)。
+buildRoad(cgmNe, tsujidoRing.n, "residential", "r_cgmesh_tsujido", "茅ヶ崎住宅街");
 // 平塚: 西側最大の都市として、環状路を鎌倉・茅ヶ崎と同格まで拡大する。
 // 実際の幹線が東(茅ヶ崎)・北(田村)を使っているため、ゲートは南〜西寄り3点にする。
 const hiratsukaRing = smallLoop(hiratsuka, 85, "hrlp", "平塚小路", 3, 70, 0, ["s", "sw", "w"]); // ★★★★☆(西側最大都市)
