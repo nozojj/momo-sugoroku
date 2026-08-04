@@ -22,8 +22,10 @@ export const ROAD_STYLE: Record<RoadType, { base: string; top: string; width: nu
   shortcut: { base: "#8b5cf6", top: "#b58af5", width: 11, dash: "2 8" },
 };
 
-export const NODE_RADIUS = 15;
-export const MAJOR_HUB_RADIUS = 23;
+// 600マス化でマス同士の間隔が詰まった区画(住宅街メッシュ・小さな衛星の輪)が増えたため、
+// マス自体を一回り小さくし、短い区間でも道が隠れないようにしている。
+export const NODE_RADIUS = 10;
+export const MAJOR_HUB_RADIUS = 18;
 
 /** 同じマスに複数の車が重なるときの散らし配置(最大4台まで想定)。 */
 export function getClusterOffset(indexInCluster: number, clusterSize: number): { dx: number; dy: number } {
