@@ -312,14 +312,19 @@ const shonandai = addHub("hub_shonandai", "湘南台", 1080, 150);
 // そのまま残し、これとは別に内陸から直接平塚へ抜けられる選択肢を追加する。
 // 郊外らしいシンプルな構成にするため、藤沢のような密な街区にはしない。
 const tamura = addJunction("wp_tamura", "田村", 0, 200); // 寒川⇄平塚の曲がり角
-const ofuna = addJunction("wp_ofuna", "大船", 1320, 350); // 目的地候補ではなく経由地(内陸⇄海沿いの結節点)
+// 街のシルエット再設計: 湘南台⇄大船の距離が短すぎて六会周辺が密集していたため、
+// 大船(+梶原・北鎌倉・大船銀座も一体で)を(+180,+60)だけ遠ざけ、独立した
+// 「駅前ターミナル」として成立する距離を確保する(相対位置はそのまま平行移動)。
+const ofuna = addJunction("wp_ofuna", "大船", 1500, 410); // 目的地候補ではなく経由地(内陸⇄海沿いの結節点)
 
 // 海沿い⇄内陸の行き来ポイント(4箇所)。完全な縦横グリッドに見えすぎないよう、
 // 座標を少しだけ本来の格子位置からずらしている。
 const kagawa = addJunction("wp_kagawa", "香川", 440, 510); // 寒川⇄茅ヶ崎
 const rokkai = addJunction("wp_rokkai", "六会", 1080, 420); // 湘南台⇄藤沢。湘南台(x=1080)・藤沢(x=1080)と同じXに揃え、縦横四方向にする
-const kajiwara = addJunction("wp_kajiwara", "梶原", 1345, 630); // 大船⇄藤沢
-const kitakamakura = addJunction("wp_kitakamakura", "北鎌倉", 1540, 370); // 大船⇄鎌倉
+const kajiwara = addJunction("wp_kajiwara", "梶原", 1500, 680); // 大船⇄藤沢(鎌倉小路周辺との重なりを避けて調整)
+// 北鎌倉は大船ほど大きく動かさない(北鎌倉⇄鎌倉の道が御成通り・建長寺参道と
+// 重ならないよう、大船との相対位置を保つより経路の素直さを優先する)。
+const kitakamakura = addJunction("wp_kitakamakura", "北鎌倉", 1650, 420); // 大船⇄鎌倉
 
 // 道路網の外側・内側にできる大きな空白を「何もない」ではなく「地形」として埋める。
 // 空白そのものを道路で埋めるのではなく、森・農地・丘陵・河川の背景を配置して、
@@ -441,12 +446,14 @@ smallLoop(tamuragaoka, 25, "tmgo", "田村ヶ丘", 1);
 // 寒川: これまで環状路が1つもなかった(幹線2+行き来1の計3方向のみ)ため、
 // 北側の空いた方角に湘南台と同じ手法(衛星型ロータリー+住宅街)で追加する。
 // 大神は寒川エリアの一部として扱い、独立した輪は作らない。
-const samukawaKita = addJunction("wp_samukawa_kita", "寒川ロータリー入口", samukawa.x + 20, samukawa.y - 60);
+// 街のシルエット再設計: 寒川は全街区中もっとも小さい「小さなロータリーの町」として
+// 引き締める(半径・オフセットとも縮小し、輪郭がぼやけないようにする)。
+const samukawaKita = addJunction("wp_samukawa_kita", "寒川ロータリー入口", samukawa.x + 15, samukawa.y - 45);
 buildRoad(samukawa, samukawaKita, "residential", "r_sm_kita", "寒川ロータリー");
-const smrtRing = smallLoop(samukawaKita, 30, "smrt", "寒川ロータリー", 1);
-const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 30, smrtRing.e.y - 105);
+const smrtRing = smallLoop(samukawaKita, 20, "smrt", "寒川ロータリー", 1);
+const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 5, smrtRing.e.y - 62);
 buildRoad(smrtRing.e, smResidential, "residential", "r_sm_residential", "寒川住宅街");
-smallLoop(smResidential, 24, "smrs", "寒川住宅街", 1);
+smallLoop(smResidential, 20, "smrs", "寒川住宅街", 1);
 
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
@@ -570,80 +577,39 @@ smallLoop(enChigo, 24, "encg", "稚児ヶ淵", 1);
 // 湘南台の1点で交わるだけだった(駅前に選択肢が無い)。3方向すべて駅のすぐ近くから
 // 出ているため、環状路は北側の空いた方角に衛星型で作る。
 // ============================================================
+// 街のシルエット再設計: 湘南台は全街区中もっとも大きい「大ロータリー+商店街」にする。
+// ゲートはshonandaiKita一本ではなく、ロータリー自体に2本のスポーク(gates:2)を
+// 持たせて「ロータリー内でも選択肢がある」構造にし、街としての規模を強調する。
 const shonandaiKita = addJunction("wp_shonandai_kita", "湘南台北口", shonandai.x + 20, shonandai.y - 55);
 buildRoad(shonandai, shonandaiKita, "residential", "r_sc_kita", "湘南台北口");
-const scrtRing = smallLoop(shonandaiKita, 30, "scrt", "湘南台ロータリー", 1);
-// 住宅街: ロータリーの東点からさらに1本、小さな輪を足す。
-const scResidential = addJunction("wp_sc_residential", "湘南台住宅街入口", scrtRing.e.x + 110, scrtRing.e.y + 55);
+const scrtRing = smallLoop(shonandaiKita, 45, "scrt", "湘南台ロータリー", 2, 45, 0, ["n", "w"]);
+// 住宅街: ロータリーの東点からさらに1本、小さな輪を足す(街の輪郭を保つため
+// オフセットを縮め、ロータリーの塊にくっつけて見えるようにする)。
+const scResidential = addJunction("wp_sc_residential", "湘南台住宅街入口", scrtRing.e.x + 55, scrtRing.e.y + 30);
 buildRoad(scrtRing.e, scResidential, "residential", "r_sc_residential", "湘南台住宅街");
-const scResRing = smallLoop(scResidential, 22, "scrs", "湘南台住宅街", 1);
+const scResRing = smallLoop(scResidential, 20, "scrs", "湘南台住宅街", 2);
 // 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
 // (六会⇄大船間の再設計に合わせて縦横のみのルートに引き直すため、実際の接続は
 // 円蔵⇄六会⇄大船のトランクを作った後段でまとめて行う。)
 
-// ============================================================
-// 設計方針の見直し: 「道路→道路→道路」で埋めるのをやめ、「街→道路→街」の
-// 構成に作り直す。寒川⇄湘南台間に、これまでのような道路沿いの小さな寄り道
-// (寒川台・四之宮台・用田・北の横断路・中央住宅街)を並べるのではなく、
-// 独立した街区を2つ(四之宮・用田)だけ置き、街と街の間は装飾なしの
-// 幹線道路(residential、経由地なし)で直結する。
-//   寒川(街区) → 幹線 → 四之宮(街区) → 幹線 → 用田(街区) → 幹線 → 湘南台(街区)
-// 各街区はロータリー(ゲート4)+商店街+住宅街の構成にし、街の中だけで
-// 複数ルートを選べるようにする(一本道の解消は「道を増やす」のではなく
-// 「街区の中に選択肢を作る」ことで行う)。
-// ============================================================
-
-// 街区は「ロータリー+付属の寄り道」ではなく、3x3の格子そのものを街として扱う。
-// 幹線は格子の西端・東端に1本ずつ繋がるだけで、格子の中に入ったら
-// 上段/中段/下段のどの道を通るかで2〜4通りの抜け方を選べる
-// (=幹線ではなく街区そのものが主役になる構造)。
-function buildGridTown(
-  center: { x: number; y: number },
-  spacingX: number,
-  spacingY: number,
-  idPrefix: string,
-  area: string,
-): { w: Hub; e: Hub; nw: Hub; n: Hub; ne: Hub; sw: Hub; s: Hub; se: Hub; c: Hub } {
-  const nw = addJunction(`${idPrefix}_nw`, `${area}(北西)`, center.x - spacingX, center.y - spacingY);
-  const n = addJunction(`${idPrefix}_n`, `${area}(北)`, center.x, center.y - spacingY);
-  const ne = addJunction(`${idPrefix}_ne`, `${area}(北東)`, center.x + spacingX, center.y - spacingY);
-  const w = addJunction(`${idPrefix}_w`, `${area}(西)`, center.x - spacingX, center.y);
-  const c = addJunction(`${idPrefix}_c`, area, center.x, center.y);
-  const e = addJunction(`${idPrefix}_e`, `${area}(東)`, center.x + spacingX, center.y);
-  const sw = addJunction(`${idPrefix}_sw`, `${area}(南西)`, center.x - spacingX, center.y + spacingY);
-  const s = addJunction(`${idPrefix}_s`, `${area}(南)`, center.x, center.y + spacingY);
-  const se = addJunction(`${idPrefix}_se`, `${area}(南東)`, center.x + spacingX, center.y + spacingY);
-  buildRoad(nw, n, "residential", `r_${idPrefix}_row1a`, area);
-  buildRoad(n, ne, "residential", `r_${idPrefix}_row1b`, area);
-  buildRoad(w, c, "residential", `r_${idPrefix}_row2a`, area);
-  buildRoad(c, e, "residential", `r_${idPrefix}_row2b`, area);
-  buildRoad(sw, s, "residential", `r_${idPrefix}_row3a`, area);
-  buildRoad(s, se, "residential", `r_${idPrefix}_row3b`, area);
-  buildRoad(nw, w, "residential", `r_${idPrefix}_col1a`, area);
-  buildRoad(w, sw, "residential", `r_${idPrefix}_col1b`, area);
-  buildRoad(n, c, "residential", `r_${idPrefix}_col2a`, area);
-  buildRoad(c, s, "residential", `r_${idPrefix}_col2b`, area);
-  buildRoad(ne, e, "residential", `r_${idPrefix}_col3a`, area);
-  buildRoad(e, se, "residential", `r_${idPrefix}_col3b`, area);
-  return { w, e, nw, n, ne, sw, s, se, c };
-}
-
-// 四之宮: 寒川寄りの街区。直通路(r_sm_sc)がy150〜200の帯を通っているため、
-// 街区全体をそれより北に収める。街区の中も、街と街をつなぐ道も斜めにせず、
-// すべて縦横四方向(水平・垂直)だけにするため、街区の高さを寒川ロータリーの
-// ne点(y=110)にそろえる。
-const shinomiyaTown = buildGridTown({ x: 650, y: 110 }, 70, 40, "snmt", "四之宮");
-buildRoad(smrtRing.ne, shinomiyaTown.w, "residential", "r_smrt_shinomiya", "四之宮");
-
-// 用田: 湘南台寄りの街区。四之宮と同じ高さにそろえ、水平の道だけでつなぐ。
-const yodaTown = buildGridTown({ x: 920, y: 110 }, 70, 30, "ydmt", "用田");
-buildRoad(shinomiyaTown.e, yodaTown.w, "residential", "r_shinomiya_yoda", "四之宮用田間");
-// 湘南台ロータリーの西点(y=95)とは高さが違うため縦横のL字でつなぐ。
-// 曲がり角は用田の東点(x=990)からも湘南台ロータリーの西点(x=1070)からも
-// 少し離したx=1010にし、どちらの街の角(北東・南東など)とも重ならないようにする。
-const yodaScrtBend1 = addJunction("wp_yoda_scrt_bend1", "用田湘南台間", 1010, yodaTown.e.y);
-buildRoad(yodaTown.e, yodaScrtBend1, "residential", "r_yoda_scrt_h1", "用田");
-buildRoad(yodaScrtBend1, scrtRing.w, "residential", "r_yoda_scrt_h2", "用田");
+// 街のシルエット再設計: 四之宮・用田はどちらも小さな街区で、寒川⇄湘南台の
+// 660px区間に2つ並べると余白が足りず「街区の連続」に見えてしまっていた。
+// 1つの街(四之宮)に統合し、幹線(r_sm_sc)のちょうど中間から北へ張り出す
+// 不規則な住宅街メッシュにする(碁盤目にしない=湘南台・円蔵と形が被らないため)。
+// ゲートは幹線からのスプール1本だけ。
+const shinomiyaGate = pickMidFiller(samukawa, shonandai);
+const snmA = addJunction("wp_snm_a", "四之宮(北西)", shinomiyaGate.x - 30, shinomiyaGate.y - 128);
+const snmB = addJunction("wp_snm_b", "四之宮(北東)", shinomiyaGate.x + 25, shinomiyaGate.y - 138);
+const snmC = addJunction("wp_snm_c", "四之宮(西)", shinomiyaGate.x - 45, shinomiyaGate.y - 98);
+const snmD = addJunction("wp_snm_d", "四之宮", shinomiyaGate.x + 10, shinomiyaGate.y - 88);
+const snmE = addJunction("wp_snm_e", "四之宮(東)", shinomiyaGate.x + 40, shinomiyaGate.y - 108);
+buildRoad(snmA, snmB, "residential", "r_snm_ab", "四之宮");
+buildRoad(snmA, snmC, "residential", "r_snm_ac", "四之宮");
+buildRoad(snmB, snmE, "residential", "r_snm_be", "四之宮");
+buildRoad(snmC, snmD, "residential", "r_snm_cd", "四之宮");
+buildRoad(snmD, snmE, "residential", "r_snm_de", "四之宮");
+buildRoad(snmA, snmD, "residential", "r_snm_ad", "四之宮");
+buildRoad(shinomiyaGate, snmD, "residential", "r_sm_sc_shinomiya_gate", "四之宮");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
@@ -659,10 +625,10 @@ buildRoad(yodaScrtBend1, scrtRing.w, "residential", "r_yoda_scrt_h2", "用田");
 buildRoad(chigasakiRing.e, tsujidoRing.w, "residential", "r_local_cg_ts", "茅ヶ崎");
 buildRoad(tsujidoRing.se, fujisawaRing.sw, "residential", "r_local2_ts_fj", "辻堂");
 
-// 藤沢: ロータリーの斜めの点からも六会・梶原へ直接抜けられるようにし、
-// 「幹線→藤沢中心→行き来ルート」以外に「ロータリー経由」でも同じ場所へ行けるようにする。
+// 藤沢: ロータリーの斜めの点から梶原へのショートカットは、梶原が大船と一緒に
+// 移動して藤沢本線(r_kj_fj)とほぼ並走・接触するようになったため廃止した。
+// 梶原へは藤沢本線(r_kj_fj)で直接到達できる。
 // (六会への接続は、六会⇄大船間の再設計に合わせて後段でまとめて縦横のみで引き直す。)
-buildRoad(fujisawaRing.se, kajiwara, "residential", "r_fj_se_kj", "藤沢ロータリー");
 
 // 藤沢: マップ最大の都市として、ロータリーからさらにもう1つ小さな輪(藤沢北口イメージ)を
 // 外付けする。中心を同じくする「内周ロータリー」ではなく、ロータリーの北東の点から
@@ -687,7 +653,7 @@ const fjMeitenEnt = addJunction("wp_fj_meiten_ent", "藤沢名店街入口", fuj
 buildRoad(fujisawaRing.n, fjMeitenEnt, "residential", "r_fj_n_meiten1", "藤沢名店街");
 // y-185(旧-60): 六会大船間トランク(y420)より北側の帯へ丸ごと逃がし、辻堂裏道・
 // 藤沢ロータリー裏道と高さで棲み分ける。
-const fjMeitenNaka = addJunction("wp_fj_meiten_naka", "藤沢名店街仲通り", fjMeitenEnt.x - 90, fjMeitenEnt.y - 185);
+const fjMeitenNaka = addJunction("wp_fj_meiten_naka", "藤沢名店街仲通り", fjMeitenEnt.x - 60, fjMeitenEnt.y - 185);
 buildRoad(fjMeitenEnt, fjMeitenNaka, "residential", "r_fj_n_meiten2", "藤沢名店街");
 // 六会大船間トランクの新しい裏道群(辻堂裏道・藤沢ロータリー裏道)がこの一帯
 // (x900〜1030・y420〜590)を通るようになったため、名店街の奥の輪・藤沢本町の輪は
@@ -699,9 +665,11 @@ buildRoad(fjMeitenNaka, fjMeitenOku, "residential", "r_fj_n_meiten3", "藤沢名
 // 東: 藤沢東口 — 北口の対になる衛星の輪。梶原方面の2本の道(藤沢⇄梶原・ロータリー南東
 // ゲート⇄梶原)、鵠沼⇄腰越の海沿い幹線のどれとも重ならない隙間(ロータリー南東ゲートの
 // すぐ南)に、小さめの円形の輪として置く。
-const fjHigashiguchi = addJunction("wp_fj_higashiguchi", "藤沢東口", fujisawaRing.se.x + 80, fujisawaRing.se.y + 45);
+// 梶原が大船と一緒に移動して藤沢ロータリー⇄梶原の道(r_fj_se_kj)の角度が
+// 変わったため、東口の輪をさらに南東へ離す。
+const fjHigashiguchi = addJunction("wp_fj_higashiguchi", "藤沢東口", fujisawaRing.se.x + 160, fujisawaRing.se.y + 60);
 buildRoad(fujisawaRing.se, fjHigashiguchi, "residential", "r_fj_se_higashiguchi", "藤沢東口");
-smallLoop(fjHigashiguchi, 45, "fjhg", "藤沢東口通り", 1);
+smallLoop(fjHigashiguchi, 32, "fjhg", "藤沢東口通り", 1);
 
 // 南: 住宅街メッシュ — 単純な輪ではなく3列×2行の格子にし、格子の中でも道を選べるようにする。
 // 辻堂⇄藤沢の裏道(r_local2_ts_fj)より南、鵠沼への幹線より西の隙間に置き、
@@ -730,7 +698,7 @@ buildRoad(fjmNw, fujisawaRing.s, "shortcut", "r_fj_mesh_exit", "藤沢住宅街"
 buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路");
 
 // 鎌倉: 観光地らしく、周辺(北鎌倉・稲村ヶ崎)にも小さな環状ルートを追加する。
-const kitakamakuraRing = smallLoop(kitakamakura, 35, "kklp", "北鎌倉小路", 2, 66); // 円覚寺・建長寺まわりのイメージ
+const kitakamakuraRing = smallLoop(kitakamakura, 25, "kklp", "北鎌倉小路", 2, 66); // 円覚寺・建長寺まわりのイメージ
 // 稲村ヶ崎自体は腰越(西)・鎌倉(北)・由比ヶ浜(南西)・鎌倉小路(北東寄り)の道が集まる
 // 交差点のため、輪は他の道と重ならない東側へ少し離した衛星型にする。
 const inamuragasakiPark = addJunction("wp_inamuragasaki_park", "稲村ヶ崎公園入口", inamuragasaki.x + 65, inamuragasaki.y);
@@ -749,10 +717,11 @@ buildRoad(komachiBend2, komachi, "residential", "r_km_komachi3", "小町通り")
 // 鎌倉圏: 街の中の選択肢を増やす拡張(600マス化・第2弾)。
 // ============================================================
 // 鎌倉: 商店街(御成通りイメージ) — ロータリーの北点から、北鎌倉⇄鎌倉の直通路
-// (r_kk_km)や合流路(r_kkkm_merge)とは重ならない東寄りの位置に小さな輪を作る。
-const onariEnt = addJunction("wp_onari_ent", "御成通り入口", kamakuraRing.n.x + 100, kamakuraRing.n.y - 40);
+// (r_kk_km、北鎌倉が大船と一緒に移動して経路が変わった)や合流路(r_kkkm_merge)
+// とは重ならない、より東・北寄りの位置に小さな輪を作る。
+const onariEnt = addJunction("wp_onari_ent", "御成通り入口", kamakuraRing.n.x + 85, kamakuraRing.n.y - 70);
 buildRoad(kamakuraRing.n, onariEnt, "residential", "r_km_n_onari", "御成通り");
-smallLoop(onariEnt, 28, "onlp", "御成通り", 1);
+smallLoop(onariEnt, 22, "onlp", "御成通り", 1);
 
 // 鎌倉: 住宅街メッシュ — 腰越・稲村ヶ崎の間、海沿いの道(r_ks_in)よりさらに南の
 // 空き地に3列×2行の格子を作る。入口を腰越、出口を稲村ヶ崎への近道にすることで、
@@ -774,7 +743,7 @@ buildRoad(kmmNe, kmmSe, "residential", "r_kmmesh_col3", "鎌倉住宅街");
 // 北鎌倉: 2つめの参道(建長寺イメージ)を、既存の環状路の南西点から短い直結(マスを
 // 挟まない1本道)で作る。マスを挟むと途中のマスが輪の頂点と重なりやすいため、
 // 距離を70px程度に抑えて直結にした。
-const kenchojiEnt = addJunction("wp_kenchoji_ent", "建長寺参道入口", kitakamakuraRing.sw.x - 50, kitakamakuraRing.sw.y + 50);
+const kenchojiEnt = addJunction("wp_kenchoji_ent", "建長寺参道入口", kitakamakuraRing.sw.x - 200, kitakamakuraRing.sw.y + 20);
 buildRoad(kitakamakuraRing.sw, kenchojiEnt, "residential", "r_kk_kenchoji", "建長寺参道");
 smallLoop(kenchojiEnt, 25, "kjlp", "建長寺参道", 1);
 
@@ -863,93 +832,76 @@ buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo
 buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential", "r_kkkm_merge", "鎌倉小路");
 
 // ============================================================
-// 生活道路の抜け道: 香川(西エリア)⇄大船(東エリア)。
-// 「街→道路→街→道路→街」の方針に合わせ、道路沿いに寄り道を点在させる
-// のではなく、独立した街区を2つ(打戻・円蔵)だけ置き、街と街の間は
-// 経由地なしの幹線道路(residential)で直結する。内陸ルート(寒川⇄湘南台⇄大船)
-// より一段南、藤沢の衛星区画群より一段北の隙間を通す。
-//   香川(既存の分岐点) → 幹線 → 打戻(街区) → 幹線 → 円蔵(街区) → 幹線 → 大船
+// 街のシルエット再設計: 香川(西エリア)⇄大船(東エリア)。
+// 「街は箱、道路は線」を徹底し、似た碁盤目だった打戻・円蔵の2街区を1つ(円蔵)に
+// 統合した。幹線は香川⇄六会を直結する1本(main)にし、円蔵はその中間から
+// ゲート1本だけで分岐する「商店街」にする(碁盤目にしない=湘南台・四之宮と
+// 形が被らないようにする)。新しい街区は増やさない。
 // ============================================================
-// 打戻・円蔵の街区自体は縦横四方向の格子だが、香川・大船という固定された既存点と
-// 結ぶ長い区間は、藤沢衛星区画群・内陸トランクの間を縫う都合上、完全な水平/垂直
-// だけでは経路が確保できない(周辺の道が密集しすぎている)。街区に直接つながる
-// 区間は水平にそろえ、地形を縫う必要がある長距離区間のみ従来どおりの軽い曲がりを
-// 残す。
-const uchimodoriTown = buildGridTown({ x: 620, y: 470 }, 70, 60, "ucmr", "打戻");
-buildRoad(kagawa, uchimodoriTown.w, "residential", "r_kagawa_uchimodori", "打戻");
+buildRoad(kagawa, rokkai, "main", "r_kg_rk", "香川");
 
-// 円蔵は現在のエリア(x=780)から動かさない。高さだけ六会(y=420、後述)にそろえ、
-// 円蔵⇄六会が斜めなしの水平幹線1本になるようにする。打戻とは高さが50違うため、
-// 打戻との接続だけ直角のL字にする。
-const enzoTown = buildGridTown({ x: 780, y: 420 }, 70, 50, "enzr", "円蔵");
-const uchiEnzoBend1 = addJunction("wp_uchi_enzo_bend1", "打戻円蔵間(南)", uchimodoriTown.e.x, uchimodoriTown.e.y - 30);
-buildRoad(uchimodoriTown.e, uchiEnzoBend1, "residential", "r_uchimodori_enzo_v1", "打戻円蔵間");
-const uchiEnzoBend2 = addJunction("wp_uchi_enzo_bend2", "打戻円蔵間(北)", enzoTown.w.x, uchiEnzoBend1.y);
-buildRoad(uchiEnzoBend1, uchiEnzoBend2, "residential", "r_uchimodori_enzo_h", "打戻円蔵間");
-buildRoad(uchiEnzoBend2, enzoTown.w, "residential", "r_uchimodori_enzo_v2", "打戻円蔵間");
+// 円蔵: 幹線のちょうど中間から南へ張り出す商店街(目抜き通り+短い路地2本)。
+// 旧・打戻+円蔵を統合した1つの街。ゲートは幹線からのスプール1本だけ。
+const enzoGate = pickMidFiller(kagawa, rokkai);
+const enzoW = addJunction("wp_enzo_w", "円蔵(西)", enzoGate.x - 70, enzoGate.y + 95);
+const enzoC = addJunction("wp_enzo_c", "円蔵", enzoGate.x, enzoGate.y + 95);
+const enzoE = addJunction("wp_enzo_e", "円蔵(東)", enzoGate.x + 70, enzoGate.y + 95);
+buildRoad(enzoW, enzoC, "residential", "r_enzo_w_c", "円蔵");
+buildRoad(enzoC, enzoE, "residential", "r_enzo_c_e", "円蔵");
+const enzoAlley1 = addJunction("wp_enzo_alley1", "円蔵仲通り(北)", enzoC.x - 35, enzoC.y - 35);
+buildRoad(enzoC, enzoAlley1, "residential", "r_enzo_alley1", "円蔵");
+const enzoAlley2 = addJunction("wp_enzo_alley2", "円蔵仲通り(南)", enzoE.x + 35, enzoE.y + 35);
+buildRoad(enzoE, enzoAlley2, "residential", "r_enzo_alley2", "円蔵");
+buildRoad(enzoGate, enzoC, "residential", "r_enzo_gate", "円蔵");
 
 // ============================================================
-// 円蔵⇄大船間の再設計(斜め排除): 六会(rokkai)は湘南台・藤沢と同じX(1080)に
-// 乗っているので、円蔵→六会は水平の幹線1本になる。大船はまず動かさずに済むかを
-// 優先し、六会からいったん藤沢北口の輪(x1110〜1210・y415〜555)の真上(y=393)を
-// 水平に抜けてから大船の真上で下ろすことで、既存の道路(湘南台⇄大船・藤沢
-// ロータリー等)と重ならないようにする。結果として大船は移動不要だった。
+// 六会→大船(東側トランク)。大船を遠ざけた分トランクが伸びたが、経路の考え方は
+// 従来どおり: 六会の真上(y=393)へ上がり、藤沢北口の輪(x1110〜1210・y415〜555)の
+// 真上を水平に抜けてから大船の真上で下ろす。すべて縦横のみ(main、幹線色)。
 // ============================================================
-
-// 円蔵(街区)→六会: このトランクを「円蔵⇄大船間の西側トランク」として扱い、
-// 寒川⇄湘南台の裏道・藤沢ロータリーからの近道もここへ合流させる。
-buildRoad(enzoTown.e, rokkai, "residential", "r_enzo_rokkai", "円蔵六会間");
+const rkOfunaBend1 = addJunction("wp_rk_ofuna_bend1", "六会大船間(西)", rokkai.x, 388);
+buildRoad(rokkai, rkOfunaBend1, "main", "r_rk_ofuna_v1", "六会大船間");
+// 大船の真西70pxで一度区切り、大船への分岐点として使う(大船南側の梶原方面の道
+// r_of_kj のマスと重ならない位置を選んでいる)。
+const rkOfunaBendE = addJunction("wp_rk_ofuna_bende", "六会大船間(東)", ofuna.x - 70, 388);
+buildRoad(rkOfunaBend1, rkOfunaBendE, "main", "r_rk_ofuna_h1", "六会大船間");
 
 // 一本道防止: トランク中央のマスから短い行き止まりの寄り道(望地)を1つ挟む。
-const enzoRokkaiMid = pickMidFiller(enzoTown.e, rokkai);
+const enzoRokkaiMid = pickMidFiller(rkOfunaBend1, rkOfunaBendE);
 const enzoOfunaSpur = addJunction("wp_enzo_ofuna_spur", "望地", enzoRokkaiMid.x, enzoRokkaiMid.y - 50);
 buildRoad(enzoRokkaiMid, enzoOfunaSpur, "residential", "r_enzo_bend1_spur", "望地");
 
-// 辻堂-藤沢の中間→六会(湘南台方面)の裏道。六会が動いたことで斜めになっていたため、
-// トランクの空いているマスへほぼ垂直に近い形で合流させ直す。
-buildRoad(pickMidFiller(tsujido, fujisawa), pickFillerAt(enzoTown.e, rokkai, 0.3), "shortcut", "r_short_tsfj_rk", "辻堂");
+const rkOfunaUp = addJunction("wp_rk_ofuna_up", "大船入口(西)", rkOfunaBendE.x, ofuna.y);
+buildRoad(rkOfunaBendE, rkOfunaUp, "main", "r_rk_ofuna_v2", "六会大船間");
+buildRoad(rkOfunaUp, ofuna, "main", "r_rk_ofuna_h2", "六会大船間");
 
-// 寒川-湘南台の2/3地点→六会 の裏道。六会が動いたことで斜めになっていたため、
-// いったん円蔵の高さ(y=420)まで垂直に下ろしてからトランクの西端(円蔵)へ短く合流させる。
-const smScRkOrigin = pickFillerAt(samukawa, shonandai, 0.66);
-const smScRkBend = addJunction("wp_smsc_rk_bend", "寒川湘南台裏道(六会分岐)", smScRkOrigin.x, rokkai.y);
-buildRoad(smScRkOrigin, smScRkBend, "shortcut", "r_short_smsc_rk_v", "湘南台");
-buildRoad(smScRkBend, enzoTown.e, "shortcut", "r_short_smsc_rk_h", "湘南台");
+// 辻堂-藤沢の中間→六会(湘南台方面)の裏道。香川⇄六会の幹線トランクへ、
+// ほぼ垂直に近い形で合流させる。
+buildRoad(pickMidFiller(tsujido, fujisawa), pickFillerAt(kagawa, rokkai, 0.75), "shortcut", "r_short_tsfj_rk", "辻堂");
 
-// 藤沢ロータリー⇄六会。六会が動いたことで斜めになっていたため、ロータリーの
-// 北西点(藤沢北口とは反対側、他の接続に未使用の点)からトランクの空いているマスへ
-// ほぼ垂直に近い形で合流させ直す(辻堂裏道とは別のマスへ振り分け、互いに重ならない
-// ようにしている)。
-buildRoad(fujisawaRing.nw, pickFillerAt(enzoTown.e, rokkai, 0.8), "residential", "r_fj_nw_rk", "藤沢ロータリー");
+// 寒川-湘南台の2/3地点→六会 の裏道。同じく香川⇄六会の幹線トランクへ合流。
+buildRoad(pickFillerAt(samukawa, shonandai, 0.66), pickFillerAt(kagawa, rokkai, 0.6), "shortcut", "r_short_smsc_rk", "湘南台");
 
-// 六会→大船(東側トランク)。六会の真上(y=393、湘南台⇄六会の縦の幹線からも
-// 藤沢北口の輪(y415〜555)からも十分離れた高さ)へいったん上がり、藤沢北口の輪の
-// 真上を水平に抜ける。大船は動かさず、トランクの途中(大船の真西あたり)から
-// 垂直に上げて大船へ下ろす形にすることで、大船南側の梶原方面の道(r_of_kj)とも
-// 重ならないようにする。
-const rkOfunaBend1 = addJunction("wp_rk_ofuna_bend1", "六会大船間(西)", rokkai.x, 393);
-buildRoad(rokkai, rkOfunaBend1, "residential", "r_rk_ofuna_v1", "六会大船間");
-// 大船の真西(x=1250)で一度区切り、大船への分岐点として使う(大船の南を通る
-// 梶原方面の道 r_of_kj のマスと重ならない位置を選んでいる)。
-const rkOfunaMid = addJunction("wp_rk_ofuna_mid", "六会大船間(中央)", 1250, 393);
-buildRoad(rkOfunaBend1, rkOfunaMid, "residential", "r_rk_ofuna_h1", "六会大船間");
-// 湘南台住宅街裏道の合流点を兼ねる、トランクの東端。
-const scResJoin = addJunction("wp_sc_res_join", "六会大船間(東・住宅街合流)", 1460, 393);
-buildRoad(rkOfunaMid, scResJoin, "residential", "r_rk_ofuna_h2", "六会大船間");
-// 六会⇄大船・湘南台住宅街裏道をまたぐ区間が一本道(10マス以上)にならないよう、
-// 合流点から短い行き止まりの寄り道を1つ挟んで分岐にする。
-const scResJoinSpur = addJunction("wp_sc_res_join_spur", "大船銀座裏", scResJoin.x + 60, scResJoin.y);
-buildRoad(scResJoin, scResJoinSpur, "residential", "r_sc_res_join_spur", "大船銀座裏");
-const rkOfunaUp = addJunction("wp_rk_ofuna_up", "大船入口(西)", rkOfunaMid.x, ofuna.y);
-buildRoad(rkOfunaMid, rkOfunaUp, "residential", "r_rk_ofuna_v2", "六会大船間");
-buildRoad(rkOfunaUp, ofuna, "residential", "r_rk_ofuna_h3", "六会大船間");
+// 藤沢ロータリー⇄六会。ロータリーの北西点(藤沢北口とは反対側、他の接続に
+// 未使用の点)から、同じく香川⇄六会の幹線トランクへ合流。
+buildRoad(fujisawaRing.nw, pickFillerAt(kagawa, rokkai, 0.85), "residential", "r_fj_nw_rk", "藤沢ロータリー");
 
-// 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。六会が動いたことで
-// 斜めになっていたため、大船銀座(ofunaShopJct)よりさらに東まで水平に迂回してから
-// 南下し、東側トランクの東端(住宅街合流点)へつなぐ(縦横のみ・既存の道と重ならない)。
-const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", scResJoin.x, scResRing.s.y);
+// 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。大船銀座より
+// さらに東まで水平に迂回してから南下し、東側トランクの終端付近へつなぐ
+// (縦横のみ・既存の道と重ならない)。
+const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, scResRing.s.y);
 buildRoad(scResRing.s, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
-buildRoad(scResBend1, scResJoin, "shortcut", "r_sc_res_rokkai_v", "湘南台住宅街");
+// 一本道防止: 東西に長い区間(9マス分)の途中から短い行き止まりの寄り道を1つ挟む。
+const scResHSpurBase = pickMidFiller(scResRing.s, scResBend1);
+const scResHSpur = addJunction("wp_sc_res_hspur", "湘南台住宅街裏の外れ(西)", scResHSpurBase.x, scResHSpurBase.y - 50);
+buildRoad(scResHSpurBase, scResHSpur, "shortcut", "r_sc_res_hspur", "湘南台住宅街");
+const scResBend2 = addJunction("wp_sc_res_bend2", "湘南台住宅街裏道(南)", scResBend1.x, 388);
+buildRoad(scResBend1, scResBend2, "shortcut", "r_sc_res_rokkai_v", "湘南台住宅街");
+buildRoad(scResBend2, rkOfunaBendE, "shortcut", "r_sc_res_rokkai_join", "湘南台住宅街");
+// 一本道防止: 東西に長い裏道の途中から短い行き止まりの寄り道を1つ挟む。
+const scResSpurBase = pickMidFiller(scResBend1, scResBend2);
+const scResSpur = addJunction("wp_sc_res_spur", "湘南台住宅街裏の外れ", scResSpurBase.x + 50, scResSpurBase.y);
+buildRoad(scResSpurBase, scResSpur, "shortcut", "r_sc_res_spur", "湘南台住宅街");
 
 // ============================================================
 // 全エリア見直し(第2弾): 藤沢⇄鎌倉・大船周辺。
@@ -960,19 +912,17 @@ buildRoad(scResBend1, scResJoin, "shortcut", "r_sc_res_rokkai_v", "湘南台住�
 // ============================================================
 buildRoad(kajiwara, koshigoe, "shortcut", "r_kj_ks", "梶原");
 
-// 梶原にも他の経由地と同じように小さな輪(飯島イメージ)を1つ持たせる。
-// 既存の道(藤沢方面・大船方面・海沿いへの新しい近道)がどれも北〜西〜南から
-// 伸びているため、東側へ離した衛星型にする。
-const kajiwaraLoopJct = addJunction("wp_kajiwara_loop", "梶原東入口", kajiwara.x + 70, kajiwara.y - 10);
-buildRoad(kajiwara, kajiwaraLoopJct, "residential", "r_kj_loop", "梶原東");
-smallLoop(kajiwaraLoopJct, 26, "kjer", "梶原東", 1);
+// 梶原東の輪(飯島イメージ)は、梶原・北鎌倉が大船と一緒に移動したことで
+// 北鎌倉⇄鎌倉・御成通り一帯と重なりを避けきれず廃止した(装飾目的の行き止まりの
+// ため、街としての機能には影響しない)。
 
-// 大船にも小さな商店街(大船銀座イメージ)を1つ持たせる。既存の接続
-// (湘南台方面・梶原方面・北鎌倉方面・裏道)がどれも西〜南〜東から伸びているため、
-// 空いている北側へ衛星型で置く。
-const ofunaShopJct = addJunction("wp_ofuna_shop", "大船銀座入口", ofuna.x + 20, ofuna.y - 90);
+// 大船は「駅前ターミナル」: 六会方面(西)・梶原方面(南)・北鎌倉方面(北東)・
+// 大船銀座(北)の4方向が中心から放射状に伸びる形が、既存の接続だけで自然に
+// できている。銀座の輪だけ規模を大きくして(半径26→32)、全街区中2番目に
+// 大きいシルエットにする。
+const ofunaShopJct = addJunction("wp_ofuna_shop", "大船銀座入口", ofuna.x + 20, ofuna.y - 105);
 buildRoad(ofuna, ofunaShopJct, "residential", "r_of_shop", "大船銀座");
-smallLoop(ofunaShopJct, 26, "ofsp", "大船銀座", 1);
+smallLoop(ofunaShopJct, 32, "ofsp", "大船銀座", 1);
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
