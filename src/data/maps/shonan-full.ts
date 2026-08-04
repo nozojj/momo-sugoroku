@@ -847,53 +847,53 @@ buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential",
 
 // ============================================================
 // 生活道路の抜け道: 香川(西エリア)⇄大船(東エリア)。
-// 幹線(coastal/main/national)は使わず、すべて residential(生活道路)でつなぐ。
-// 藤沢のロータリー・住宅街・商店街の並びを避け、内陸ルート(寒川⇄湘南台⇄大船)よりも
-// 一段南、藤沢の衛星区画群よりも一段北の隙間を縫って通す。一本道ではなく、
-// 住宅街メッシュの手前と出口の2箇所で分岐し(+合流点で3つ目の分岐相当)、
-// 「最短ではないが知っていると便利な近道」という位置づけにする。
+// 「街→道路→街→道路→街」の方針に合わせ、道路沿いに寄り道を点在させる
+// のではなく、独立した街区を2つ(打戻・円蔵)だけ置き、街と街の間は
+// 経由地なしの幹線道路(residential)で直結する。内陸ルート(寒川⇄湘南台⇄大船)
+// より一段南、藤沢の衛星区画群より一段北の隙間を通す。
+//   香川(既存の分岐点) → 幹線 → 打戻(街区) → 幹線 → 円蔵(街区) → 幹線 → 大船
 // ============================================================
-const backstreetP1 = addJunction("wp_backstreet_p1", "四之宮入口", 550, 440);
-buildRoad(kagawa, backstreetP1, "residential", "r_bs_kagawa_p1", "四之宮");
+const uchimodoriJct = addJunction("wp_uchimodori", "打戻", 620, 470);
+const uchimodoriRing = smallLoop(uchimodoriJct, 30, "ucmr", "打戻ロータリー", 2, 30, 0, ["w", "e"]);
+buildRoad(kagawa, uchimodoriRing.w, "residential", "r_kagawa_uchimodori", "打戻");
+// 商店街(北東側からさらに北へ)。
+const uchimodoriShopJct = addJunction("wp_uchimodori_shop", "打戻商店街入口", uchimodoriRing.n.x + 30, uchimodoriRing.n.y - 90);
+buildRoad(uchimodoriRing.n, uchimodoriShopJct, "residential", "r_uchimodori_shop", "打戻商店街");
+smallLoop(uchimodoriShopJct, 24, "ucsp", "打戻商店街", 1);
+// 住宅街メッシュ(北西側からさらに北へ、2x2)。
+const uchimodoriMeshNw = addJunction("ucmesh_nw", "打戻住宅街(北西)", uchimodoriRing.nw.x - 40, uchimodoriRing.nw.y - 60);
+const uchimodoriMeshNe = addJunction("ucmesh_ne", "打戻住宅街(北東)", uchimodoriRing.nw.x, uchimodoriRing.nw.y - 60);
+const uchimodoriMeshSw = addJunction("ucmesh_sw", "打戻住宅街(南西)", uchimodoriRing.nw.x - 40, uchimodoriRing.nw.y - 20);
+const uchimodoriMeshSe = addJunction("ucmesh_se", "打戻住宅街(南東)", uchimodoriRing.nw.x, uchimodoriRing.nw.y - 20);
+buildRoad(uchimodoriMeshNw, uchimodoriMeshNe, "residential", "r_ucmesh_row1", "打戻住宅街");
+buildRoad(uchimodoriMeshSw, uchimodoriMeshSe, "residential", "r_ucmesh_row2", "打戻住宅街");
+buildRoad(uchimodoriMeshNw, uchimodoriMeshSw, "residential", "r_ucmesh_col1", "打戻住宅街");
+buildRoad(uchimodoriMeshNe, uchimodoriMeshSe, "residential", "r_ucmesh_col2", "打戻住宅街");
+buildRoad(uchimodoriRing.nw, uchimodoriMeshSe, "residential", "r_uchimodori_mesh", "打戻住宅街");
 
-// 分岐1: P1から南へ、行き止まりの小さな輪(四之宮イメージ)。
-const backstreetSpur = addJunction("wp_backstreet_spur", "四之宮", backstreetP1.x, backstreetP1.y + 70);
-buildRoad(backstreetP1, backstreetSpur, "residential", "r_bs_p1_spur", "四之宮");
-smallLoop(backstreetSpur, 26, "bslp", "四之宮", 1);
+const enzoJct = addJunction("wp_enzo", "円蔵", 780, 340);
+const enzoRing = smallLoop(enzoJct, 26, "enzr", "円蔵ロータリー", 2, 26, 0, ["w", "e"]);
+buildRoad(uchimodoriRing.e, enzoRing.w, "residential", "r_uchimodori_enzo", "打戻円蔵間");
+// 神社の輪(北東側からさらに北へ)。
+const enzoShrineJct = addJunction("wp_enzo_shrine", "円蔵神社入口", enzoRing.ne.x + 10, enzoRing.ne.y - 45);
+buildRoad(enzoRing.ne, enzoShrineJct, "residential", "r_enzo_shrine", "円蔵神社");
+smallLoop(enzoShrineJct, 24, "enzs", "円蔵神社", 1);
+// 住宅街の輪(北西側からさらに北へ)。
+const enzoResJct = addJunction("wp_enzo_res", "円蔵住宅街入口", enzoRing.nw.x - 10, enzoRing.nw.y - 45);
+buildRoad(enzoRing.nw, enzoResJct, "residential", "r_enzo_res", "円蔵住宅街");
+smallLoop(enzoResJct, 24, "enzrs", "円蔵住宅街", 1);
 
-// 住宅街メッシュ(3列×2行)。P1から少し東へ入ったところに置く。
-const bsmNw = addJunction("bsmesh_nw", "内陸住宅街(北西)", 620, 400);
-const bsmN = addJunction("bsmesh_n", "内陸住宅街(北)", 660, 400);
-const bsmNe = addJunction("bsmesh_ne", "内陸住宅街(北東)", 700, 400);
-const bsmSw = addJunction("bsmesh_sw", "内陸住宅街(南西)", 620, 445);
-const bsmS = addJunction("bsmesh_s", "内陸住宅街(南)", 660, 445);
-const bsmSe = addJunction("bsmesh_se", "内陸住宅街(南東)", 700, 445);
-buildRoad(bsmNw, bsmN, "residential", "r_bsmesh_row1a", "内陸住宅街");
-buildRoad(bsmN, bsmNe, "residential", "r_bsmesh_row1b", "内陸住宅街");
-buildRoad(bsmSw, bsmS, "residential", "r_bsmesh_row2a", "内陸住宅街");
-buildRoad(bsmS, bsmSe, "residential", "r_bsmesh_row2b", "内陸住宅街");
-buildRoad(bsmNw, bsmSw, "residential", "r_bsmesh_col1", "内陸住宅街");
-buildRoad(bsmN, bsmS, "residential", "r_bsmesh_col2", "内陸住宅街");
-buildRoad(bsmNe, bsmSe, "residential", "r_bsmesh_col3", "内陸住宅街");
-buildRoad(backstreetP1, bsmNw, "residential", "r_bs_p1_mesh", "内陸住宅街");
-
-// 分岐2: メッシュを出た直後、北回り(Pb)と南回り(Pa)の2本に分かれる。
-const backstreetPb = addJunction("wp_backstreet_pb", "内陸ルート北回り", 800, 370);
-buildRoad(bsmNe, backstreetPb, "residential", "r_bsmesh_ne_pb", "内陸住宅街");
-const backstreetPa = addJunction("wp_backstreet_pa", "内陸ルート南回り", 780, 485);
-buildRoad(bsmSe, backstreetPa, "residential", "r_bsmesh_se_pa", "内陸住宅街");
-
-// 分岐3(合流): 北回り・南回りが1点で合流する。
-const backstreetP2 = addJunction("wp_backstreet_p2", "内陸ルート合流点", 900, 395);
-buildRoad(backstreetPb, backstreetP2, "residential", "r_bs_pb_p2", "内陸ルート");
-buildRoad(backstreetPa, backstreetP2, "residential", "r_bs_pa_p2", "内陸ルート");
-
-// 合流後、内陸トランク(寒川⇄湘南台⇄大船)と藤沢の衛星区画群の隙間を抜けて大船へ。
-const backstreetP3 = addJunction("wp_backstreet_p3", "内陸ルート中間点", 1030, 280);
-buildRoad(backstreetP2, backstreetP3, "residential", "r_bs_p2_p3", "内陸ルート");
-const backstreetP4 = addJunction("wp_backstreet_p4", "内陸ルート東端", 1215, 325);
-buildRoad(backstreetP3, backstreetP4, "residential", "r_bs_p3_p4", "内陸ルート");
-buildRoad(backstreetP4, ofuna, "residential", "r_bs_p4_ofuna", "内陸ルート");
+// 円蔵から大船へは、内陸トランク・藤沢衛星区画群・大船周辺の道を避けて
+// 軽く曲がりながら抜ける(経由地は挟まない、単純な幹線)。
+const enzoOfunaBend1 = addJunction("wp_enzo_ofuna_bend1", "円蔵大船間(西)", 1000, 260);
+buildRoad(enzoRing.e, enzoOfunaBend1, "residential", "r_enzo_bend1", "円蔵大船間");
+// 円蔵⇄大船間が長い一本道(10マス以上)にならないよう、西側の曲がり角に
+// 短い行き止まりの寄り道(望地)を1つだけ挟んで分岐にする。
+const enzoOfunaSpur = addJunction("wp_enzo_ofuna_spur", "望地", enzoOfunaBend1.x, enzoOfunaBend1.y - 50);
+buildRoad(enzoOfunaBend1, enzoOfunaSpur, "residential", "r_enzo_bend1_spur", "望地");
+const enzoOfunaBend2 = addJunction("wp_enzo_ofuna_bend2", "円蔵大船間(東)", 1200, 340);
+buildRoad(enzoOfunaBend1, enzoOfunaBend2, "residential", "r_enzo_bend2", "円蔵大船間");
+buildRoad(enzoOfunaBend2, ofuna, "residential", "r_bend_ofuna", "円蔵大船間");
 
 // ============================================================
 // 全エリア見直し(第2弾): 藤沢⇄鎌倉・大船周辺。
