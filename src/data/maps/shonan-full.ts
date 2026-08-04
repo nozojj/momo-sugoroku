@@ -924,6 +924,29 @@ const backstreetP4 = addJunction("wp_backstreet_p4", "内陸ルート東端", 12
 buildRoad(backstreetP3, backstreetP4, "residential", "r_bs_p3_p4", "内陸ルート");
 buildRoad(backstreetP4, ofuna, "residential", "r_bs_p4_ofuna", "内陸ルート");
 
+// ============================================================
+// 全エリア見直し(第2弾): 藤沢⇄鎌倉・大船周辺。
+// 藤沢⇄鎌倉はこれまで「海沿い(鵠沼⇄腰越⇄稲村ヶ崎)」と「内陸(梶原⇄大船⇄北鎌倉)」の
+// 2ルートしかなく、しかもどちらも分岐なしの長い一本道だった。梶原⇄腰越を直結する
+// 裏道を新設し、海沿い⇄内陸を行き来できる3本目のルートにする。
+// 大船は経由地なのに独自の街並みが1つも無かったため、小さな商店街を1つ足す。
+// ============================================================
+buildRoad(kajiwara, koshigoe, "shortcut", "r_kj_ks", "梶原");
+
+// 梶原にも他の経由地と同じように小さな輪(飯島イメージ)を1つ持たせる。
+// 既存の道(藤沢方面・大船方面・海沿いへの新しい近道)がどれも北〜西〜南から
+// 伸びているため、東側へ離した衛星型にする。
+const kajiwaraLoopJct = addJunction("wp_kajiwara_loop", "梶原東入口", kajiwara.x + 70, kajiwara.y - 10);
+buildRoad(kajiwara, kajiwaraLoopJct, "residential", "r_kj_loop", "梶原東");
+smallLoop(kajiwaraLoopJct, 26, "kjer", "梶原東", 1);
+
+// 大船にも小さな商店街(大船銀座イメージ)を1つ持たせる。既存の接続
+// (湘南台方面・梶原方面・北鎌倉方面・裏道)がどれも西〜南〜東から伸びているため、
+// 空いている北側へ衛星型で置く。
+const ofunaShopJct = addJunction("wp_ofuna_shop", "大船銀座入口", ofuna.x + 20, ofuna.y - 90);
+buildRoad(ofuna, ofunaShopJct, "residential", "r_of_shop", "大船銀座");
+smallLoop(ofunaShopJct, 26, "ofsp", "大船銀座", 1);
+
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
   for (const spec of nodeSpecs) {
