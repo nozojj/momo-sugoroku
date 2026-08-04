@@ -796,6 +796,56 @@ buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo
 // 鎌倉小路のリング自体と交差しないようにする)。
 buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential", "r_kkkm_merge", "鎌倉小路");
 
+// ============================================================
+// 生活道路の抜け道: 香川(西エリア)⇄大船(東エリア)。
+// 幹線(coastal/main/national)は使わず、すべて residential(生活道路)でつなぐ。
+// 藤沢のロータリー・住宅街・商店街の並びを避け、内陸ルート(寒川⇄湘南台⇄大船)よりも
+// 一段南、藤沢の衛星区画群よりも一段北の隙間を縫って通す。一本道ではなく、
+// 住宅街メッシュの手前と出口の2箇所で分岐し(+合流点で3つ目の分岐相当)、
+// 「最短ではないが知っていると便利な近道」という位置づけにする。
+// ============================================================
+const backstreetP1 = addJunction("wp_backstreet_p1", "四之宮入口", 550, 440);
+buildRoad(kagawa, backstreetP1, "residential", "r_bs_kagawa_p1", "四之宮");
+
+// 分岐1: P1から南へ、行き止まりの小さな輪(四之宮イメージ)。
+const backstreetSpur = addJunction("wp_backstreet_spur", "四之宮", backstreetP1.x, backstreetP1.y + 70);
+buildRoad(backstreetP1, backstreetSpur, "residential", "r_bs_p1_spur", "四之宮");
+smallLoop(backstreetSpur, 26, "bslp", "四之宮", 1);
+
+// 住宅街メッシュ(3列×2行)。P1から少し東へ入ったところに置く。
+const bsmNw = addJunction("bsmesh_nw", "内陸住宅街(北西)", 620, 400);
+const bsmN = addJunction("bsmesh_n", "内陸住宅街(北)", 660, 400);
+const bsmNe = addJunction("bsmesh_ne", "内陸住宅街(北東)", 700, 400);
+const bsmSw = addJunction("bsmesh_sw", "内陸住宅街(南西)", 620, 445);
+const bsmS = addJunction("bsmesh_s", "内陸住宅街(南)", 660, 445);
+const bsmSe = addJunction("bsmesh_se", "内陸住宅街(南東)", 700, 445);
+buildRoad(bsmNw, bsmN, "residential", "r_bsmesh_row1a", "内陸住宅街");
+buildRoad(bsmN, bsmNe, "residential", "r_bsmesh_row1b", "内陸住宅街");
+buildRoad(bsmSw, bsmS, "residential", "r_bsmesh_row2a", "内陸住宅街");
+buildRoad(bsmS, bsmSe, "residential", "r_bsmesh_row2b", "内陸住宅街");
+buildRoad(bsmNw, bsmSw, "residential", "r_bsmesh_col1", "内陸住宅街");
+buildRoad(bsmN, bsmS, "residential", "r_bsmesh_col2", "内陸住宅街");
+buildRoad(bsmNe, bsmSe, "residential", "r_bsmesh_col3", "内陸住宅街");
+buildRoad(backstreetP1, bsmNw, "residential", "r_bs_p1_mesh", "内陸住宅街");
+
+// 分岐2: メッシュを出た直後、北回り(Pb)と南回り(Pa)の2本に分かれる。
+const backstreetPb = addJunction("wp_backstreet_pb", "内陸ルート北回り", 800, 370);
+buildRoad(bsmNe, backstreetPb, "residential", "r_bsmesh_ne_pb", "内陸住宅街");
+const backstreetPa = addJunction("wp_backstreet_pa", "内陸ルート南回り", 780, 485);
+buildRoad(bsmSe, backstreetPa, "residential", "r_bsmesh_se_pa", "内陸住宅街");
+
+// 分岐3(合流): 北回り・南回りが1点で合流する。
+const backstreetP2 = addJunction("wp_backstreet_p2", "内陸ルート合流点", 900, 395);
+buildRoad(backstreetPb, backstreetP2, "residential", "r_bs_pb_p2", "内陸ルート");
+buildRoad(backstreetPa, backstreetP2, "residential", "r_bs_pa_p2", "内陸ルート");
+
+// 合流後、内陸トランク(寒川⇄湘南台⇄大船)と藤沢の衛星区画群の隙間を抜けて大船へ。
+const backstreetP3 = addJunction("wp_backstreet_p3", "内陸ルート中間点", 1030, 280);
+buildRoad(backstreetP2, backstreetP3, "residential", "r_bs_p2_p3", "内陸ルート");
+const backstreetP4 = addJunction("wp_backstreet_p4", "内陸ルート東端", 1215, 325);
+buildRoad(backstreetP3, backstreetP4, "residential", "r_bs_p3_p4", "内陸ルート");
+buildRoad(backstreetP4, ofuna, "residential", "r_bs_p4_ofuna", "内陸ルート");
+
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
   for (const spec of nodeSpecs) {
