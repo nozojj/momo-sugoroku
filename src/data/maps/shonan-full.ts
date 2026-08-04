@@ -600,7 +600,6 @@ buildRoad(scrtRing.n, dansuiOuterE, "residential", "r_scrt_outer", "湘南台外
 // 寒川住宅街(smrs)を避けるため、外周通りは一度さらに北へ膨らませてから東へ向かう。
 const dansuiOuterBend = addJunction("wp_dansui_outer_bend", "外周通り北", 440, -20);
 buildRoad(dansuiOuterW, dansuiOuterBend, "residential", "r_outer_loop_a", "外周通り");
-buildRoad(dansuiOuterBend, dansuiOuterE, "residential", "r_outer_loop_b", "外周通り");
 
 // ============================================================
 // 外周通り(寒川外周通り⇄湘南台外周通り)が完全な一本道だったため、その内側
@@ -630,33 +629,40 @@ buildRoad(kitaJutakuJct, dansuiCenterMid, "residential", "r_kitacross_down_mid",
 buildRoad(kitaCrossBend2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.3), "residential", "r_kitacross_down_e", "北の横断路");
 
 // ============================================================
-// 外周通り(寒川外周通り⇄湘南台外周通り、特に外周通り北⇄湘南台外周通りの660px区間)が
-// まだ完全な一本道だったため、その途中2箇所から分岐を増やす。
-// 各分岐は「北の横断路へ降りる」「小さな住宅街へ寄り道する」の2択を持ち、
-// 一方は北の横断路を経由せず中央住宅街まで直接つながる、外周⇄中央の横断路そのものにする。
+// 外周通り北⇄湘南台外周通り(660px)を、分岐を足すだけでなく区間そのものを
+// 道路網に作り直す。dansuiOuterBend⇄dansuiOuterEの一本のbuildRoadは作らず、
+// 代わりに3つの小さな街(寒川台・四之宮台・用田)を経由地として直列につなぎ、
+// それぞれをゲート2つの環状路にすることで「街を回る短い道/長い道」自体が
+// 選択になるようにする。各街から中央エリア(北の横断路・中央住宅街)へ
+// 降りる道も1本ずつ持たせ、「外周を進むか、街を抜けて中央へ降りるか」を
+// 選べるようにする。
 // ============================================================
-const outerBranch1 = pickFillerAt(dansuiOuterBend, dansuiOuterE, 0.33);
-buildRoad(outerBranch1, kitaCrossBend1, "residential", "r_outer_branch1_down", "北の横断路");
-// 分岐先1: 小さな格子状の住宅街(寒川台)。
-const sagamidaiNw = addJunction("bsmesh2_nw", "寒川台(北西)", 620, -75);
-const sagamidaiNe = addJunction("bsmesh2_ne", "寒川台(北東)", 660, -75);
-const sagamidaiSw = addJunction("bsmesh2_sw", "寒川台(南西)", 620, -40);
-const sagamidaiSe = addJunction("bsmesh2_se", "寒川台(南東)", 660, -40);
-buildRoad(sagamidaiNw, sagamidaiNe, "residential", "r_sagamidai_row1", "寒川台");
-buildRoad(sagamidaiSw, sagamidaiSe, "residential", "r_sagamidai_row2", "寒川台");
-buildRoad(sagamidaiNw, sagamidaiSw, "residential", "r_sagamidai_col1", "寒川台");
-buildRoad(sagamidaiNe, sagamidaiSe, "residential", "r_sagamidai_col2", "寒川台");
-buildRoad(outerBranch1, sagamidaiSw, "residential", "r_outer_branch1_sagamidai", "寒川台");
+const sagamidaiHub = addJunction("wp_sagamidai", "寒川台", 580, -30);
+const sagamidaiRing = smallLoop(sagamidaiHub, 28, "sgmd", "寒川台", 2, 28, 0, ["w", "e"]);
+buildRoad(dansuiOuterBend, sagamidaiRing.w, "residential", "r_bend_sagamidai", "寒川台");
+const shinomiyadaiHub = addJunction("wp_shinomiyadai", "四之宮台", 780, -25);
+const shinomiyadaiRing = smallLoop(shinomiyadaiHub, 28, "snmd", "四之宮台", 2, 28, 0, ["w", "e"]);
+buildRoad(sagamidaiRing.e, shinomiyadaiRing.w, "residential", "r_sagamidai_shinomiyadai", "四之宮台");
+const yodaHub = addJunction("wp_yodadai", "用田", 1010, -30);
+const yodaRing = smallLoop(yodaHub, 22, "ydmd", "用田", 2, 22, 0, ["w", "e"]);
+buildRoad(shinomiyadaiRing.e, yodaRing.w, "residential", "r_shinomiyadai_yoda", "用田");
+buildRoad(yodaRing.e, dansuiOuterE, "residential", "r_yoda_outere", "用田");
 
-// 外周⇄中央の横断路そのもの(北の横断路を経由しない直通の降り口)。
-// 北の横断路(kitaCrossBend2まわり)と重ならないよう、外周通りのさらに東寄りの点から
-// 中央住宅街⇄湘南台ロータリー間の道の東寄りへ直接つなぐ。
-const outerBranch2 = pickFillerAt(dansuiOuterBend, dansuiOuterE, 0.85);
-buildRoad(outerBranch2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.9), "residential", "r_outer_branch2_center", "外周中央横断路");
-// 分岐先2: 小さな輪の住宅街(用田)。
-const yodaJct = addJunction("wp_yoda", "用田入口", outerBranch2.x, outerBranch2.y - 55);
-buildRoad(outerBranch2, yodaJct, "residential", "r_outer_branch2_yoda", "用田");
-smallLoop(yodaJct, 24, "ydlp", "用田住宅街", 1);
+// 各街から北側(行き止まりの小さな寄り道)と南側(中央エリアへの降り口)を1本ずつ。
+const sagamidaiSpur = addJunction("wp_sagamidai_spur", "寒川台北", sagamidaiRing.n.x, sagamidaiRing.n.y - 45);
+buildRoad(sagamidaiRing.n, sagamidaiSpur, "residential", "r_sagamidai_spur", "寒川台北");
+smallLoop(sagamidaiSpur, 22, "sgsp", "寒川台北", 1);
+buildRoad(sagamidaiRing.s, kitaCrossBend1, "residential", "r_sagamidai_down", "寒川台");
+
+const shinomiyadaiSpur = addJunction("wp_shinomiyadai_spur", "四之宮台北", shinomiyadaiRing.n.x, shinomiyadaiRing.n.y - 45);
+buildRoad(shinomiyadaiRing.n, shinomiyadaiSpur, "residential", "r_shinomiyadai_spur", "四之宮台北");
+smallLoop(shinomiyadaiSpur, 22, "snsp", "四之宮台北", 1);
+buildRoad(shinomiyadaiRing.s, dansuiCenterMid, "residential", "r_shinomiyadai_down", "四之宮台");
+
+const yodaSpur = addJunction("wp_yoda_spur", "用田北", yodaRing.n.x, yodaRing.n.y - 45);
+buildRoad(yodaRing.n, yodaSpur, "residential", "r_yoda_spur", "用田北");
+smallLoop(yodaSpur, 22, "ydsp", "用田北", 1);
+buildRoad(yodaRing.s, kitaCrossE, "residential", "r_yoda_down", "用田");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
