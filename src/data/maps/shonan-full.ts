@@ -546,12 +546,12 @@ buildRoad(fjmNw, fujisawaRing.s, "shortcut", "r_fj_mesh_exit", "藤沢住宅街"
 buildRoad(kamakuraRing.w, inamuragasaki, "residential", "r_km_w_in", "鎌倉小路");
 
 // 鎌倉: 観光地らしく、周辺(北鎌倉・稲村ヶ崎)にも小さな環状ルートを追加する。
-smallLoop(kitakamakura, 35, "kklp", "北鎌倉小路", 2, 66); // 円覚寺・建長寺まわりのイメージ
+const kitakamakuraRing = smallLoop(kitakamakura, 35, "kklp", "北鎌倉小路", 2, 66); // 円覚寺・建長寺まわりのイメージ
 // 稲村ヶ崎自体は腰越(西)・鎌倉(北)・由比ヶ浜(南西)・鎌倉小路(北東寄り)の道が集まる
 // 交差点のため、輪は他の道と重ならない東側へ少し離した衛星型にする。
 const inamuragasakiPark = addJunction("wp_inamuragasaki_park", "稲村ヶ崎公園入口", inamuragasaki.x + 65, inamuragasaki.y);
 buildRoad(inamuragasaki, inamuragasakiPark, "residential", "r_in_park", "稲村ヶ崎小路");
-smallLoop(inamuragasakiPark, 25, "inlp", "稲村ヶ崎小路", 1); // 稲村ヶ崎公園まわりのイメージ
+const inamuragasakiParkRing = smallLoop(inamuragasakiPark, 25, "inlp", "稲村ヶ崎小路", 1); // 稲村ヶ崎公園まわりのイメージ
 
 // 鎌倉: 古い商店街らしく、まっすぐではなく2回曲がって着く小さな通り(小町通りイメージ)を追加。
 const komachiBend1 = addJunction("wp_komachi1", "小町通り入口", kamakuraRing.e.x + 40, kamakuraRing.e.y);
@@ -560,6 +560,60 @@ const komachiBend2 = addJunction("wp_komachi2", "小町通り中程", komachiBen
 buildRoad(komachiBend1, komachiBend2, "residential", "r_km_komachi2", "小町通り");
 const komachi = addJunction("wp_komachi3", "小町通り", komachiBend2.x + 40, komachiBend2.y);
 buildRoad(komachiBend2, komachi, "residential", "r_km_komachi3", "小町通り");
+
+// ============================================================
+// 鎌倉圏: 街の中の選択肢を増やす拡張(600マス化・第2弾)。
+// ============================================================
+// 鎌倉: 商店街(御成通りイメージ) — ロータリーの北点から、北鎌倉⇄鎌倉の直通路
+// (r_kk_km)や合流路(r_kkkm_merge)とは重ならない東寄りの位置に小さな輪を作る。
+const onariEnt = addJunction("wp_onari_ent", "御成通り入口", kamakuraRing.n.x + 100, kamakuraRing.n.y - 40);
+buildRoad(kamakuraRing.n, onariEnt, "residential", "r_km_n_onari", "御成通り");
+smallLoop(onariEnt, 28, "onlp", "御成通り", 1);
+
+// 鎌倉: 住宅街メッシュ — 腰越・稲村ヶ崎の間、海沿いの道(r_ks_in)よりさらに南の
+// 空き地に3列×2行の格子を作る。入口を腰越、出口を稲村ヶ崎への近道にすることで、
+// 海沿いを通らずに腰越⇄稲村ヶ崎を抜けられる裏ルートにする。
+const kmmNw = addJunction("kmmesh_nw", "鎌倉住宅街(北西)", 1340, 1140);
+const kmmN = addJunction("kmmesh_n", "鎌倉住宅街(北)", 1410, 1140);
+const kmmNe = addJunction("kmmesh_ne", "鎌倉住宅街(北東)", 1480, 1140);
+const kmmSw = addJunction("kmmesh_sw", "鎌倉住宅街(南西)", 1340, 1190);
+const kmmS = addJunction("kmmesh_s", "鎌倉住宅街(南)", 1410, 1190);
+const kmmSe = addJunction("kmmesh_se", "鎌倉住宅街(南東)", 1480, 1190);
+buildRoad(kmmNw, kmmN, "residential", "r_kmmesh_row1a", "鎌倉住宅街");
+buildRoad(kmmN, kmmNe, "residential", "r_kmmesh_row1b", "鎌倉住宅街");
+buildRoad(kmmSw, kmmS, "residential", "r_kmmesh_row2a", "鎌倉住宅街");
+buildRoad(kmmS, kmmSe, "residential", "r_kmmesh_row2b", "鎌倉住宅街");
+buildRoad(kmmNw, kmmSw, "residential", "r_kmmesh_col1", "鎌倉住宅街");
+buildRoad(kmmN, kmmS, "residential", "r_kmmesh_col2", "鎌倉住宅街");
+buildRoad(kmmNe, kmmSe, "residential", "r_kmmesh_col3", "鎌倉住宅街");
+
+// 北鎌倉: 2つめの参道(建長寺イメージ)を、既存の環状路の南西点から短い直結(マスを
+// 挟まない1本道)で作る。マスを挟むと途中のマスが輪の頂点と重なりやすいため、
+// 距離を70px程度に抑えて直結にした。
+const kenchojiEnt = addJunction("wp_kenchoji_ent", "建長寺参道入口", kitakamakuraRing.sw.x - 50, kitakamakuraRing.sw.y + 50);
+buildRoad(kitakamakuraRing.sw, kenchojiEnt, "residential", "r_kk_kenchoji", "建長寺参道");
+smallLoop(kenchojiEnt, 25, "kjlp", "建長寺参道", 1);
+
+// 稲村ヶ崎: 公園入口の輪からさらに海側へ1本、小さな海岸通りを足す。
+const inamuraKaigan = addJunction("wp_inamura_kaigan", "稲村ヶ崎海岸通り入口", inamuragasakiParkRing.e.x + 60, inamuragasakiParkRing.e.y + 40);
+buildRoad(inamuragasakiParkRing.e, inamuraKaigan, "residential", "r_inpark_kaigan", "稲村ヶ崎海岸通り");
+smallLoop(inamuraKaigan, 22, "incl", "稲村ヶ崎海岸通り", 1);
+
+// 腰越: これまで行き止まりの1マスだけだった観光地に、衛星型の小さな輪を持たせて
+// 「浜辺の集落」らしい内部の選択肢を作る(由比ヶ浜は後方でノード定義後に追加)。
+// 腰越自体を中心にすると鵠沼⇄腰越・腰越⇄稲村ヶ崎の道と重なるため、南西へ離す。
+const koshigoeSat = addJunction("wp_koshigoe_sat", "腰越漁港通り入口", koshigoe.x - 30, koshigoe.y + 90);
+buildRoad(koshigoe, koshigoeSat, "residential", "r_ks_sat", "腰越漁港通り");
+smallLoop(koshigoeSat, 25, "kslp", "腰越漁港通り", 1);
+// 鎌倉住宅街メッシュの入口(腰越漁港通りから)。出口(由比ヶ浜側)は由比ヶ浜のノード
+// 定義後にまとめて追加する。
+buildRoad(koshigoeSat, kmmNw, "residential", "r_ks_mesh", "鎌倉住宅街");
+
+// 小町通り: 行き止まりの1本道の終点から、さらに1本南へ入った衛星の輪を追加し、
+// 古い商店街らしい奥行きを持たせる(終点そのものを中心にすると入口の道と重なるため)。
+const komachiOku = addJunction("wp_komachi_oku", "小町通り奥入口", komachi.x, komachi.y + 70);
+buildRoad(komachi, komachiOku, "residential", "r_km_komachi_oku", "小町通り奥");
+smallLoop(komachiOku, 25, "kmclp", "小町通り奥", 1);
 
 // 長い一本道の途中から、内陸ルートへ抜ける近道を追加。
 // 海沿いを直進するか、内陸へ抜けて別ルートを回るか、の選択肢が生まれる。
@@ -584,6 +638,14 @@ buildRoad(tsujidoRing.s, tsujidoKaigan, "coastal", "r_ts_s_kaigan", "辻堂海�
 
 const yuigahama = addJunction("wp_yuigahama", "由比ヶ浜", inamuragasaki.x - 100, inamuragasaki.y + 90);
 buildRoad(inamuragasaki, yuigahama, "coastal", "r_in_yui", "由比ヶ浜");
+// 由比ヶ浜自体を中心に輪を作ると、稲村ヶ崎からの道(r_in_yui)の延長線上に輪の頂点が
+// 乗って重なるため、南西へ1本離した衛星の輪にする。
+const yuigahamaSat = addJunction("wp_yuigahama_sat", "由比ヶ浜海岸通り入口", yuigahama.x - 40, yuigahama.y + 40);
+buildRoad(yuigahama, yuigahamaSat, "residential", "r_yui_sat", "由比ヶ浜海岸通り");
+smallLoop(yuigahamaSat, 24, "yuilp", "由比ヶ浜海岸通り", 1);
+// 鎌倉住宅街メッシュの出口。北東の角から稲村ヶ崎へ直結する(南東の角から由比ヶ浜へ
+// 抜けるルートだと、稲村ヶ崎⇄由比ヶ浜の道や由比ヶ浜海岸通りの輪と重なるため)。
+buildRoad(kmmNe, inamuragasaki, "shortcut", "r_km_mesh_inamura", "鎌倉住宅街");
 
 // ============================================================
 // 「都市間の一本道」から「道路網」へ: まだ途中に分岐のなかった区間
