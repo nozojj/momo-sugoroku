@@ -581,88 +581,53 @@ const scResRing = smallLoop(scResidential, 22, "scrs", "湘南台住宅街", 1);
 buildRoad(scResRing.s, rokkai, "shortcut", "r_sc_res_rokkai", "湘南台住宅街");
 
 // ============================================================
-// 寒川⇄湘南台の直通路(上の1本道)の北側に、住宅街の輪を1つ追加する。
-// 寒川ロータリー(smrt)⇄湘南台ロータリー(scrt)を「真ん中を抜ける道」で直結し、
-// さらにその北側に「外周を回る道」を1本通すことで、直通路と合わせて
-//   ①上(直通路)をまっすぐ行く
-//   ②真ん中を抜ける
-//   ③外周(住宅街の輪)を回る
-// の3択になるようにする。
+// 設計方針の見直し: 「道路→道路→道路」で埋めるのをやめ、「街→道路→街」の
+// 構成に作り直す。寒川⇄湘南台間に、これまでのような道路沿いの小さな寄り道
+// (寒川台・四之宮台・用田・北の横断路・中央住宅街)を並べるのではなく、
+// 独立した街区を2つ(四之宮・用田)だけ置き、街と街の間は装飾なしの
+// 幹線道路(residential、経由地なし)で直結する。
+//   寒川(街区) → 幹線 → 四之宮(街区) → 幹線 → 用田(街区) → 幹線 → 湘南台(街区)
+// 各街区はロータリー(ゲート4)+商店街+住宅街の構成にし、街の中だけで
+// 複数ルートを選べるようにする(一本道の解消は「道を増やす」のではなく
+// 「街区の中に選択肢を作る」ことで行う)。
 // ============================================================
-const dansuiCenterMid = addJunction("wp_dansui_mid", "中央住宅街", 770, 110);
-buildRoad(smrtRing.e, dansuiCenterMid, "residential", "r_smrt_mid", "中央住宅街");
-buildRoad(dansuiCenterMid, scrtRing.w, "residential", "r_mid_scrt", "中央住宅街");
 
-const dansuiOuterW = addJunction("wp_dansui_outer_w", "寒川外周通り", 340, 30);
-buildRoad(smrtRing.w, dansuiOuterW, "residential", "r_smrt_outer", "寒川外周通り");
-const dansuiOuterE = addJunction("wp_dansui_outer_e", "湘南台外周通り", 1100, 20);
-buildRoad(scrtRing.n, dansuiOuterE, "residential", "r_scrt_outer", "湘南台外周通り");
-// 寒川住宅街(smrs)を避けるため、外周通りは一度さらに北へ膨らませてから東へ向かう。
-const dansuiOuterBend = addJunction("wp_dansui_outer_bend", "外周通り北", 440, -20);
-buildRoad(dansuiOuterW, dansuiOuterBend, "residential", "r_outer_loop_a", "外周通り");
+// 四之宮: 寒川寄りの街区。寒川ロータリーの北東点から幹線道路で直結する。
+// 直通路(r_sm_sc)・その途中の近道群がy150〜200の帯を通っているため、
+// ゲートは西・東(幹線)のみにし、商店街・住宅街メッシュはどちらも
+// 北側(斜めのne/nw)から、さらに北へ離して置く。
+const shinomiyaTownJct = addJunction("wp_shinomiya_town", "四之宮", 650, 125);
+const shinomiyaTownRing = smallLoop(shinomiyaTownJct, 35, "snmt", "四之宮ロータリー", 2, 35, 0, ["w", "e"]);
+buildRoad(smrtRing.ne, shinomiyaTownRing.w, "residential", "r_smrt_shinomiya", "四之宮");
+// 商店街(北東側からさらに北へ)。
+const shinomiyaShopJct = addJunction("wp_shinomiya_shop", "四之宮銀座入口", shinomiyaTownRing.ne.x + 10, shinomiyaTownRing.ne.y - 45);
+buildRoad(shinomiyaTownRing.ne, shinomiyaShopJct, "residential", "r_shinomiya_shop", "四之宮銀座");
+smallLoop(shinomiyaShopJct, 24, "snsp", "四之宮銀座", 1);
+// 住宅街メッシュ(北西側からさらに北へ、2x2)。
+const shinomiyaMeshNw = addJunction("snmesh_nw", "四之宮住宅街(北西)", shinomiyaTownRing.nw.x - 35, shinomiyaTownRing.nw.y - 60);
+const shinomiyaMeshNe = addJunction("snmesh_ne", "四之宮住宅街(北東)", shinomiyaTownRing.nw.x + 5, shinomiyaTownRing.nw.y - 60);
+const shinomiyaMeshSw = addJunction("snmesh_sw", "四之宮住宅街(南西)", shinomiyaTownRing.nw.x - 35, shinomiyaTownRing.nw.y - 20);
+const shinomiyaMeshSe = addJunction("snmesh_se", "四之宮住宅街(南東)", shinomiyaTownRing.nw.x + 5, shinomiyaTownRing.nw.y - 20);
+buildRoad(shinomiyaMeshNw, shinomiyaMeshNe, "residential", "r_snmesh_row1", "四之宮住宅街");
+buildRoad(shinomiyaMeshSw, shinomiyaMeshSe, "residential", "r_snmesh_row2", "四之宮住宅街");
+buildRoad(shinomiyaMeshNw, shinomiyaMeshSw, "residential", "r_snmesh_col1", "四之宮住宅街");
+buildRoad(shinomiyaMeshNe, shinomiyaMeshSe, "residential", "r_snmesh_col2", "四之宮住宅街");
+buildRoad(shinomiyaTownRing.nw, shinomiyaMeshSe, "residential", "r_shinomiya_mesh", "四之宮住宅街");
 
-// ============================================================
-// 外周通り(寒川外周通り⇄湘南台外周通り)が完全な一本道だったため、その内側
-// (外周通りより南、中央住宅街より北の帯)に、ゆるく曲がる横断ルートをもう1本通す。
-// 途中に小さな住宅街(北住宅街)を1つ経由し、3箇所で中央住宅街の道へ降りられる
-// ようにすることで、「上側だけをまっすぐ抜ける」か「途中で中央へ降りる」かを
-// 選べるようにする(最短ルートと寄り道ルートの選択)。
-// ============================================================
-const kitaCrossW = addJunction("wp_kita_cross_w", "北の横断路入口", 480, 75);
-buildRoad(smrtRing.ne, kitaCrossW, "residential", "r_smrt_kitacross", "北の横断路");
-const kitaCrossBend1 = addJunction("wp_kita_cross_bend1", "北の横断路(西)", 600, 55);
-buildRoad(kitaCrossW, kitaCrossBend1, "residential", "r_kitacross_1", "北の横断路");
-
-const kitaJutakuJct = addJunction("wp_kita_jutaku", "北住宅街入口", 720, 70);
-buildRoad(kitaCrossBend1, kitaJutakuJct, "residential", "r_kitacross_2", "北の横断路");
-const kitaJutakuRing = smallLoop(kitaJutakuJct, 24, "kjrp", "北住宅街", 1);
-
-const kitaCrossBend2 = addJunction("wp_kita_cross_bend2", "北の横断路(東)", 850, 60);
-buildRoad(kitaJutakuRing.e, kitaCrossBend2, "residential", "r_kitacross_3", "北の横断路");
-const kitaCrossE = addJunction("wp_kita_cross_e", "北の横断路出口", 1080, 30);
-buildRoad(kitaCrossBend2, kitaCrossE, "residential", "r_kitacross_4", "北の横断路");
-buildRoad(kitaCrossE, scrtRing.ne, "residential", "r_scrt_kitacross", "北の横断路");
-
-// 中央住宅街への降り口を3箇所(西・中央・東)。
-buildRoad(kitaCrossBend1, pickFillerAt(smrtRing.e, dansuiCenterMid, 0.4), "residential", "r_kitacross_down_w", "北の横断路");
-buildRoad(kitaJutakuJct, dansuiCenterMid, "residential", "r_kitacross_down_mid", "北の横断路");
-buildRoad(kitaCrossBend2, pickFillerAt(dansuiCenterMid, scrtRing.w, 0.3), "residential", "r_kitacross_down_e", "北の横断路");
-
-// ============================================================
-// 外周通り北⇄湘南台外周通り(660px)を、分岐を足すだけでなく区間そのものを
-// 道路網に作り直す。dansuiOuterBend⇄dansuiOuterEの一本のbuildRoadは作らず、
-// 代わりに3つの小さな街(寒川台・四之宮台・用田)を経由地として直列につなぎ、
-// それぞれをゲート2つの環状路にすることで「街を回る短い道/長い道」自体が
-// 選択になるようにする。各街から中央エリア(北の横断路・中央住宅街)へ
-// 降りる道も1本ずつ持たせ、「外周を進むか、街を抜けて中央へ降りるか」を
-// 選べるようにする。
-// ============================================================
-const sagamidaiHub = addJunction("wp_sagamidai", "寒川台", 580, -30);
-const sagamidaiRing = smallLoop(sagamidaiHub, 28, "sgmd", "寒川台", 2, 28, 0, ["w", "e"]);
-buildRoad(dansuiOuterBend, sagamidaiRing.w, "residential", "r_bend_sagamidai", "寒川台");
-const shinomiyadaiHub = addJunction("wp_shinomiyadai", "四之宮台", 780, -25);
-const shinomiyadaiRing = smallLoop(shinomiyadaiHub, 28, "snmd", "四之宮台", 2, 28, 0, ["w", "e"]);
-buildRoad(sagamidaiRing.e, shinomiyadaiRing.w, "residential", "r_sagamidai_shinomiyadai", "四之宮台");
-const yodaHub = addJunction("wp_yodadai", "用田", 1010, -30);
-const yodaRing = smallLoop(yodaHub, 22, "ydmd", "用田", 2, 22, 0, ["w", "e"]);
-buildRoad(shinomiyadaiRing.e, yodaRing.w, "residential", "r_shinomiyadai_yoda", "用田");
-buildRoad(yodaRing.e, dansuiOuterE, "residential", "r_yoda_outere", "用田");
-
-// 各街から北側(行き止まりの小さな寄り道)と南側(中央エリアへの降り口)を1本ずつ。
-const sagamidaiSpur = addJunction("wp_sagamidai_spur", "寒川台北", sagamidaiRing.n.x, sagamidaiRing.n.y - 45);
-buildRoad(sagamidaiRing.n, sagamidaiSpur, "residential", "r_sagamidai_spur", "寒川台北");
-smallLoop(sagamidaiSpur, 22, "sgsp", "寒川台北", 1);
-buildRoad(sagamidaiRing.s, kitaCrossBend1, "residential", "r_sagamidai_down", "寒川台");
-
-const shinomiyadaiSpur = addJunction("wp_shinomiyadai_spur", "四之宮台北", shinomiyadaiRing.n.x, shinomiyadaiRing.n.y - 45);
-buildRoad(shinomiyadaiRing.n, shinomiyadaiSpur, "residential", "r_shinomiyadai_spur", "四之宮台北");
-smallLoop(shinomiyadaiSpur, 22, "snsp", "四之宮台北", 1);
-buildRoad(shinomiyadaiRing.s, dansuiCenterMid, "residential", "r_shinomiyadai_down", "四之宮台");
-
-const yodaSpur = addJunction("wp_yoda_spur", "用田北", yodaRing.n.x, yodaRing.n.y - 45);
-buildRoad(yodaRing.n, yodaSpur, "residential", "r_yoda_spur", "用田北");
-smallLoop(yodaSpur, 22, "ydsp", "用田北", 1);
-buildRoad(yodaRing.s, kitaCrossE, "residential", "r_yoda_down", "用田");
+// 用田: 湘南台寄りの街区。四之宮ロータリーの東点から幹線道路で直結する。
+// 同じ理由でゲートは西・東のみにし、神社・住宅街は北東/北西からさらに北へ離す。
+const yodaTownJct = addJunction("wp_yoda_town", "用田", 900, 105);
+const yodaTownRing = smallLoop(yodaTownJct, 32, "ydmt", "用田ロータリー", 2, 32, 0, ["w", "e"]);
+buildRoad(shinomiyaTownRing.e, yodaTownRing.w, "residential", "r_shinomiya_yoda", "四之宮用田間");
+buildRoad(yodaTownRing.e, scrtRing.w, "residential", "r_yoda_scrt", "用田");
+// 神社の輪(北東側からさらに北へ)。
+const yodaShrineJct = addJunction("wp_yoda_shrine", "用田神社入口", yodaTownRing.ne.x + 10, yodaTownRing.ne.y - 45);
+buildRoad(yodaTownRing.ne, yodaShrineJct, "residential", "r_yoda_shrine", "用田神社");
+smallLoop(yodaShrineJct, 24, "ydsr", "用田神社", 1);
+// 住宅街の輪(北西側からさらに北へ)。
+const yodaResJct = addJunction("wp_yoda_res", "用田住宅街入口", yodaTownRing.nw.x - 10, yodaTownRing.nw.y - 45);
+buildRoad(yodaTownRing.nw, yodaResJct, "residential", "r_yoda_res", "用田住宅街");
+smallLoop(yodaResJct, 24, "ydrs", "用田住宅街", 1);
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
