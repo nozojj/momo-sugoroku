@@ -581,6 +581,28 @@ const scResRing = smallLoop(scResidential, 22, "scrs", "湘南台住宅街", 1);
 buildRoad(scResRing.s, rokkai, "shortcut", "r_sc_res_rokkai", "湘南台住宅街");
 
 // ============================================================
+// 寒川⇄湘南台の直通路(上の1本道)の北側に、住宅街の輪を1つ追加する。
+// 寒川ロータリー(smrt)⇄湘南台ロータリー(scrt)を「真ん中を抜ける道」で直結し、
+// さらにその北側に「外周を回る道」を1本通すことで、直通路と合わせて
+//   ①上(直通路)をまっすぐ行く
+//   ②真ん中を抜ける
+//   ③外周(住宅街の輪)を回る
+// の3択になるようにする。
+// ============================================================
+const dansuiCenterMid = addJunction("wp_dansui_mid", "中央住宅街", 770, 110);
+buildRoad(smrtRing.e, dansuiCenterMid, "residential", "r_smrt_mid", "中央住宅街");
+buildRoad(dansuiCenterMid, scrtRing.w, "residential", "r_mid_scrt", "中央住宅街");
+
+const dansuiOuterW = addJunction("wp_dansui_outer_w", "寒川外周通り", 340, 30);
+buildRoad(smrtRing.w, dansuiOuterW, "residential", "r_smrt_outer", "寒川外周通り");
+const dansuiOuterE = addJunction("wp_dansui_outer_e", "湘南台外周通り", 1100, 20);
+buildRoad(scrtRing.n, dansuiOuterE, "residential", "r_scrt_outer", "湘南台外周通り");
+// 寒川住宅街(smrs)を避けるため、外周通りは一度さらに北へ膨らませてから東へ向かう。
+const dansuiOuterBend = addJunction("wp_dansui_outer_bend", "外周通り北", 440, -20);
+buildRoad(dansuiOuterW, dansuiOuterBend, "residential", "r_outer_loop_a", "外周通り");
+buildRoad(dansuiOuterBend, dansuiOuterE, "residential", "r_outer_loop_b", "外周通り");
+
+// ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
 // 藤沢をさらに分岐の多いハブにする、鎌倉周辺を強化する、
 // 長い一本道の途中に内陸へ抜ける近道を作る
