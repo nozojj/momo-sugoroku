@@ -628,14 +628,21 @@ function buildGridTown(
 }
 
 // 四之宮: 寒川寄りの街区。直通路(r_sm_sc)がy150〜200の帯を通っているため、
-// 街区全体をそれより北(中心y=95)に収め、南端でも直通路と40px以上離す。
-const shinomiyaTown = buildGridTown({ x: 650, y: 95 }, 70, 45, "snmt", "四之宮");
+// 街区全体をそれより北に収める。街区の中も、街と街をつなぐ道も斜めにせず、
+// すべて縦横四方向(水平・垂直)だけにするため、街区の高さを寒川ロータリーの
+// ne点(y=110)にそろえる。
+const shinomiyaTown = buildGridTown({ x: 650, y: 110 }, 70, 40, "snmt", "四之宮");
 buildRoad(smrtRing.ne, shinomiyaTown.w, "residential", "r_smrt_shinomiya", "四之宮");
 
-// 用田: 湘南台寄りの街区。四之宮と同じ帯の高さに置く。
-const yodaTown = buildGridTown({ x: 920, y: 90 }, 70, 45, "ydmt", "用田");
+// 用田: 湘南台寄りの街区。四之宮と同じ高さにそろえ、水平の道だけでつなぐ。
+const yodaTown = buildGridTown({ x: 920, y: 110 }, 70, 30, "ydmt", "用田");
 buildRoad(shinomiyaTown.e, yodaTown.w, "residential", "r_shinomiya_yoda", "四之宮用田間");
-buildRoad(yodaTown.e, scrtRing.w, "residential", "r_yoda_scrt", "用田");
+// 湘南台ロータリーの西点(y=95)とは高さが違うため縦横のL字でつなぐ。
+// 曲がり角は用田の東点(x=990)からも湘南台ロータリーの西点(x=1070)からも
+// 少し離したx=1010にし、どちらの街の角(北東・南東など)とも重ならないようにする。
+const yodaScrtBend1 = addJunction("wp_yoda_scrt_bend1", "用田湘南台間", 1010, yodaTown.e.y);
+buildRoad(yodaTown.e, yodaScrtBend1, "residential", "r_yoda_scrt_h1", "用田");
+buildRoad(yodaScrtBend1, scrtRing.w, "residential", "r_yoda_scrt_h2", "用田");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
@@ -861,6 +868,11 @@ buildRoad(pickMidFiller(kitakamakura, kamakura), kamakuraRing.nw, "residential",
 // より一段南、藤沢の衛星区画群より一段北の隙間を通す。
 //   香川(既存の分岐点) → 幹線 → 打戻(街区) → 幹線 → 円蔵(街区) → 幹線 → 大船
 // ============================================================
+// 打戻・円蔵の街区自体は縦横四方向の格子だが、香川・大船という固定された既存点と
+// 結ぶ長い区間は、藤沢衛星区画群・内陸トランクの間を縫う都合上、完全な水平/垂直
+// だけでは経路が確保できない(周辺の道が密集しすぎている)。街区に直接つながる
+// 区間は水平にそろえ、地形を縫う必要がある長距離区間のみ従来どおりの軽い曲がりを
+// 残す。
 const uchimodoriTown = buildGridTown({ x: 620, y: 470 }, 70, 60, "ucmr", "打戻");
 buildRoad(kagawa, uchimodoriTown.w, "residential", "r_kagawa_uchimodori", "打戻");
 
