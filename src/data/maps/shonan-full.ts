@@ -649,18 +649,25 @@ buildRoad(shonandai, sctw[1][3], "residential", "r_sc_kita", "湘南台北口");
 // 1つの街(四之宮)に統合し、幹線(r_sm_sc)のちょうど中間から北へ張り出す
 // 不規則な住宅街メッシュにする(碁盤目にしない=湘南台・円蔵と形が被らないため)。
 // ゲートは幹線からのスプール1本だけ。
+// 斜めの多い不規則メッシュをやめ、3列×2行の格子(はしご状)に作り直す
+// (縦横のみ・斜めなし)。北ルート(snmB)・中間ルート西(snmC)・中間ルート東
+// (snmE)・幹線ゲート(snmD)の接続先はそのまま同じ変数を使う。
 const shinomiyaGate = pickMidFiller(samukawa, shonandai);
-const snmA = addJunction("wp_snm_a", "四之宮(北西)", shinomiyaGate.x - 30, shinomiyaGate.y - 128);
-const snmB = addJunction("wp_snm_b", "四之宮(北東)", shinomiyaGate.x + 25, shinomiyaGate.y - 138);
-const snmC = addJunction("wp_snm_c", "四之宮(西)", shinomiyaGate.x - 45, shinomiyaGate.y - 98);
-const snmD = addJunction("wp_snm_d", "四之宮", shinomiyaGate.x + 10, shinomiyaGate.y - 88);
-const snmE = addJunction("wp_snm_e", "四之宮(東)", shinomiyaGate.x + 40, shinomiyaGate.y - 108);
+const snmCx = shinomiyaGate.x + 10;
+const snmCy = shinomiyaGate.y - 108;
+const snmA = addJunction("wp_snm_a", "四之宮(北西)", snmCx - 42, snmCy - 19);
+const snmB = addJunction("wp_snm_b", "四之宮(北東)", snmCx, snmCy - 19);
+const snmF = addJunction("wp_snm_f", "四之宮(東端)", snmCx + 42, snmCy - 19);
+const snmC = addJunction("wp_snm_c", "四之宮(西)", snmCx - 42, snmCy + 19);
+const snmD = addJunction("wp_snm_d", "四之宮", snmCx, snmCy + 19);
+const snmE = addJunction("wp_snm_e", "四之宮(東)", snmCx + 42, snmCy + 19);
 buildRoad(snmA, snmB, "residential", "r_snm_ab", "四之宮");
-buildRoad(snmA, snmC, "residential", "r_snm_ac", "四之宮");
-buildRoad(snmB, snmE, "residential", "r_snm_be", "四之宮");
+buildRoad(snmB, snmF, "residential", "r_snm_bf", "四之宮");
 buildRoad(snmC, snmD, "residential", "r_snm_cd", "四之宮");
 buildRoad(snmD, snmE, "residential", "r_snm_de", "四之宮");
-buildRoad(snmA, snmD, "residential", "r_snm_ad", "四之宮");
+buildRoad(snmA, snmC, "residential", "r_snm_ac", "四之宮");
+buildRoad(snmB, snmD, "residential", "r_snm_bd", "四之宮");
+buildRoad(snmF, snmE, "residential", "r_snm_fe", "四之宮");
 buildRoad(shinomiyaGate, snmD, "residential", "r_sm_sc_shinomiya_gate", "四之宮");
 
 // ============================================================
