@@ -1291,7 +1291,20 @@ bendAroundNode("r_kg_cg_3", "r_kg_cg_4", "cglp_n", "bend37");
 bendAroundNode("wp_ofuna_shop", "r_of_shop_1", "ofsp_s", "bend38");
 bendAroundNode("r_kj_fj_6", "r_kj_fj_7", "fjrt_e", "bend39");
 bendAroundNode("inlp_e", "wp_inamura_kaigan", "incl_nw", "bend40");
-bendAroundNode("hub_samukawa", "wp_samukawa_kita", "smrt_s", "bend41");
+// 寒川ロータリーは半径27pxと全街区中もっとも小さく、迂回点を置く余地が
+// ほぼ無い(どの方角にずらしてもロータリー自身の点か、寒川⇄湘南台の幹線と
+// 交差してしまう)。避けるのではなく、素通りされていたsmrt_s自体を経由する
+// 2区間に繋ぎ直す(=そこを実際のゲートにする)。
+{
+  const idx = edgeSpecs.findIndex(
+    (e) => (e.from === "hub_samukawa" && e.to === "wp_samukawa_kita") || (e.from === "wp_samukawa_kita" && e.to === "hub_samukawa"),
+  );
+  if (idx === -1) throw new Error("寒川ロータリー: hub_samukawa-wp_samukawa_kita の辺が見つかりません");
+  const orig = edgeSpecs[idx];
+  edgeSpecs.splice(idx, 1);
+  edgeSpecs.push({ from: "hub_samukawa", to: "smrt_s", roadType: orig.roadType });
+  edgeSpecs.push({ from: "smrt_s", to: "wp_samukawa_kita", roadType: orig.roadType });
+}
 bendAroundNode("r_cg_ts_2", "r_cg_ts_3", "r_local_cg_ts_1", "bend42");
 bendAroundNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2", "bend44");
 bendAroundNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5", "bend45");
