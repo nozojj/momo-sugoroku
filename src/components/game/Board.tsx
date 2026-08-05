@@ -39,6 +39,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   const [zoom, setZoom] = useState(0.55);
   const dragState = useRef<{ startX: number; startY: number; startPan: { x: number; y: number } } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [debugClickPos, setDebugClickPos] = useState<{ x: number; y: number } | null>(null);
 
   const { width, height, edges } = useMemo(() => {
     const xs = map.nodes.map((n) => n.x);
@@ -100,6 +101,15 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     setZoom((z) => clampZoom(z - e.deltaY * 0.0012));
   }
 
+  // デバッグ用: クリックした画面位置をズーム・パンを逆算してゲーム内座標に変換
+  function onDebugClick(e: React.MouseEvent) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gameX = (e.clientX - rect.left - pan.x) / zoom + minX;
+    const gameY = (e.clientY - rect.top - pan.y) / zoom + minY;
+    setDebugClickPos({ x: Math.round(gameX), y: Math.round(gameY) });
+  }
+
   function recenterOnCurrentPlayer() {
     const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
     if (!node || !containerRef.current) return;
@@ -120,6 +130,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         onWheel={onWheel}
+        onClick={onDebugClick}
         style={{ cursor: dragging ? "grabbing" : "grab" }}
       >
         <div
@@ -265,6 +276,12 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
           </svg>
         </div>
       </div>
+
+      {debugClickPos && (
+        <div className="absolute right-3 top-3 rounded bg-black/80 px-2 py-1 text-xs font-mono text-white pointer-events-none">
+          クリック位置: x={debugClickPos.x}, y={debugClickPos.y}
+        </div>
+      )}
 
       <div className="absolute right-3 bottom-3 flex flex-col gap-1.5">
         <button
