@@ -795,8 +795,9 @@ buildRoad(tsujidoRing.s, tsujidoKaigan, "coastal", "r_ts_s_kaigan", "辻堂海�
 const yuigahama = addJunction("wp_yuigahama", "由比ヶ浜", inamuragasaki.x - 100, inamuragasaki.y + 90);
 buildRoad(inamuragasaki, yuigahama, "coastal", "r_in_yui", "由比ヶ浜");
 // 由比ヶ浜自体を中心に輪を作ると、稲村ヶ崎からの道(r_in_yui)の延長線上に輪の頂点が
-// 乗って重なるため、南西へ1本離した衛星の輪にする。
-const yuigahamaSat = addJunction("wp_yuigahama_sat", "由比ヶ浜海岸通り入口", yuigahama.x - 40, yuigahama.y + 40);
+// 乗って重なるため、南西へ1本離した衛星の輪にする。オフセットは輪の北東の角
+// (yuilp_ne)が由比ヶ浜(wp_yuigahama)自身と重ならないだけの距離を確保している。
+const yuigahamaSat = addJunction("wp_yuigahama_sat", "由比ヶ浜海岸通り入口", yuigahama.x - 46, yuigahama.y + 46);
 buildRoad(yuigahama, yuigahamaSat, "residential", "r_yui_sat", "由比ヶ浜海岸通り");
 smallLoop(yuigahamaSat, 24, "yuilp", "由比ヶ浜海岸通り", 1);
 // 鎌倉住宅街メッシュの出口。北東の角から稲村ヶ崎へ直結する(南東の角から由比ヶ浜へ
@@ -923,6 +924,27 @@ buildRoad(kajiwara, koshigoe, "shortcut", "r_kj_ks", "梶原");
 const ofunaShopJct = addJunction("wp_ofuna_shop", "大船銀座入口", ofuna.x + 20, ofuna.y - 105);
 buildRoad(ofuna, ofunaShopJct, "residential", "r_of_shop", "大船銀座");
 smallLoop(ofunaShopJct, 32, "ofsp", "大船銀座", 1);
+
+// ------------------------------------------------------------------
+// 座標の微調整: 別々に生成された道・輪が、互いを見ずに独立して座標を決めるため
+// ごくまれに1〜数pxだけマスが重なることがある。そのような箇所だけ、最終座標を
+// 数px押し出して重なりを解消する(道の形自体を作り直すほどではない微修正)。
+// ------------------------------------------------------------------
+function nudgeNode(id: string, dx: number, dy: number) {
+  const spec = nodeSpecs.find((n) => n.id === id);
+  if (!spec) throw new Error(`nudgeNode: unknown node id "${id}"`);
+  spec.x += dx;
+  spec.y += dy;
+}
+nudgeNode("r_in_km_1", 3, 0); // 稲村ヶ崎南通り ⇄ 鎌倉小路旧道
+nudgeNode("r_ts_fj_1", -3, -1); // 辻堂南通り ⇄ 辻堂小路(東)
+nudgeNode("r_rk_fj_4", 0, 2); // 六会北通り ⇄ 藤沢ロータリー(北)
+nudgeNode("r_kk_km_1", -2, -3); // 北鎌倉通り ⇄ 北鎌倉小路(南・南西)
+nudgeNode("r_km_w_in_1", 3, 2); // 鎌倉小路新道 ⇄ 鎌倉小路本通り
+nudgeNode("r_enlp_candle_1", -2, 2); // 江の島シーキャンドル通り ⇄ 江の島参道(北西)
+nudgeNode("r_in_yui_1", -2, -2); // 由比ヶ浜北通り ⇄ 鎌倉住宅街大通り
+nudgeNode("r_hr_cg_6", 1, -1); // 平塚南通り ⇄ 茅ヶ崎中央(北東)
+nudgeNode("r_fj_n_meiten2_2", 1, 1); // 藤沢名店街北通り ⇄ 香川新道
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
