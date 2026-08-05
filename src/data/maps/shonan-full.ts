@@ -682,6 +682,27 @@ buildRoad(northRouteWest, northRouteMid, "main", "r_north_spine_1", "北ルー�
 buildRoad(northRouteMid, northRouteEast, "main", "r_north_spine_2", "北ルート");
 
 // ============================================================
+// 中間ルート: 寒川ロータリー⇄四之宮⇄湘南台ブロックをつなぐ、北ルートとは別の
+// もう1本の東西ルート(residential、生活道路レイヤー)。北ルート(最北端)と
+// 寒川⇄湘南台の中央トランク(南端、六会列を避けたL字)の間の空いた帯を通す。
+// 縦横のみで構成し、四之宮は西(snmC)・東(snmE)の2ゲートで通過点にする
+// (北ルートの接続先であるsnmBとは別のゲートを使い、四之宮内部で分岐させる)。
+// ============================================================
+// 西側: 寒川住宅街の輪の列(x=483)にすぐ沿わせると輪の点と重なるため、
+// いったん東へ離れてから縦に折れる。
+const midRouteBendW1 = addJunction("wp_mid_route_bend_w1", "中間ルート(寒川・東)", 600, smrsRing.e.y);
+const midRouteBendW2 = addJunction("wp_mid_route_bend_w2", "中間ルート(寒川・南)", 600, snmC.y);
+buildRoad(smrsRing.e, midRouteBendW1, "residential", "r_mid_west_h1", "中間ルート");
+buildRoad(midRouteBendW1, midRouteBendW2, "residential", "r_mid_west_v", "中間ルート");
+buildRoad(midRouteBendW2, snmC, "residential", "r_mid_west_h2", "中間ルート");
+// 東側: 四之宮の点の列(x=823)にすぐ沿わせると四之宮内部の道と重なるため、
+// いったん東へ離れてから折れる(snmEとブロックのyはほぼ同じ(4px差)なので
+// 折れ点は1つで足りる)。
+const midRouteBendE1 = addJunction("wp_mid_route_bend_e1", "中間ルート(湘南台・西)", 910, sctw[0][2].y);
+buildRoad(snmE, midRouteBendE1, "residential", "r_mid_east_h1", "中間ルート");
+buildRoad(midRouteBendE1, sctw[0][2], "residential", "r_mid_east_h2", "中間ルート");
+
+// ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
 // 藤沢をさらに分岐の多いハブにする、鎌倉周辺を強化する、
 // 長い一本道の途中に内陸へ抜ける近道を作る
