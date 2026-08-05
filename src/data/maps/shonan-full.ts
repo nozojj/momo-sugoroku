@@ -453,7 +453,7 @@ buildRoad(samukawa, samukawaKita, "residential", "r_sm_kita", "寒川ロータ�
 const smrtRing = smallLoop(samukawaKita, 27, "smrt", "寒川ロータリー", 1);
 const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 6, smrtRing.e.y - 73);
 buildRoad(smrtRing.e, smResidential, "residential", "r_sm_residential", "寒川住宅街");
-smallLoop(smResidential, 27, "smrs", "寒川住宅街", 1);
+const smrsRing = smallLoop(smResidential, 27, "smrs", "寒川住宅街", 1);
 
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
@@ -610,6 +610,24 @@ buildRoad(snmC, snmD, "residential", "r_snm_cd", "四之宮");
 buildRoad(snmD, snmE, "residential", "r_snm_de", "四之宮");
 buildRoad(snmA, snmD, "residential", "r_snm_ad", "四之宮");
 buildRoad(shinomiyaGate, snmD, "residential", "r_sm_sc_shinomiya_gate", "四之宮");
+
+// ============================================================
+// 北ルート: 寒川・四之宮・湘南台の北側を東西に貫く幹線(main)。既存の
+// 寒川⇄湘南台の道(中央ルート)とは別の、北側の迂回幹線として機能させる。
+// 各街のシルエットの外側(北端の既存ゲート)にだけ接続し、街の中は貫通しない。
+// 縦横のみで構成し斜めは使わない(スパイン・ゲート接続とも同じx/yで直線)。
+// 六会へはこの幹線から新たに直結させない(湘南台の東側は住宅街の輪・藤沢北口が
+// 密集していて、無理に迂回させると別の場所で道がマスを横切る問題を再発するため)。
+// 既存の湘南台⇄六会の幹線(main、南北一直線)を経由して到達させる。
+// ============================================================
+const northRouteWest = addJunction("wp_north_route_west", "北ルート(寒川)", smrsRing.n.x, -40);
+const northRouteMid = addJunction("wp_north_route_mid", "北ルート(四之宮)", snmB.x, -40);
+const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南台)", scrtRing.n.x, -40);
+buildRoad(northRouteWest, smrsRing.n, "main", "r_north_west_gate", "北ルート");
+buildRoad(northRouteMid, snmB, "main", "r_north_mid_gate", "北ルート");
+buildRoad(northRouteEast, scrtRing.n, "main", "r_north_east_gate", "北ルート");
+buildRoad(northRouteWest, northRouteMid, "main", "r_north_spine_1", "北ルート");
+buildRoad(northRouteMid, northRouteEast, "main", "r_north_spine_2", "北ルート");
 
 // ============================================================
 // ゲーム性強化: 茅ヶ崎〜辻堂〜藤沢を1つの都市圏として道路を増やす、
