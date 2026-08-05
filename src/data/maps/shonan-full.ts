@@ -450,10 +450,10 @@ smallLoop(tamuragaoka, 25, "tmgo", "田村ヶ丘", 1);
 // 引き締める(半径・オフセットとも縮小し、輪郭がぼやけないようにする)。
 const samukawaKita = addJunction("wp_samukawa_kita", "寒川ロータリー入口", samukawa.x + 15, samukawa.y - 45);
 buildRoad(samukawa, samukawaKita, "residential", "r_sm_kita", "寒川ロータリー");
-const smrtRing = smallLoop(samukawaKita, 20, "smrt", "寒川ロータリー", 1);
-const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 5, smrtRing.e.y - 62);
+const smrtRing = smallLoop(samukawaKita, 27, "smrt", "寒川ロータリー", 1);
+const smResidential = addJunction("wp_sm_residential", "寒川住宅街入口", smrtRing.e.x - 6, smrtRing.e.y - 73);
 buildRoad(smrtRing.e, smResidential, "residential", "r_sm_residential", "寒川住宅街");
-smallLoop(smResidential, 20, "smrs", "寒川住宅街", 1);
+smallLoop(smResidential, 27, "smrs", "寒川住宅街", 1);
 
 // ============================================================
 // 道路密度のメリハリ(小さな環状路)
@@ -518,9 +518,9 @@ const tsShop = addJunction("wp_ts_shop", "辻堂海浜商店街入口", tsujidoR
 buildRoad(tsujidoRing.sw, tsShop, "residential", "r_ts_sw_shop", "辻堂海浜商店街");
 const tsShopRing = smallLoop(tsShop, 26, "tssp", "辻堂海浜商店街", 1);
 // 商店街からさらに1本、小さな輪(辻堂緑ヶ浜イメージ)を足す。
-const tsMidori = addJunction("wp_ts_midori", "辻堂緑ヶ浜入口", tsShopRing.s.x, tsShopRing.s.y + 50);
+const tsMidori = addJunction("wp_ts_midori", "辻堂緑ヶ浜入口", tsShopRing.s.x, tsShopRing.s.y + 74);
 buildRoad(tsShopRing.s, tsMidori, "residential", "r_tssp_midori", "辻堂緑ヶ浜");
-smallLoop(tsMidori, 24, "tsmd", "辻堂緑ヶ浜", 1);
+smallLoop(tsMidori, 32, "tsmd", "辻堂緑ヶ浜", 1); // 半径は南からの直接アクセス路が輪の点を避けて通れるだけの余裕を持たせている
 // 茅ヶ崎住宅街メッシュから辻堂ロータリーの北西ゲートへ抜ける裏道(海沿い幹線・
 // 裏道(r_local_cg_ts)のどちらとも通らない北側のルート)。
 buildRoad(cgmNe, tsujidoRing.n, "residential", "r_cgmesh_tsujido", "茅ヶ崎住宅街");
@@ -540,7 +540,7 @@ const hrShopRing = smallLoop(hrShop, 28, "hrsp", "平塚銀座", 1);
 // 平塚: 銀座の輪からさらに1本、小さな輪(桜ヶ丘イメージ)を足す。
 const hrSakura = addJunction("wp_hr_sakura", "平塚桜ヶ丘入口", hrShopRing.e.x + 60, hrShopRing.e.y + 20);
 buildRoad(hrShopRing.e, hrSakura, "residential", "r_hrsp_sakura", "平塚桜ヶ丘");
-smallLoop(hrSakura, 25, "hrsk", "平塚桜ヶ丘", 1);
+smallLoop(hrSakura, 27, "hrsk", "平塚桜ヶ丘", 1);
 
 // 平塚: 住宅街メッシュ — ロータリー南東点から南側の空き地(農地の裏手)へ
 // 3列×2行の格子を作る。出口をロータリー南点へ直結し、格子内でも通り方を選べる
@@ -567,10 +567,10 @@ const enlpRing = smallLoop(enoshima, 35, "enlp", "江の島参道", 1);
 // 選べるようにする。
 const enCandle = addJunction("wp_en_candle", "江の島シーキャンドル入口", enlpRing.n.x - 160, enlpRing.n.y + 35);
 buildRoad(enlpRing.n, enCandle, "residential", "r_enlp_candle", "江の島シーキャンドル通り");
-smallLoop(enCandle, 24, "encd", "江の島シーキャンドル通り", 1);
+smallLoop(enCandle, 30, "encd", "江の島シーキャンドル通り", 1);
 const enChigo = addJunction("wp_en_chigo", "稚児ヶ淵入口", enlpRing.s.x, enlpRing.s.y + 55);
 buildRoad(enlpRing.s, enChigo, "coastal", "r_enlp_chigo", "稚児ヶ淵");
-smallLoop(enChigo, 24, "encg", "稚児ヶ淵", 1);
+smallLoop(enChigo, 32, "encg", "稚児ヶ淵", 1);
 
 // ============================================================
 // 湘南台: 600マス化・第3弾。これまで環状路が1つもなく、寒川・六会・大船の3方向が
@@ -587,7 +587,7 @@ const scrtRing = smallLoop(shonandaiKita, 45, "scrt", "湘南台ロータリー"
 // オフセットを縮め、ロータリーの塊にくっつけて見えるようにする)。
 const scResidential = addJunction("wp_sc_residential", "湘南台住宅街入口", scrtRing.e.x + 55, scrtRing.e.y + 30);
 buildRoad(scrtRing.e, scResidential, "residential", "r_sc_residential", "湘南台住宅街");
-const scResRing = smallLoop(scResidential, 20, "scrs", "湘南台住宅街", 2);
+const scResRing = smallLoop(scResidential, 30, "scrs", "湘南台住宅街", 2);
 // 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
 // (六会⇄大船間の再設計に合わせて縦横のみのルートに引き直すため、実際の接続は
 // 円蔵⇄六会⇄大船のトランクを作った後段でまとめて行う。)
@@ -721,7 +721,7 @@ buildRoad(komachiBend2, komachi, "residential", "r_km_komachi3", "小町通り")
 // とは重ならない、より東・北寄りの位置に小さな輪を作る。
 const onariEnt = addJunction("wp_onari_ent", "御成通り入口", kamakuraRing.n.x + 85, kamakuraRing.n.y - 70);
 buildRoad(kamakuraRing.n, onariEnt, "residential", "r_km_n_onari", "御成通り");
-smallLoop(onariEnt, 22, "onlp", "御成通り", 1);
+smallLoop(onariEnt, 27, "onlp", "御成通り", 1);
 
 // 鎌倉: 住宅街メッシュ — 腰越・稲村ヶ崎の間、海沿いの道(r_ks_in)よりさらに南の
 // 空き地に3列×2行の格子を作る。入口を腰越、出口を稲村ヶ崎への近道にすることで、
@@ -745,19 +745,19 @@ buildRoad(kmmNe, kmmSe, "residential", "r_kmmesh_col3", "鎌倉住宅街");
 // 距離を70px程度に抑えて直結にした。
 const kenchojiEnt = addJunction("wp_kenchoji_ent", "建長寺参道入口", kitakamakuraRing.sw.x - 200, kitakamakuraRing.sw.y + 20);
 buildRoad(kitakamakuraRing.sw, kenchojiEnt, "residential", "r_kk_kenchoji", "建長寺参道");
-smallLoop(kenchojiEnt, 25, "kjlp", "建長寺参道", 1);
+smallLoop(kenchojiEnt, 27, "kjlp", "建長寺参道", 1);
 
 // 稲村ヶ崎: 公園入口の輪からさらに海側へ1本、小さな海岸通りを足す。
 const inamuraKaigan = addJunction("wp_inamura_kaigan", "稲村ヶ崎海岸通り入口", inamuragasakiParkRing.e.x + 60, inamuragasakiParkRing.e.y + 40);
 buildRoad(inamuragasakiParkRing.e, inamuraKaigan, "residential", "r_inpark_kaigan", "稲村ヶ崎海岸通り");
-smallLoop(inamuraKaigan, 22, "incl", "稲村ヶ崎海岸通り", 1);
+smallLoop(inamuraKaigan, 27, "incl", "稲村ヶ崎海岸通り", 1);
 
 // 腰越: これまで行き止まりの1マスだけだった観光地に、衛星型の小さな輪を持たせて
 // 「浜辺の集落」らしい内部の選択肢を作る(由比ヶ浜は後方でノード定義後に追加)。
 // 腰越自体を中心にすると鵠沼⇄腰越・腰越⇄稲村ヶ崎の道と重なるため、南西へ離す。
 const koshigoeSat = addJunction("wp_koshigoe_sat", "腰越漁港通り入口", koshigoe.x - 30, koshigoe.y + 90);
 buildRoad(koshigoe, koshigoeSat, "residential", "r_ks_sat", "腰越漁港通り");
-smallLoop(koshigoeSat, 25, "kslp", "腰越漁港通り", 1);
+smallLoop(koshigoeSat, 27, "kslp", "腰越漁港通り", 1);
 // 鎌倉住宅街メッシュの入口(腰越漁港通りから)。出口(由比ヶ浜側)は由比ヶ浜のノード
 // 定義後にまとめて追加する。
 buildRoad(koshigoeSat, kmmNw, "residential", "r_ks_mesh", "鎌倉住宅街");
@@ -766,7 +766,7 @@ buildRoad(koshigoeSat, kmmNw, "residential", "r_ks_mesh", "鎌倉住宅街");
 // 古い商店街らしい奥行きを持たせる(終点そのものを中心にすると入口の道と重なるため)。
 const komachiOku = addJunction("wp_komachi_oku", "小町通り奥入口", komachi.x, komachi.y + 70);
 buildRoad(komachi, komachiOku, "residential", "r_km_komachi_oku", "小町通り奥");
-smallLoop(komachiOku, 25, "kmclp", "小町通り奥", 1);
+smallLoop(komachiOku, 28, "kmclp", "小町通り奥", 1);
 
 // 長い一本道の途中から、内陸ルートへ抜ける近道を追加。
 // 海沿いを直進するか、内陸へ抜けて別ルートを回るか、の選択肢が生まれる。
@@ -799,7 +799,7 @@ buildRoad(inamuragasaki, yuigahama, "coastal", "r_in_yui", "由比ヶ浜");
 // (yuilp_ne)が由比ヶ浜(wp_yuigahama)自身と重ならないだけの距離を確保している。
 const yuigahamaSat = addJunction("wp_yuigahama_sat", "由比ヶ浜海岸通り入口", yuigahama.x - 46, yuigahama.y + 46);
 buildRoad(yuigahama, yuigahamaSat, "residential", "r_yui_sat", "由比ヶ浜海岸通り");
-smallLoop(yuigahamaSat, 24, "yuilp", "由比ヶ浜海岸通り", 1);
+smallLoop(yuigahamaSat, 32, "yuilp", "由比ヶ浜海岸通り", 1);
 // 鎌倉住宅街メッシュの出口。北東の角から稲村ヶ崎へ直結する(南東の角から由比ヶ浜へ
 // 抜けるルートだと、稲村ヶ崎⇄由比ヶ浜の道や由比ヶ浜海岸通りの輪と重なるため)。
 buildRoad(kmmNe, inamuragasaki, "shortcut", "r_km_mesh_inamura", "鎌倉住宅街");
@@ -820,7 +820,7 @@ const katasekaigan = addJunction("wp_katase_kaigan", "片瀬海岸", pickMidFill
 buildRoad(pickMidFiller(kugenuma, koshigoe), katasekaigan, "coastal", "r_kgks_katase", "片瀬海岸");
 // 600マス化・第6弾: 片瀬海岸は行き止まりの1マスだけだったため、小さな輪だけ追加する
 // (他の小地名と違い、水族館の想定地として指定されているため独立した輪にする)。
-smallLoop(katasekaigan, 24, "ktlp", "片瀬海岸通り", 1);
+smallLoop(katasekaigan, 32, "ktlp", "片瀬海岸通り", 1); // 半径は北からの直接アクセス路が輪の点を避けて通れるだけの余裕を持たせている
 
 // 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道
 const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x, pickMidFiller(shonandai, ofuna).y - 60);
@@ -945,6 +945,265 @@ nudgeNode("r_enlp_candle_1", -2, 2); // 江の島シーキャンドル通り ⇄
 nudgeNode("r_in_yui_1", -2, -2); // 由比ヶ浜北通り ⇄ 鎌倉住宅街大通り
 nudgeNode("r_hr_cg_6", 1, -1); // 平塚南通り ⇄ 茅ヶ崎中央(北東)
 nudgeNode("r_fj_n_meiten2_2", 1, 1); // 藤沢名店街北通り ⇄ 香川新道
+
+// ------------------------------------------------------------------
+// 道が無関係なマスの真上を素通りする問題の解消: ハブ⇄出入口の直線や、別々に
+// 生成された道どうしが、途中にある無関係なマス(X)の真上を素通りしてしまう
+// 箇所が多数あった。Xを経由する交差点に変えるのではなく、道(A⇄B)自体を
+// Xを避けてL字に迂回させる(A⇄迂回点⇄Bの2区間にする)。迂回点はA・Bのみに
+// つながる単純な通過点で、Xの接続は一切変更しない。
+// ------------------------------------------------------------------
+function bAndNodeRadius(n: { majorHub?: true }): number {
+  return n.majorHub ? 18 : 10;
+}
+/** 線分(x1,y1)-(x2,y2)が、中心(cx,cy)・半幅hw・半高hhの矩形と交わるか(Liang-Barsky)。 */
+function bAndSegmentHitsRect(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, hw: number, hh: number): boolean {
+  const xmin = cx - hw, xmax = cx + hw, ymin = cy - hh, ymax = cy + hh;
+  let t0 = 0, t1 = 1;
+  const dx = x2 - x1, dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - xmin, xmax - x1, y1 - ymin, ymax - y1];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) {
+      if (q[i] < 0) return false;
+    } else {
+      const r = q[i] / p[i];
+      if (p[i] < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+      else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+  }
+  return t0 <= t1;
+}
+/** 既存のどの道(いま置き換えようとしているa⇄b自体は除く)も、点(px,py)を中心とした通常マスの上を通っていないか。 */
+function bAndAnyExistingEdgeHitsPoint(px: number, py: number, a: string, b: string): boolean {
+  const r = 10 - 2;
+  for (const e of edgeSpecs) {
+    if ((e.from === a && e.to === b) || (e.from === b && e.to === a)) continue;
+    const from = nodeSpecs.find((n) => n.id === e.from);
+    const to = nodeSpecs.find((n) => n.id === e.to);
+    if (!from || !to) continue;
+    if (bAndSegmentHitsRect(from.x, from.y, to.x, to.y, px, py, r, r)) return true;
+  }
+  return false;
+}
+/** 迂回点の候補(bx,by)が、a・b以外の全マスと重ならず、新しい2区間もa・b以外のマスを素通りせず、
+ * 既存のどの道からも素通りされない(=候補自体が別の道の上に乗らない)か。 */
+function bAndCandidateIsSafe(bx: number, by: number, a: string, b: string): boolean {
+  const bRadius = 10; // 迂回点は常に通常マス
+  for (const n of nodeSpecs) {
+    if (n.id === a || n.id === b) continue;
+    const rSum = bRadius + bAndNodeRadius(n);
+    if (Math.abs(bx - n.x) < rSum && Math.abs(by - n.y) < rSum) return false;
+  }
+  const an = nodeSpecs.find((n) => n.id === a)!;
+  const bn = nodeSpecs.find((n) => n.id === b)!;
+  for (const n of nodeSpecs) {
+    if (n.id === a || n.id === b) continue;
+    const r = bAndNodeRadius(n) - 2;
+    if (r <= 0) continue;
+    if (bAndSegmentHitsRect(an.x, an.y, bx, by, n.x, n.y, r, r)) return false;
+    if (bAndSegmentHitsRect(bx, by, bn.x, bn.y, n.x, n.y, r, r)) return false;
+  }
+  if (bAndAnyExistingEdgeHitsPoint(bx, by, a, b)) return false;
+  return true;
+}
+/** 線分(x1,y1)-(x2,y2)が、a・b以外のどれかのマスの真上を通っていないか。 */
+function bAndSegmentHitsAnyOtherNode(x1: number, y1: number, x2: number, y2: number, a: string, b: string): boolean {
+  for (const n of nodeSpecs) {
+    if (n.id === a || n.id === b) continue;
+    const r = bAndNodeRadius(n) - 2;
+    if (r <= 0) continue;
+    if (bAndSegmentHitsRect(x1, y1, x2, y2, n.x, n.y, r, r)) return true;
+  }
+  return false;
+}
+
+function bendAroundNode(a: string, b: string, x: string, idPrefix: string) {
+  const an = nodeSpecs.find((n) => n.id === a);
+  const bn = nodeSpecs.find((n) => n.id === b);
+  const xn = nodeSpecs.find((n) => n.id === x);
+  if (!an || !bn || !xn) throw new Error(`bendAroundNode: unknown node id among "${a}", "${b}", "${x}"`);
+  const idx = edgeSpecs.findIndex((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+  if (idx === -1) throw new Error(`bendAroundNode: no edge between "${a}" and "${b}"`);
+  const edge = edgeSpecs[idx];
+
+  const dx = bn.x - an.x, dy = bn.y - an.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux; // 進行方向に対する法線ベクトル
+
+  const vx = xn.x - an.x, vy = xn.y - an.y;
+  const preferredSide = vx * px + vy * py >= 0 ? -1 : 1; // Xと反対側を優先
+  const t = vx * ux + vy * uy; // A→B方向でのXの投影位置
+  const projX = an.x + ux * t, projY = an.y + uy * t;
+
+  // まず単純な1点バイパス(法線方向〜やや斜めに1回だけ膨らませる)を試す。
+  // A〜B全体を大きく迂回させると遠くの無関係なマスまで巻き込みやすいので、
+  // 効かない場合は「Xの近くだけ」を四角くよける2点のノッチ(コの字)に切り替える
+  // (街区の外周沿いをかすめて避けるイメージ)。
+  const margins = [8, 14, 20, 28, 38, 50, 65];
+  const angleOffsetsDeg = [0, -15, 15, -30, 30, -45, 45];
+  let singleFound: { x: number; y: number } | null = null;
+  single: for (const margin of margins) {
+    for (const angleDeg of angleOffsetsDeg) {
+      for (const sideFirst of [preferredSide, -preferredSide] as const) {
+        const clearance = bAndNodeRadius(xn) + 10 + margin;
+        const theta = (angleDeg * Math.PI) / 180;
+        const dirX = px * Math.cos(theta) - py * Math.sin(theta);
+        const dirY = px * Math.sin(theta) + py * Math.cos(theta);
+        const bx = Math.round(projX + dirX * sideFirst * clearance);
+        const by = Math.round(projY + dirY * sideFirst * clearance);
+        if (bAndCandidateIsSafe(bx, by, a, b)) {
+          singleFound = { x: bx, y: by };
+          break single;
+        }
+      }
+    }
+  }
+  if (singleFound) {
+    const bendId = `${idPrefix}_bend`;
+    nodeSpecs.push({ id: bendId, name: `${xn.area}迂回路`, type: "normal", area: xn.area, x: singleFound.x, y: singleFound.y });
+    edgeSpecs.splice(idx, 1);
+    edgeSpecs.push({ from: a, to: bendId, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+    edgeSpecs.push({ from: bendId, to: b, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+    return;
+  }
+
+  // 2点のノッチ(コの字)。Xのすぐ手前・すぐ先の2点だけを法線方向にずらし、
+  // それ以外はもとの直線に沿わせることで、遠くのマスを巻き込まずXだけを避ける。
+  let notchFound: { p1: { x: number; y: number }; p2: { x: number; y: number } } | null = null;
+  const halfSpans = [bAndNodeRadius(xn) + 6, bAndNodeRadius(xn) + 12, bAndNodeRadius(xn) + 20, bAndNodeRadius(xn) + 32];
+  notch: for (const margin of margins.concat([85, 110, 140, 170])) {
+    for (const halfSpan of halfSpans) {
+      for (const sideFirst of [preferredSide, -preferredSide] as const) {
+        const clearance = bAndNodeRadius(xn) + 10 + margin;
+        const p1x = Math.round(projX - ux * halfSpan + px * sideFirst * clearance);
+        const p1y = Math.round(projY - uy * halfSpan + py * sideFirst * clearance);
+        const p2x = Math.round(projX + ux * halfSpan + px * sideFirst * clearance);
+        const p2y = Math.round(projY + uy * halfSpan + py * sideFirst * clearance);
+        if (
+          bAndCandidateIsSafe(p1x, p1y, a, b) &&
+          bAndCandidateIsSafe(p2x, p2y, a, b) &&
+          !bAndSegmentHitsAnyOtherNode(p1x, p1y, p2x, p2y, a, b)
+        ) {
+          notchFound = { p1: { x: p1x, y: p1y }, p2: { x: p2x, y: p2y } };
+          break notch;
+        }
+      }
+    }
+  }
+  if (!notchFound) {
+    // 最終手段: Xの周囲を360度・複数半径で総当たりし、A・Bへの2区間とも安全な
+    // 隙間(たいていリング上の点と点のあいだ)を探す。狭い衛星の輪などで
+    // 法線方向がふさがっている場合の救済。
+    let fallback: { x: number; y: number } | null = null;
+    fb: for (let radius = bAndNodeRadius(xn) + 12; radius <= bAndNodeRadius(xn) + 160; radius += 4) {
+      for (let angleDeg = 0; angleDeg < 360; angleDeg += 2) {
+        const theta = (angleDeg * Math.PI) / 180;
+        const bx = Math.round(xn.x + radius * Math.cos(theta));
+        const by = Math.round(xn.y + radius * Math.sin(theta));
+        if (bAndCandidateIsSafe(bx, by, a, b)) {
+          fallback = { x: bx, y: by };
+          break fb;
+        }
+      }
+    }
+    if (!fallback) {
+      throw new Error(`bendAroundNode(${a}, ${b}, avoid ${x}): no safe detour point found within search range`);
+    }
+    const bendId = `${idPrefix}_bend`;
+    nodeSpecs.push({ id: bendId, name: `${xn.area}迂回路`, type: "normal", area: xn.area, x: fallback.x, y: fallback.y });
+    edgeSpecs.splice(idx, 1);
+    edgeSpecs.push({ from: a, to: bendId, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+    edgeSpecs.push({ from: bendId, to: b, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+    return;
+  }
+  const id1 = `${idPrefix}_bend1`;
+  const id2 = `${idPrefix}_bend2`;
+  nodeSpecs.push({ id: id1, name: `${xn.area}迂回路`, type: "normal", area: xn.area, x: notchFound.p1.x, y: notchFound.p1.y });
+  nodeSpecs.push({ id: id2, name: `${xn.area}迂回路`, type: "normal", area: xn.area, x: notchFound.p2.x, y: notchFound.p2.y });
+  edgeSpecs.splice(idx, 1);
+  edgeSpecs.push({ from: a, to: id1, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+  edgeSpecs.push({ from: id1, to: id2, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+  edgeSpecs.push({ from: id2, to: b, roadType: edge.roadType, requiresCardId: edge.requiresCardId });
+}
+
+bendAroundNode("hub_enoshima", "r_kg_en_bridge_2", "enlp_n", "bend01");
+bendAroundNode("wp_inamuragasaki", "wp_inamuragasaki_park", "inlp_w", "bend02");
+bendAroundNode("wp_tamura", "wp_tamura_kado", "tmlp_s", "bend03");
+bendAroundNode("wp_rokkai", "r_sc_rk_4", "wp_rk_ofuna_bend1", "bend04");
+bendAroundNode("r_fj_kg_1", "r_fj_kg_2", "fjrt_s", "bend05");
+bendAroundNode("r_kg_ks_3", "wp_katase_kaigan", "ktlp_n", "bend06");
+bendAroundNode("r_rk_fj_2", "r_rk_fj_3", "wp_fj_meiten_ent", "bend07");
+bendAroundNode("r_rk_fj_3", "r_rk_fj_4", "fjrt_n", "bend08");
+bendAroundNode("r_tm_hr_5", "wp_nakahara", "nklp_w", "bend09");
+bendAroundNode("r_tm_hr_8", "r_tm_hr_9", "hrlp_n", "bend10");
+bendAroundNode("fjrt_n", "wp_fj_meiten_ent", "r_rk_fj_3", "bend11");
+bendAroundNode("fjrt_ne", "r_fj_ne_kitaguchi_1", "fjkt_s", "bend12");
+bendAroundNode("tssp_s", "wp_ts_midori", "tsmd_n", "bend13");
+bendAroundNode("enlp_s", "wp_en_chigo", "encg_n", "bend14");
+bendAroundNode("scrs_s", "r_sc_res_rokkai_h_1", "scrs_se", "bend15");
+bendAroundNode("wp_komachi3", "wp_komachi_oku", "kmclp_n", "bend16");
+bendAroundNode("wp_chigasaki_kaigan", "wp_chigasaki_kaigan_oku", "cgklp_n", "bend17");
+bendAroundNode("wp_yuigahama", "wp_yuigahama_sat", "yuilp_ne", "bend18");
+bendAroundNode("r_cg_ts_3", "r_cg_ts_4", "r_local_cg_ts_2", "bend19");
+bendAroundNode("wp_kitakamakura", "r_of_kk_2", "kklp_w", "bend20");
+bendAroundNode("r_local_cg_ts_2", "r_local_cg_ts_3", "r_cg_ts_4", "bend21");
+bendAroundNode("r_in_km_1", "r_in_km_2", "kmlp_s", "bend22");
+bendAroundNode("smrt_e", "wp_sm_residential", "smrt_ne", "bend23");
+bendAroundNode("kklp_w", "kklp_nw", "r_sc_res_rokkai_join_2", "bend25");
+bendAroundNode("kmlp_n", "r_km_n_onari_1", "r_kk_km_6", "bend26");
+bendAroundNode("wp_kenchoji_ent", "r_kk_kenchoji_3", "kjlp_e", "bend27");
+bendAroundNode("wp_onari_ent", "r_km_n_onari_1", "onlp_sw", "bend28");
+bendAroundNode("kklp_ne", "kklp_e", "r_sc_res_rokkai_join_1", "bend29");
+bendAroundNode("wp_koshigoe_sat", "r_ks_mesh_1", "kslp_s", "bend30");
+bendAroundNode("wp_rk_ofuna_bende", "r_sc_res_rokkai_join_5", "r_sc_of_9", "bend31");
+bendAroundNode("r_local_cg_ts_1", "r_local_cg_ts_2", "r_cg_ts_3", "bend32");
+bendAroundNode("hrlp_ne", "wp_hr_shop", "hrsp_sw", "bend33");
+bendAroundNode("r_cg_ts_4", "r_cg_ts_5", "r_local_cg_ts_3", "bend34");
+bendAroundNode("wp_en_candle", "r_enlp_candle_2", "encd_e", "bend35");
+bendAroundNode("tslp_nw", "r_tslp_gate_tslp_nw_1", "r_cgmesh_col3_1", "bend36");
+bendAroundNode("r_kg_cg_3", "r_kg_cg_4", "cglp_n", "bend37");
+bendAroundNode("wp_ofuna_shop", "r_of_shop_1", "ofsp_s", "bend38");
+bendAroundNode("r_kj_fj_6", "r_kj_fj_7", "fjrt_e", "bend39");
+bendAroundNode("inlp_e", "wp_inamura_kaigan", "incl_nw", "bend40");
+bendAroundNode("hub_samukawa", "wp_samukawa_kita", "smrt_s", "bend41");
+bendAroundNode("r_cg_ts_2", "r_cg_ts_3", "r_local_cg_ts_1", "bend42");
+bendAroundNode("wp_ofuna", "r_sc_of_9", "r_sc_res_rokkai_join_5", "bend43");
+bendAroundNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2", "bend44");
+bendAroundNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5", "bend45");
+bendAroundNode("hrsp_e", "wp_hr_sakura", "hrsk_w", "bend46");
+bendAroundNode("wp_koshigoe_sat", "r_ks_sat_1", "kslp_n", "bend47");
+bendAroundNode("scrt_e", "wp_sc_residential", "scrs_nw", "bend48");
+bendAroundNode("r_kk_km_1", "r_kk_km_2", "kklp_sw", "bend49");
+bendAroundNode("enlp_n", "r_enlp_candle_1", "enlp_nw", "bend50");
+bendAroundNode("r_cg_ne_mesh_1", "r_cg_ne_mesh_2", "r_short_cgts_kg_2", "bend51");
+bendAroundNode("wp_chigasaki_kaigan_oku", "r_ts_shop_cg_kaigan_4", "cgklp_ne", "bend52");
+bendAroundNode("tslp_sw", "wp_ts_shop", "tssp_e", "bend53");
+bendAroundNode("wp_ts_shop", "r_ts_shop_cg_kaigan_1", "tssp_sw", "bend54");
+bendAroundNode("nklp_e", "wp_tamuragaoka", "tmgo_w", "bend55");
+
+// ------------------------------------------------------------------
+// 座標の微調整(第2弾): 上記の輪の半径調整・迂回追加に伴い、隣接する別の輪・
+// 既存マスとごくわずか(数px)重なった箇所だけを最終座標で押し出す。
+// ------------------------------------------------------------------
+nudgeNode("smrt_n", 0, 1);
+nudgeNode("smrt_ne", 0, 1);
+nudgeNode("smrt_se", -4, -6);
+nudgeNode("inlp_e", -4, 4);
+nudgeNode("inlp_ne", -4, 0);
+nudgeNode("incl_nw", -2, 2);
+nudgeNode("incl_n", -2, 2);
+nudgeNode("incl_ne", 2, 2);
+nudgeNode("onlp_sw", 5, -3);
+nudgeNode("onlp_nw", 1, 1);
+nudgeNode("kslp_n", 1, 2);
+nudgeNode("kslp_ne", 2, 2);
+nudgeNode("yuilp_ne", -6, 6);
+nudgeNode("smrt_s", -1, -2);
+nudgeNode("smrt_sw", -2, -2);
+nudgeNode("ktlp_ne", -2, 2);
+nudgeNode("bend40_bend", -1, 4);
 
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
