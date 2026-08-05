@@ -664,6 +664,10 @@ function buildGridBlock(
   rows: number,
   idPrefix: string,
   area: string,
+  // "full": 全マスを格子状に接続する(従来どおり)。
+  // "perimeter": 外周(四辺)だけを道にし、中央列は南北ゲートを結ぶ最短の1本だけ
+  // 通す(内部は接続を作らない=見た目上「塗りつぶされた街区」にする)。
+  edgeStyle: "full" | "perimeter" = "full",
 ): Hub[][] {
   const grid: Hub[][] = [];
   for (let c = 0; c < cols; c++) {
@@ -675,14 +679,33 @@ function buildGridBlock(
     }
     grid.push(col);
   }
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      buildRoad(grid[c][r], grid[c + 1][r], "residential", `r_${idPrefix}_h${c}${r}`, area);
+  if (edgeStyle === "full") {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        buildRoad(grid[c][r], grid[c + 1][r], "residential", `r_${idPrefix}_h${c}${r}`, area);
+      }
     }
-  }
-  for (let c = 0; c < cols; c++) {
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows - 1; r++) {
+        buildRoad(grid[c][r], grid[c][r + 1], "residential", `r_${idPrefix}_v${c}${r}`, area);
+      }
+    }
+  } else {
+    // 外周(上端・下端・左端・右端)
+    for (let c = 0; c < cols - 1; c++) {
+      buildRoad(grid[c][0], grid[c + 1][0], "residential", `r_${idPrefix}_h${c}0`, area);
+      buildRoad(grid[c][rows - 1], grid[c + 1][rows - 1], "residential", `r_${idPrefix}_h${c}${rows - 1}`, area);
+    }
     for (let r = 0; r < rows - 1; r++) {
-      buildRoad(grid[c][r], grid[c][r + 1], "residential", `r_${idPrefix}_v${c}${r}`, area);
+      buildRoad(grid[0][r], grid[0][r + 1], "residential", `r_${idPrefix}_v0${r}`, area);
+      buildRoad(grid[cols - 1][r], grid[cols - 1][r + 1], "residential", `r_${idPrefix}_v${cols - 1}${r}`, area);
+    }
+    // 中央列: 南北ゲートを結ぶ最短の1本(外周だけだと中央列の内部マスが孤立するため)。
+    const midCol = Math.floor(cols / 2);
+    if (midCol > 0 && midCol < cols - 1) {
+      for (let r = 0; r < rows - 1; r++) {
+        buildRoad(grid[midCol][r], grid[midCol][r + 1], "residential", `r_${idPrefix}_v${midCol}${r}`, area);
+      }
     }
   }
   return grid;
@@ -690,9 +713,20 @@ function buildGridBlock(
 // 中央列(c=1)をhub_shonandai・北ルートと同じx=1080に揃え、南口・北口とも
 // 縦一直線の接続にする(斜めなし)。南端行はhub_shonandaiの24px北に置き、
 // 街区の外周がすぐそこまで迫っているように見せる。
-const sctw = buildGridBlock(1080 - 42, 12, 42, 38, 3, 4, "sctw", "湘南台");
+// edgeStyle:"perimeter" — 全マス格子(3x4=17辺)だと「規則正しい道路網」に見えて
+// しまうため、外周(四辺)+中央列(南北ゲートを結ぶ最短路)の13辺だけに絞り、
+// 内部はtextureデコレーション(建物の塊)で塗って「街」の見た目を作る。
+const sctw = buildGridBlock(1080 - 42, 12, 42, 38, 3, 4, "sctw", "湘南台", "perimeter");
 const shonandaiKita = sctw[1][0]; // 北口ゲート(北ルートへ)
 buildRoad(shonandai, sctw[1][3], "residential", "r_sc_kita", "湘南台北口"); // 南口ゲート(hub_shonandaiへ)
+decorations.push({
+  kind: "texture",
+  variant: "houses",
+  x: sctw[0][0].x - 24,
+  y: sctw[0][0].y - 24,
+  width: sctw[2][0].x - sctw[0][0].x + 48,
+  height: sctw[0][3].y - sctw[0][0].y + 48,
+});
 // 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
 // (六会⇄大船間の再設計に合わせて縦横のみのルートに引き直すため、実際の接続は
 // 円蔵⇄六会⇄大船のトランクを作った後段でまとめて行う。)
@@ -736,9 +770,11 @@ buildRoad(shinomiyaGate, snmD, "residential", "r_sm_sc_shinomiya_gate", "四之�
 // 密集していて、無理に迂回させると別の場所で道がマスを横切る問題を再発するため)。
 // 既存の湘南台⇄六会の幹線(main、南北一直線)を経由して到達させる。
 // ============================================================
-const northRouteWest = addJunction("wp_north_route_west", "北ルート(寒川)", smrsRing.n.x, -40);
-const northRouteMid = addJunction("wp_north_route_mid", "北ルート(四之宮)", snmB.x, -40);
-const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南台)", shonandaiKita.x, -40);
+// 湘南台の街区(y=12〜126)・四之宮(y≈snmCy-19〜+19)と縦方向の間隔を広く取り、
+// 「街のすぐ上に幹線が並走している」印象を避ける(y=-40→-90)。
+const northRouteWest = addJunction("wp_north_route_west", "北ルート(寒川)", smrsRing.n.x, -90);
+const northRouteMid = addJunction("wp_north_route_mid", "北ルート(四之宮)", snmB.x, -90);
+const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南台)", shonandaiKita.x, -90);
 buildRoad(northRouteWest, smrsRing.n, "main", "r_north_west_gate", "北ルート");
 buildRoad(northRouteMid, snmB, "main", "r_north_mid_gate", "北ルート");
 buildRoad(northRouteEast, shonandaiKita, "main", "r_north_east_gate", "北ルート");
