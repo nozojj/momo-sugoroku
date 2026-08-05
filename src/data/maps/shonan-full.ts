@@ -222,6 +222,28 @@ function buildRoad(a: Hub, b: Hub, roadType: RoadType, idPrefix: string, area: s
   chainCache.set([a.id, b.id].sort().join("__"), fillers);
 }
 
+/**
+ * 同じroadType・areaで連続するbuildRoad呼び出しをまとめて書くためのヘルパー。
+ * points=[a,b,c,d] なら buildRoad(a,b,...), buildRoad(b,c,...), buildRoad(c,d,...) を
+ * 順番に呼ぶのと完全に同じ(生成されるノードID・座標・chainCacheの中身も一致する)。
+ * idPrefixesは各区間ごとに明示的に指定する(自動生成しない)。既存のidPrefixは
+ * "r_sm_sc_h1"のように意味のある名前であり、インデックスから機械的に作ると
+ * ノードIDが変わってしまうため。
+ */
+function connectRoad(points: Hub[], roadType: RoadType, area: string, idPrefixes: string[]) {
+  if (idPrefixes.length !== points.length - 1) {
+    throw new Error(`connectRoad: expected ${points.length - 1} idPrefixes, got ${idPrefixes.length}`);
+  }
+  for (let i = 0; i < points.length - 1; i++) {
+    buildRoad(points[i], points[i + 1], roadType, idPrefixes[i], area, 0);
+  }
+}
+
+/** connectRoadを複数区間まとめて呼ぶためのヘルパー。roadType・areaが共通の複数チェーンをまとめて書ける。 */
+function connectMany(chains: { points: Hub[]; idPrefixes: string[] }[], roadType: RoadType, area: string) {
+  for (const chain of chains) connectRoad(chain.points, roadType, area, chain.idPrefixes);
+}
+
 /** a⇄b の区間(すでに buildRoad 済みであること)の、だいたい真ん中のマスを1つ拾う。 */
 function pickMidFiller(a: Hub, b: Hub): Hub {
   return pickFillerAt(a, b, 0.5);
@@ -533,10 +555,14 @@ const cgmNe = addJunction("cgmesh_ne", "茅ヶ崎住宅街(北東)", 710, 600);
 const cgmSw = addJunction("cgmesh_sw", "茅ヶ崎住宅街(南西)", 620, 680);
 const cgmS = addJunction("cgmesh_s", "茅ヶ崎住宅街(南)", 680, 680);
 const cgmSe = addJunction("cgmesh_se", "茅ヶ崎住宅街(南東)", 710, 680);
-buildRoad(cgmNw, cgmN, "residential", "r_cgmesh_row1a", "茅ヶ崎住宅街");
-buildRoad(cgmN, cgmNe, "residential", "r_cgmesh_row1b", "茅ヶ崎住宅街");
-buildRoad(cgmSw, cgmS, "residential", "r_cgmesh_row2a", "茅ヶ崎住宅街");
-buildRoad(cgmS, cgmSe, "residential", "r_cgmesh_row2b", "茅ヶ崎住宅街");
+connectMany(
+  [
+    { points: [cgmNw, cgmN, cgmNe], idPrefixes: ["r_cgmesh_row1a", "r_cgmesh_row1b"] },
+    { points: [cgmSw, cgmS, cgmSe], idPrefixes: ["r_cgmesh_row2a", "r_cgmesh_row2b"] },
+  ],
+  "residential",
+  "茅ヶ崎住宅街",
+);
 buildRoad(cgmNw, cgmSw, "residential", "r_cgmesh_col1", "茅ヶ崎住宅街");
 buildRoad(cgmN, cgmS, "residential", "r_cgmesh_col2", "茅ヶ崎住宅街");
 buildRoad(cgmNe, cgmSe, "residential", "r_cgmesh_col3", "茅ヶ崎住宅街");
@@ -591,10 +617,14 @@ const hrmNe = addJunction("hrmesh_ne", "平塚住宅街(北東)", 200, 830);
 const hrmSw = addJunction("hrmesh_sw", "平塚住宅街(南西)", 60, 880);
 const hrmS = addJunction("hrmesh_s", "平塚住宅街(南)", 130, 880);
 const hrmSe = addJunction("hrmesh_se", "平塚住宅街(南東)", 200, 880);
-buildRoad(hrmNw, hrmN, "residential", "r_hrmesh_row1a", "平塚住宅街");
-buildRoad(hrmN, hrmNe, "residential", "r_hrmesh_row1b", "平塚住宅街");
-buildRoad(hrmSw, hrmS, "residential", "r_hrmesh_row2a", "平塚住宅街");
-buildRoad(hrmS, hrmSe, "residential", "r_hrmesh_row2b", "平塚住宅街");
+connectMany(
+  [
+    { points: [hrmNw, hrmN, hrmNe], idPrefixes: ["r_hrmesh_row1a", "r_hrmesh_row1b"] },
+    { points: [hrmSw, hrmS, hrmSe], idPrefixes: ["r_hrmesh_row2a", "r_hrmesh_row2b"] },
+  ],
+  "residential",
+  "平塚住宅街",
+);
 buildRoad(hrmNw, hrmSw, "residential", "r_hrmesh_col1", "平塚住宅街");
 buildRoad(hrmN, hrmS, "residential", "r_hrmesh_col2", "平塚住宅街");
 buildRoad(hrmNe, hrmSe, "residential", "r_hrmesh_col3", "平塚住宅街");
@@ -684,10 +714,14 @@ const snmF = addJunction("wp_snm_f", "四之宮(東端)", snmCx + 42, snmCy - 19
 const snmC = addJunction("wp_snm_c", "四之宮(西)", snmCx - 42, snmCy + 19);
 const snmD = addJunction("wp_snm_d", "四之宮", snmCx, snmCy + 19);
 const snmE = addJunction("wp_snm_e", "四之宮(東)", snmCx + 42, snmCy + 19);
-buildRoad(snmA, snmB, "residential", "r_snm_ab", "四之宮");
-buildRoad(snmB, snmF, "residential", "r_snm_bf", "四之宮");
-buildRoad(snmC, snmD, "residential", "r_snm_cd", "四之宮");
-buildRoad(snmD, snmE, "residential", "r_snm_de", "四之宮");
+connectMany(
+  [
+    { points: [snmA, snmB, snmF], idPrefixes: ["r_snm_ab", "r_snm_bf"] },
+    { points: [snmC, snmD, snmE], idPrefixes: ["r_snm_cd", "r_snm_de"] },
+  ],
+  "residential",
+  "四之宮",
+);
 buildRoad(snmA, snmC, "residential", "r_snm_ac", "四之宮");
 buildRoad(snmB, snmD, "residential", "r_snm_bd", "四之宮");
 buildRoad(snmF, snmE, "residential", "r_snm_fe", "四之宮");
@@ -708,8 +742,7 @@ const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南�
 buildRoad(northRouteWest, smrsRing.n, "main", "r_north_west_gate", "北ルート");
 buildRoad(northRouteMid, snmB, "main", "r_north_mid_gate", "北ルート");
 buildRoad(northRouteEast, shonandaiKita, "main", "r_north_east_gate", "北ルート");
-buildRoad(northRouteWest, northRouteMid, "main", "r_north_spine_1", "北ルート");
-buildRoad(northRouteMid, northRouteEast, "main", "r_north_spine_2", "北ルート");
+connectRoad([northRouteWest, northRouteMid, northRouteEast], "main", "北ルート", ["r_north_spine_1", "r_north_spine_2"]);
 
 // ============================================================
 // 中間ルート: 寒川ロータリー⇄四之宮⇄湘南台ブロックをつなぐ、北ルートとは別の
@@ -722,9 +755,12 @@ buildRoad(northRouteMid, northRouteEast, "main", "r_north_spine_2", "北ルー�
 // いったん東へ離れてから縦に折れる。
 const midRouteBendW1 = addJunction("wp_mid_route_bend_w1", "中間ルート(寒川・東)", 600, smrsRing.e.y);
 const midRouteBendW2 = addJunction("wp_mid_route_bend_w2", "中間ルート(寒川・南)", 600, snmC.y);
-buildRoad(smrsRing.e, midRouteBendW1, "residential", "r_mid_west_h1", "中間ルート");
-buildRoad(midRouteBendW1, midRouteBendW2, "residential", "r_mid_west_v", "中間ルート");
-buildRoad(midRouteBendW2, snmC, "residential", "r_mid_west_h2", "中間ルート");
+connectRoad(
+  [smrsRing.e, midRouteBendW1, midRouteBendW2, snmC],
+  "residential",
+  "中間ルート",
+  ["r_mid_west_h1", "r_mid_west_v", "r_mid_west_h2"],
+);
 // 東側: 四之宮の点の列(x=823)にすぐ沿わせると四之宮内部の道と重なるため、
 // いったん東へ離れてから折れる(snmEとブロックのyはほぼ同じ(4px差)なので
 // 折れ点は1つで足りる)。
@@ -802,10 +838,14 @@ const fjmNe = addJunction("fjmesh_ne", "藤沢住宅街(北東)", 1050, 815);
 const fjmSw = addJunction("fjmesh_sw", "藤沢住宅街(南西)", 890, 865);
 const fjmS = addJunction("fjmesh_s", "藤沢住宅街(南)", 970, 865);
 const fjmSe = addJunction("fjmesh_se", "藤沢住宅街(南東)", 1050, 865);
-buildRoad(fjmNw, fjmN, "residential", "r_fjmesh_row1a", "藤沢住宅街");
-buildRoad(fjmN, fjmNe, "residential", "r_fjmesh_row1b", "藤沢住宅街");
-buildRoad(fjmSw, fjmS, "residential", "r_fjmesh_row2a", "藤沢住宅街");
-buildRoad(fjmS, fjmSe, "residential", "r_fjmesh_row2b", "藤沢住宅街");
+connectMany(
+  [
+    { points: [fjmNw, fjmN, fjmNe], idPrefixes: ["r_fjmesh_row1a", "r_fjmesh_row1b"] },
+    { points: [fjmSw, fjmS, fjmSe], idPrefixes: ["r_fjmesh_row2a", "r_fjmesh_row2b"] },
+  ],
+  "residential",
+  "藤沢住宅街",
+);
 buildRoad(fjmNw, fjmSw, "residential", "r_fjmesh_col1", "藤沢住宅街");
 buildRoad(fjmN, fjmS, "residential", "r_fjmesh_col2", "藤沢住宅街");
 buildRoad(fjmNe, fjmSe, "residential", "r_fjmesh_col3", "藤沢住宅街");
@@ -853,10 +893,14 @@ const kmmNe = addJunction("kmmesh_ne", "鎌倉住宅街(北東)", 1480, 1140);
 const kmmSw = addJunction("kmmesh_sw", "鎌倉住宅街(南西)", 1340, 1190);
 const kmmS = addJunction("kmmesh_s", "鎌倉住宅街(南)", 1410, 1190);
 const kmmSe = addJunction("kmmesh_se", "鎌倉住宅街(南東)", 1480, 1190);
-buildRoad(kmmNw, kmmN, "residential", "r_kmmesh_row1a", "鎌倉住宅街");
-buildRoad(kmmN, kmmNe, "residential", "r_kmmesh_row1b", "鎌倉住宅街");
-buildRoad(kmmSw, kmmS, "residential", "r_kmmesh_row2a", "鎌倉住宅街");
-buildRoad(kmmS, kmmSe, "residential", "r_kmmesh_row2b", "鎌倉住宅街");
+connectMany(
+  [
+    { points: [kmmNw, kmmN, kmmNe], idPrefixes: ["r_kmmesh_row1a", "r_kmmesh_row1b"] },
+    { points: [kmmSw, kmmS, kmmSe], idPrefixes: ["r_kmmesh_row2a", "r_kmmesh_row2b"] },
+  ],
+  "residential",
+  "鎌倉住宅街",
+);
 buildRoad(kmmNw, kmmSw, "residential", "r_kmmesh_col1", "鎌倉住宅街");
 buildRoad(kmmN, kmmS, "residential", "r_kmmesh_col2", "鎌倉住宅街");
 buildRoad(kmmNe, kmmSe, "residential", "r_kmmesh_col3", "鎌倉住宅街");
@@ -969,8 +1013,7 @@ const enzoGate = pickMidFiller(kagawa, rokkai);
 const enzoW = addJunction("wp_enzo_w", "円蔵(西)", enzoGate.x - 70, enzoGate.y + 95);
 const enzoC = addJunction("wp_enzo_c", "円蔵", enzoGate.x, enzoGate.y + 95);
 const enzoE = addJunction("wp_enzo_e", "円蔵(東)", enzoGate.x + 70, enzoGate.y + 95);
-buildRoad(enzoW, enzoC, "residential", "r_enzo_w_c", "円蔵");
-buildRoad(enzoC, enzoE, "residential", "r_enzo_c_e", "円蔵");
+connectRoad([enzoW, enzoC, enzoE], "residential", "円蔵", ["r_enzo_w_c", "r_enzo_c_e"]);
 const enzoAlley1 = addJunction("wp_enzo_alley1", "円蔵仲通り(北)", enzoC.x - 35, enzoC.y - 35);
 buildRoad(enzoC, enzoAlley1, "residential", "r_enzo_alley1", "円蔵");
 const enzoAlley2 = addJunction("wp_enzo_alley2", "円蔵仲通り(南)", enzoE.x + 35, enzoE.y + 35);
@@ -995,8 +1038,7 @@ const enzoOfunaSpur = addJunction("wp_enzo_ofuna_spur", "望地", enzoRokkaiMid.
 buildRoad(enzoRokkaiMid, enzoOfunaSpur, "residential", "r_enzo_bend1_spur", "望地");
 
 const rkOfunaUp = addJunction("wp_rk_ofuna_up", "大船入口(西)", rkOfunaBendE.x, ofuna.y);
-buildRoad(rkOfunaBendE, rkOfunaUp, "main", "r_rk_ofuna_v2", "六会大船間");
-buildRoad(rkOfunaUp, ofuna, "main", "r_rk_ofuna_h2", "六会大船間");
+connectRoad([rkOfunaBendE, rkOfunaUp, ofuna], "main", "六会大船間", ["r_rk_ofuna_v2", "r_rk_ofuna_h2"]);
 
 // 辻堂-藤沢の中間→六会(湘南台方面)の裏道。香川⇄六会の幹線トランクへ、
 // ほぼ垂直に近い形で合流させる。
@@ -1023,8 +1065,12 @@ const scResHSpurBase = pickMidFiller(scResBranchStart, scResBend1);
 const scResHSpur = addJunction("wp_sc_res_hspur", "湘南台住宅街裏の外れ(西)", scResHSpurBase.x, scResHSpurBase.y - 50);
 buildRoad(scResHSpurBase, scResHSpur, "shortcut", "r_sc_res_hspur", "湘南台住宅街");
 const scResBend2 = addJunction("wp_sc_res_bend2", "湘南台住宅街裏道(南)", scResBend1.x, 388);
-buildRoad(scResBend1, scResBend2, "shortcut", "r_sc_res_rokkai_v", "湘南台住宅街");
-buildRoad(scResBend2, rkOfunaBendE, "shortcut", "r_sc_res_rokkai_join", "湘南台住宅街");
+connectRoad(
+  [scResBend1, scResBend2, rkOfunaBendE],
+  "shortcut",
+  "湘南台住宅街",
+  ["r_sc_res_rokkai_v", "r_sc_res_rokkai_join"],
+);
 // 一本道防止: 東西に長い裏道の途中から短い行き止まりの寄り道を1つ挟む。
 const scResSpurBase = pickMidFiller(scResBend1, scResBend2);
 const scResSpur = addJunction("wp_sc_res_spur", "湘南台住宅街裏の外れ", scResSpurBase.x + 50, scResSpurBase.y);
