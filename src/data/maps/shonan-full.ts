@@ -1321,6 +1321,95 @@ bendAroundNode("r_sc_res_rokkai_h_6", "r_sc_res_rokkai_h_7", "r_sc_of_v_1", "ben
 nudgeNode("r_scof_zengyo_1", 15, -15);
 
 // ------------------------------------------------------------------
+// 道の線同士が(マスとは無関係な)開けた場所で交差してしまっている箇所の解消
+// (第1弾: ちょっとした座標の押し出しだけで直せたもの)。
+// ------------------------------------------------------------------
+nudgeNode("r_cg_ts_5", 61, 35);
+nudgeNode("wp_tamuragaoka", 0, -50);
+nudgeNode("wp_hr_sakura", 0, -50);
+nudgeNode("wp_fj_higashiguchi", -35, -61);
+nudgeNode("r_km_w_in_1", -49, 49);
+nudgeNode("kklp_sw", -35, -35);
+nudgeNode("wp_inamuragasaki_park", -13, -48);
+nudgeNode("inlp_se", -25, -25);
+nudgeNode("wp_komachi_oku", -13, -48);
+nudgeNode("wp_yuigahama_sat", -35, -61);
+nudgeNode("r_scof_zengyo_1", -35, -35);
+nudgeNode("bend19_bend", -35, -61);
+
+// ------------------------------------------------------------------
+// 道の線同士が(マスとは無関係な)開けた場所で交差してしまっている箇所の解消
+// (第2弾: 座標を押し出すだけでは直せなかったもの)。ほとんどが「半径20〜30px
+// 程度の小さな輪・メッシュの1辺」対「その輪のすぐそばを通る迂回・裏道」という
+// 組み合わせで、輪自体を動かす余地がほぼ無い。避けるのではなく、交差している
+// 短い辺の方を、もう片方の道がすでに触れている点を経由する2区間に繋ぎ直す
+// (=すれ違いをやめて、その点を実際のゲートにする)。
+// ------------------------------------------------------------------
+function edgeSpliceThroughNode(a: string, b: string, x: string) {
+  const idx = edgeSpecs.findIndex((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+  if (idx === -1) throw new Error(`edgeSpliceThroughNode: no edge between "${a}" and "${b}"`);
+  const orig = edgeSpecs[idx];
+  edgeSpecs.splice(idx, 1);
+  const hasEdge = (p: string, q: string) => edgeSpecs.some((e) => (e.from === p && e.to === q) || (e.from === q && e.to === p));
+  if (!hasEdge(a, x)) edgeSpecs.push({ from: a, to: x, roadType: orig.roadType, requiresCardId: orig.requiresCardId });
+  if (!hasEdge(x, b)) edgeSpecs.push({ from: x, to: b, roadType: orig.roadType, requiresCardId: orig.requiresCardId });
+}
+edgeSpliceThroughNode("enlp_n", "enlp_ne", "bend01_bend");
+edgeSpliceThroughNode("r_sc_res_rokkai_join_4", "r_sc_res_rokkai_join_5", "wp_ofuna");
+edgeSpliceThroughNode("wp_rokkai", "r_kg_rk_12", "r_fj_n_meiten2_2");
+edgeSpliceThroughNode("r_sc_res_rokkai_join_1", "r_sc_res_rokkai_join_2", "wp_kitakamakura");
+edgeSpliceThroughNode("r_hr_cg_1", "r_hr_cg_2", "hrlp_e");
+edgeSpliceThroughNode("r_hr_cg_6", "r_hr_cg_7", "cglp_w");
+edgeSpliceThroughNode("r_cg_ts_1", "r_cg_ts_2", "cglp_e");
+edgeSpliceThroughNode("r_cg_ts_4", "bend34_bend", "bend21_bend");
+edgeSpliceThroughNode("tslp_sw", "r_tslp_ring5_1", "r_cg_ts_5");
+edgeSpliceThroughNode("tslp_e", "r_tslp_ring1_1", "r_ts_fj_1");
+edgeSpliceThroughNode("r_ts_fj_4", "r_ts_fj_5", "fjrt_w");
+edgeSpliceThroughNode("fjrt_s", "r_fjrt_ring3_1", "bend05_bend");
+edgeSpliceThroughNode("r_in_km_1", "bend22_bend", "kmlp_s");
+edgeSpliceThroughNode("r_sc_res_rokkai_h_6", "bend56_bend", "r_sc_of_v_1");
+edgeSpliceThroughNode("r_sc_of_v_4", "r_sc_of_v_5", "r_rk_ofuna_h1_6");
+edgeSpliceThroughNode("cglp_n", "r_cglp_ring0_1", "bend37_bend");
+edgeSpliceThroughNode("r_fj_n_meiten2_1", "bend44_bend", "r_rk_fj_2");
+edgeSpliceThroughNode("r_rk_fj_3", "bend07_bend", "wp_fj_meiten_ent");
+edgeSpliceThroughNode("fjrt_n", "r_fjrt_ring7_1", "bend08_bend");
+edgeSpliceThroughNode("fjrt_n", "bend11_bend", "r_rk_fj_3");
+edgeSpliceThroughNode("r_kk_kenchoji_2", "r_kk_kenchoji_3", "r_of_kj_2");
+edgeSpliceThroughNode("r_kj_fj_6", "bend39_bend", "fjrt_e");
+edgeSpliceThroughNode("r_of_kk_2", "bend20_bend", "kklp_w");
+edgeSpliceThroughNode("r_kk_km_1", "bend49_bend", "kklp_s");
+edgeSpliceThroughNode("r_km_n_onari_1", "bend26_bend", "r_kk_km_6");
+edgeSpliceThroughNode("r_kk_km_6", "r_kk_km_7", "kmlp_n");
+edgeSpliceThroughNode("hrlp_n", "r_hrlp_ring7_1", "bend10_bend");
+edgeSpliceThroughNode("tmlp_s", "tmlp_sw", "bend03_bend");
+edgeSpliceThroughNode("nklp_w", "nklp_nw", "bend09_bend");
+edgeSpliceThroughNode("smrs_se", "smrs_s", "wp_sm_residential");
+edgeSpliceThroughNode("fjkt_se", "fjkt_s", "bend12_bend");
+edgeSpliceThroughNode("r_fj_mesh_exit_2", "r_fj_mesh_exit_3", "r_fj_sw_mesh_1");
+edgeSpliceThroughNode("cgcyu_ne", "cgcyu_e", "wp_cg_chuo");
+edgeSpliceThroughNode("cgsp_se", "cgsp_s", "wp_cg_shop");
+edgeSpliceThroughNode("cgmesh_ne", "r_cgmesh_col3_1", "tslp_nw");
+edgeSpliceThroughNode("cgmesh_s", "cgmesh_se", "tslp_w");
+edgeSpliceThroughNode("r_cg_ne_mesh_1", "bend51_bend", "r_short_cgts_kg_2");
+edgeSpliceThroughNode("tssp_e", "tssp_se", "bend53_bend");
+edgeSpliceThroughNode("tssp_s", "tssp_sw", "bend54_bend");
+edgeSpliceThroughNode("tsmd_n", "tsmd_ne", "bend13_bend");
+edgeSpliceThroughNode("hrsp_s", "hrsp_sw", "bend33_bend");
+edgeSpliceThroughNode("encd_e", "encd_se", "bend35_bend");
+edgeSpliceThroughNode("encg_ne", "encg_e", "wp_en_chigo");
+edgeSpliceThroughNode("wp_sc_res_bend2", "r_sc_res_rokkai_join_1", "bend29_bend");
+edgeSpliceThroughNode("r_sc_res_rokkai_join_2", "r_sc_res_rokkai_join_3", "bend25_bend");
+edgeSpliceThroughNode("onlp_se", "onlp_s", "wp_onari_ent");
+edgeSpliceThroughNode("kjlp_e", "kjlp_se", "bend27_bend");
+edgeSpliceThroughNode("incl_sw", "incl_w", "wp_inamura_kaigan");
+edgeSpliceThroughNode("kslp_s", "kslp_sw", "bend30_bend");
+edgeSpliceThroughNode("kslp_n", "kslp_nw", "wp_koshigoe_sat");
+edgeSpliceThroughNode("cgklp_n", "cgklp_ne", "bend17_bend");
+edgeSpliceThroughNode("cgklp_e", "cgklp_se", "wp_chigasaki_kaigan_oku");
+edgeSpliceThroughNode("ktlp_n", "ktlp_nw", "bend06_bend");
+edgeSpliceThroughNode("ofsp_se", "ofsp_s", "bend38_bend");
+
+// ------------------------------------------------------------------
 // 座標の微調整(第2弾): 上記の輪の半径調整・迂回追加に伴い、隣接する別の輪・
 // 既存マスとごくわずか(数px)重なった箇所だけを最終座標で押し出す。
 // ------------------------------------------------------------------
