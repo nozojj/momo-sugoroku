@@ -573,14 +573,17 @@ buildRoad(enlpRing.s, enChigo, "coastal", "r_enlp_chigo", "稚児ヶ淵");
 smallLoop(enChigo, 32, "encg", "稚児ヶ淵", 1);
 
 // ============================================================
-// 湘南台: 「ロータリー(輪)」だと規模を大きくしても道路の交差点にしか見えない
-// ため、密な格子ブロック(3列×4行=12マス、全17辺で格子状に接続)に作り直す。
-// 全街区中もっとも大きい街として、他の街(4〜5マスのメッシュ)よりはっきり
-// 大きい面積にする。外周トランク(寒川・大船・六会・北ルート)は、格子の
-// 北端中央・南端中央の2点だけをゲートにして接続し(南口は寒川・大船・六会の
-// 3方向が集まる既存のhub_shonandaiに直結、北口は北ルートに直結)、格子の中心は
-// どのトランクからも直接は触れない。東端中央にもう1つだけ、湘南台住宅街の
-// 裏道(六会・大船方面へ抜ける裏ルート)用のゲートを設ける。
+// 湘南台: 道路階層を分離する。
+//   幹線(main) = 街区の外側だけを通る(寒川・大船・六会・北ルートの4本)。
+//   生活道路(residential) = 街区の内部専用。色も別レイヤーとして視覚分離する。
+// 街区(3列×4行=12マスの格子)を先に置き、そのあとで幹線をその外側に迂回させる
+// 順序で設計する(逆に「幹線が交差する点に街を後付けする」と、街ではなく
+// 交差点そのものが主役に見えてしまうため)。ゲートは北端中央・南端中央の
+// 2点だけ(=1〜2箇所)。南端はhub_shonandaiとほぼ密着させ(24px)、寒川・大船・
+// 六会の3幹線が収束する場所そのものを街区の一部として視覚的に取り込む
+// (旧デザインは寒川台距離があり、街と交差点が別物に見えていた)。
+// 湘南台住宅街の裏道(六会・大船方面)は、街区の中を通さずhub_shonandai自体
+// から分岐させる(=ゲート以外で幹線と街内部の道路が交差・接続しない)。
 // ============================================================
 function buildGridBlock(
   originX: number,
@@ -615,10 +618,10 @@ function buildGridBlock(
   return grid;
 }
 // 中央列(c=1)をhub_shonandai・北ルートと同じx=1080に揃え、南口・北口とも
-// 縦一直線の接続にする(斜めなし)。
-const sctw = buildGridBlock(1080 - 42, 0, 42, 38, 3, 4, "sctw", "湘南台");
+// 縦一直線の接続にする(斜めなし)。南端行はhub_shonandaiの24px北に置き、
+// 街区の外周がすぐそこまで迫っているように見せる。
+const sctw = buildGridBlock(1080 - 42, 12, 42, 38, 3, 4, "sctw", "湘南台");
 const shonandaiKita = sctw[1][0]; // 北口ゲート(北ルートへ)
-const scResidential = sctw[2][2]; // 東口ゲート(湘南台住宅街の裏道へ)
 buildRoad(shonandai, sctw[1][3], "residential", "r_sc_kita", "湘南台北口"); // 南口ゲート(hub_shonandaiへ)
 // 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
 // (六会⇄大船間の再設計に合わせて縦横のみのルートに引き直すため、実際の接続は
@@ -937,13 +940,14 @@ buildRoad(pickFillerAt(samukawa, shonandai, 0.66), pickFillerAt(kagawa, rokkai, 
 // 未使用の点)から、同じく香川⇄六会の幹線トランクへ合流。
 buildRoad(fujisawaRing.nw, pickFillerAt(kagawa, rokkai, 0.85), "residential", "r_fj_nw_rk", "藤沢ロータリー");
 
-// 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。大船銀座より
-// さらに東まで水平に迂回してから南下し、東側トランクの終端付近へつなぐ
-// (縦横のみ・既存の道と重ならない)。
-const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, scResidential.y);
-buildRoad(scResidential, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
+// 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。街区の中は通さず
+// hub_shonandai自身から分岐させ(=ゲート以外で幹線と街内部の道路が交差・
+// 接続しないようにする)、大船銀座よりさらに東まで水平に迂回してから南下し、
+// 東側トランクの終端付近へつなぐ(縦横のみ・既存の道と重ならない)。
+const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, shonandai.y);
+buildRoad(shonandai, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
 // 一本道防止: 東西に長い区間(9マス分)の途中から短い行き止まりの寄り道を1つ挟む。
-const scResHSpurBase = pickMidFiller(scResidential, scResBend1);
+const scResHSpurBase = pickMidFiller(shonandai, scResBend1);
 const scResHSpur = addJunction("wp_sc_res_hspur", "湘南台住宅街裏の外れ(西)", scResHSpurBase.x, scResHSpurBase.y - 50);
 buildRoad(scResHSpurBase, scResHSpur, "shortcut", "r_sc_res_hspur", "湘南台住宅街");
 const scResBend2 = addJunction("wp_sc_res_bend2", "湘南台住宅街裏道(南)", scResBend1.x, 388);
