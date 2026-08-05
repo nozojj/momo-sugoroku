@@ -946,6 +946,81 @@ nudgeNode("r_in_yui_1", -2, -2); // 由比ヶ浜北通り ⇄ 鎌倉住宅街大
 nudgeNode("r_hr_cg_6", 1, -1); // 平塚南通り ⇄ 茅ヶ崎中央(北東)
 nudgeNode("r_fj_n_meiten2_2", 1, 1); // 藤沢名店街北通り ⇄ 香川新道
 
+// ------------------------------------------------------------------
+// 道が無関係なマスを素通りする問題の解消: ハブ⇄出入口の直線や、別々に生成された
+// 道どうしが、途中にある無関係なマスの真上を素通りしてしまう箇所が多数あった
+// (環状路は全方位に点を持つため、どの方角からの道もどこかの点をかすめやすい)。
+// 座標を動かす代わりに、その素通りされているマス(X)を経由する2本の道に
+// 繋ぎ直し、「素通りする道」を「実際に立ち寄る交差点」に変える。
+// ------------------------------------------------------------------
+function hasEdge(a: string, b: string): boolean {
+  return edgeSpecs.some((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+}
+function spliceThroughNode(a: string, b: string, x: string) {
+  const idx = edgeSpecs.findIndex((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+  if (idx === -1) throw new Error(`spliceThroughNode: no edge between "${a}" and "${b}"`);
+  const orig = edgeSpecs[idx];
+  edgeSpecs.splice(idx, 1);
+  if (!hasEdge(a, x)) edgeSpecs.push({ from: a, to: x, roadType: orig.roadType, requiresCardId: orig.requiresCardId });
+  if (!hasEdge(x, b)) edgeSpecs.push({ from: x, to: b, roadType: orig.roadType, requiresCardId: orig.requiresCardId });
+}
+
+spliceThroughNode("hub_enoshima", "r_kg_en_bridge_2", "enlp_n");
+spliceThroughNode("wp_inamuragasaki", "wp_inamuragasaki_park", "inlp_w");
+spliceThroughNode("wp_tamura", "wp_tamura_kado", "tmlp_s");
+spliceThroughNode("wp_rokkai", "r_sc_rk_4", "wp_rk_ofuna_bend1");
+spliceThroughNode("r_fj_kg_1", "r_fj_kg_2", "fjrt_s");
+spliceThroughNode("r_kg_ks_3", "wp_katase_kaigan", "ktlp_n");
+spliceThroughNode("r_rk_fj_2", "r_rk_fj_3", "wp_fj_meiten_ent");
+spliceThroughNode("r_rk_fj_3", "r_rk_fj_4", "fjrt_n");
+spliceThroughNode("r_tm_hr_5", "wp_nakahara", "nklp_w");
+spliceThroughNode("r_tm_hr_8", "r_tm_hr_9", "hrlp_n");
+spliceThroughNode("fjrt_n", "wp_fj_meiten_ent", "r_rk_fj_3");
+spliceThroughNode("fjrt_ne", "r_fj_ne_kitaguchi_1", "fjkt_s");
+spliceThroughNode("tssp_s", "wp_ts_midori", "tsmd_n");
+spliceThroughNode("enlp_s", "wp_en_chigo", "encg_n");
+spliceThroughNode("scrs_s", "r_sc_res_rokkai_h_1", "scrs_se");
+spliceThroughNode("wp_komachi3", "wp_komachi_oku", "kmclp_n");
+spliceThroughNode("wp_chigasaki_kaigan", "wp_chigasaki_kaigan_oku", "cgklp_n");
+spliceThroughNode("wp_yuigahama", "wp_yuigahama_sat", "yuilp_ne");
+spliceThroughNode("r_cg_ts_3", "r_cg_ts_4", "r_local_cg_ts_2");
+spliceThroughNode("wp_kitakamakura", "r_of_kk_2", "kklp_w");
+spliceThroughNode("r_local_cg_ts_2", "r_local_cg_ts_3", "r_cg_ts_4");
+spliceThroughNode("r_in_km_1", "r_in_km_2", "kmlp_s");
+spliceThroughNode("smrt_e", "wp_sm_residential", "smrt_ne");
+spliceThroughNode("smrt_ne", "wp_sm_residential", "smrs_s");
+spliceThroughNode("kklp_w", "kklp_nw", "r_sc_res_rokkai_join_2");
+spliceThroughNode("kmlp_n", "r_km_n_onari_1", "r_kk_km_6");
+spliceThroughNode("wp_kenchoji_ent", "r_kk_kenchoji_3", "kjlp_e");
+spliceThroughNode("wp_onari_ent", "r_km_n_onari_1", "onlp_sw");
+spliceThroughNode("kklp_ne", "kklp_e", "r_sc_res_rokkai_join_1");
+spliceThroughNode("wp_koshigoe_sat", "r_ks_mesh_1", "kslp_s");
+spliceThroughNode("wp_rk_ofuna_bende", "r_sc_res_rokkai_join_5", "r_sc_of_9");
+spliceThroughNode("r_local_cg_ts_1", "r_local_cg_ts_2", "r_cg_ts_3");
+spliceThroughNode("hrlp_ne", "wp_hr_shop", "hrsp_sw");
+spliceThroughNode("r_cg_ts_4", "r_cg_ts_5", "r_local_cg_ts_3");
+spliceThroughNode("wp_en_candle", "r_enlp_candle_2", "encd_e");
+spliceThroughNode("tslp_nw", "r_tslp_gate_tslp_nw_1", "r_cgmesh_col3_1");
+spliceThroughNode("r_kg_cg_3", "r_kg_cg_4", "cglp_n");
+spliceThroughNode("wp_ofuna_shop", "r_of_shop_1", "ofsp_s");
+spliceThroughNode("r_kj_fj_6", "r_kj_fj_7", "fjrt_e");
+spliceThroughNode("inlp_e", "wp_inamura_kaigan", "incl_nw");
+spliceThroughNode("hub_samukawa", "wp_samukawa_kita", "smrt_s");
+spliceThroughNode("r_cg_ts_2", "r_cg_ts_3", "r_local_cg_ts_1");
+spliceThroughNode("wp_ofuna", "r_sc_of_9", "r_sc_res_rokkai_join_5");
+spliceThroughNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2");
+spliceThroughNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5");
+spliceThroughNode("hrsp_e", "wp_hr_sakura", "hrsk_w");
+spliceThroughNode("wp_koshigoe_sat", "r_ks_sat_1", "kslp_n");
+spliceThroughNode("scrt_e", "wp_sc_residential", "scrs_nw");
+spliceThroughNode("r_kk_km_1", "r_kk_km_2", "kklp_sw");
+spliceThroughNode("enlp_n", "r_enlp_candle_1", "enlp_nw");
+spliceThroughNode("r_cg_ne_mesh_1", "r_cg_ne_mesh_2", "r_short_cgts_kg_2");
+spliceThroughNode("wp_chigasaki_kaigan_oku", "r_ts_shop_cg_kaigan_4", "cgklp_ne");
+spliceThroughNode("tslp_sw", "wp_ts_shop", "tssp_e");
+spliceThroughNode("wp_ts_shop", "r_ts_shop_cg_kaigan_1", "tssp_sw");
+spliceThroughNode("nklp_e", "wp_tamuragaoka", "tmgo_w");
+
 export function buildShonanFullMap(): { map: MapData; properties: PropertyDef[] } {
   const nodeMap = new Map<string, MapNode>();
   for (const spec of nodeSpecs) {
