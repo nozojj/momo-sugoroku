@@ -400,7 +400,24 @@ buildRoad(inamuragasaki, kamakura, "coastal", "r_in_km", "稲村ヶ崎");
 // ============================================================
 // 内陸ルート(2区間)。同じ理由で蛇行は廃止。
 // ============================================================
-buildRoad(samukawa, shonandai, "main", "r_sm_sc", "寒川");
+// 寒川⇄湘南台は斜めの直線ではなく、湘南台の真下まで縦横だけで下りてから
+// 寒川へ一直線に向かうルートにする(斜めなし)。湘南台側はx=1080の列を
+// 使うと六会行きの幹線(r_sc_rk)と同じ列に重なってしまうため、いったん
+// 西へ1マス分ずらしてから南下する。四之宮のゲートや香川・六会への近道は
+// この区間の途中の点を拾って使っているため、3区間のマス列をつなげて1本の
+// 連続したチェーンとしてchainCacheに登録し直し、pickMidFiller/pickFillerAtが
+// 引き続き正しく機能するようにする。
+const smscBendW = addJunction("wp_sm_sc_bend_w", "寒川湘南台間(西)", shonandai.x - 90, samukawa.y);
+const smscBendN = addJunction("wp_sm_sc_bend_n", "寒川湘南台間(北)", shonandai.x - 90, shonandai.y);
+buildRoad(samukawa, smscBendW, "main", "r_sm_sc_h1", "寒川");
+buildRoad(smscBendW, smscBendN, "main", "r_sm_sc_v", "寒川");
+buildRoad(smscBendN, shonandai, "main", "r_sm_sc_h2", "寒川");
+{
+  const c1 = chainCache.get([samukawa.id, smscBendW.id].sort().join("__")) ?? [];
+  const c2 = chainCache.get([smscBendW.id, smscBendN.id].sort().join("__")) ?? [];
+  const c3 = chainCache.get([smscBendN.id, shonandai.id].sort().join("__")) ?? [];
+  chainCache.set([samukawa.id, shonandai.id].sort().join("__"), [...c1, smscBendW, ...c2, smscBendN, ...c3]);
+}
 buildRoad(shonandai, ofuna, "main", "r_sc_of", "湘南台");
 
 // ============================================================
