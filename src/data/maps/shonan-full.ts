@@ -418,7 +418,30 @@ buildRoad(smscBendN, shonandai, "main", "r_sm_sc_h2", "寒川");
   const c3 = chainCache.get([smscBendN.id, shonandai.id].sort().join("__")) ?? [];
   chainCache.set([samukawa.id, shonandai.id].sort().join("__"), [...c1, smscBendW, ...c2, smscBendN, ...c3]);
 }
-buildRoad(shonandai, ofuna, "main", "r_sc_of", "湘南台");
+// 湘南台⇄大船も斜めの直線ではなく、湘南台と同じ緯度を東へ進んでから南下する
+// L字にする(斜めなし)。大船自体は西(六会大船間)・北(大船銀座)・南(梶原)・
+// 東(北鎌倉)の4方向がすでにふさがっているため、大船へ直接着けるのではなく、
+// 六会大船間トランクの西側の点(大船入口(西)、後方で定義)へ南から合流させる。
+// 善行の枝道はこの区間の途中の点を拾っているため、寒川⇄湘南台と同様に
+// 区間をつなげてchainCacheに登録し直す。
+const scofBendE = addJunction("wp_sc_of_bend_e", "湘南台大船間(東)", ofuna.x - 100, shonandai.y);
+const scofBendS = addJunction("wp_sc_of_bend_s", "湘南台大船間(南)", ofuna.x - 100, ofuna.y + 40);
+const scofBendE2 = addJunction("wp_sc_of_bend_e2", "湘南台大船間(南東)", ofuna.x - 70, ofuna.y + 40);
+buildRoad(shonandai, scofBendE, "main", "r_sc_of_h", "湘南台");
+buildRoad(scofBendE, scofBendS, "main", "r_sc_of_v", "湘南台");
+buildRoad(scofBendS, scofBendE2, "main", "r_sc_of_h2", "湘南台");
+// 最後は「大船入口(西)」(wp_rk_ofuna_up、後方で定義)へ直結する短い1区間。
+// まだ定義前のノードIDなので、buildRoadを介さず直接エッジを追加する。
+edgeSpecs.push({ from: scofBendE2.id, to: "wp_rk_ofuna_up", roadType: "main" });
+{
+  const c1 = chainCache.get([shonandai.id, scofBendE.id].sort().join("__")) ?? [];
+  const c2 = chainCache.get([scofBendE.id, scofBendS.id].sort().join("__")) ?? [];
+  const c3 = chainCache.get([scofBendS.id, scofBendE2.id].sort().join("__")) ?? [];
+  chainCache.set(
+    [shonandai.id, ofuna.id].sort().join("__"),
+    [...c1, scofBendE, ...c2, scofBendS, ...c3, scofBendE2],
+  );
+}
 
 // ============================================================
 // 海沿い⇄内陸の行き来(4箇所、各2区間)。
@@ -920,8 +943,9 @@ buildRoad(pickMidFiller(kugenuma, koshigoe), katasekaigan, "coastal", "r_kgks_ka
 // (他の小地名と違い、水族館の想定地として指定されているため独立した輪にする)。
 smallLoop(katasekaigan, 32, "ktlp", "片瀬海岸通り", 1); // 半径は北からの直接アクセス路が輪の点を避けて通れるだけの余裕を持たせている
 
-// 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道
-const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x, pickMidFiller(shonandai, ofuna).y - 60);
+// 湘南台⇄大船の中間 → 善行(実在地名)への短い枝道(区間の途中が縦の列・
+// 湘南台住宅街裏道の横の列と近いため、どちらからも離れた向きへオフセットする)。
+const zengyo = addJunction("wp_zengyo", "善行", pickMidFiller(shonandai, ofuna).x + 80, pickMidFiller(shonandai, ofuna).y - 60);
 buildRoad(pickMidFiller(shonandai, ofuna), zengyo, "residential", "r_scof_zengyo", "善行");
 
 // 北鎌倉⇄鎌倉(8マス、区間内で最長)の中間 → 鎌倉小路の北ゲートに合流させる。
@@ -989,10 +1013,13 @@ buildRoad(fujisawaRing.nw, pickFillerAt(kagawa, rokkai, 0.85), "residential", "r
 // hub_shonandai自身から分岐させ(=ゲート以外で幹線と街内部の道路が交差・
 // 接続しないようにする)、大船銀座よりさらに東まで水平に迂回してから南下し、
 // 東側トランクの終端付近へつなぐ(縦横のみ・既存の道と重ならない)。
-const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, shonandai.y);
-buildRoad(shonandai, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
+// 湘南台⇄大船の幹線(r_sc_of、y=shonandai.yで東へ一直線)と同じ緯度を通ると
+// 重なってしまうため、いったん六会方面の列(x=1080)を少し南下してから東へ折れる。
+const scResBranchStart = pickFillerAt(shonandai, rokkai, 0.2);
+const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, scResBranchStart.y);
+buildRoad(scResBranchStart, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
 // 一本道防止: 東西に長い区間(9マス分)の途中から短い行き止まりの寄り道を1つ挟む。
-const scResHSpurBase = pickMidFiller(shonandai, scResBend1);
+const scResHSpurBase = pickMidFiller(scResBranchStart, scResBend1);
 const scResHSpur = addJunction("wp_sc_res_hspur", "湘南台住宅街裏の外れ(西)", scResHSpurBase.x, scResHSpurBase.y - 50);
 buildRoad(scResHSpurBase, scResHSpur, "shortcut", "r_sc_res_hspur", "湘南台住宅街");
 const scResBend2 = addJunction("wp_sc_res_bend2", "湘南台住宅街裏道(南)", scResBend1.x, 388);
@@ -1255,7 +1282,6 @@ bendAroundNode("wp_kenchoji_ent", "r_kk_kenchoji_3", "kjlp_e", "bend27");
 bendAroundNode("wp_onari_ent", "r_km_n_onari_1", "onlp_sw", "bend28");
 bendAroundNode("kklp_ne", "kklp_e", "r_sc_res_rokkai_join_1", "bend29");
 bendAroundNode("wp_koshigoe_sat", "r_ks_mesh_1", "kslp_s", "bend30");
-bendAroundNode("wp_rk_ofuna_bende", "r_sc_res_rokkai_join_5", "r_sc_of_9", "bend31");
 bendAroundNode("r_local_cg_ts_1", "r_local_cg_ts_2", "r_cg_ts_3", "bend32");
 bendAroundNode("hrlp_ne", "wp_hr_shop", "hrsp_sw", "bend33");
 bendAroundNode("r_cg_ts_4", "r_cg_ts_5", "r_local_cg_ts_3", "bend34");
@@ -1267,7 +1293,6 @@ bendAroundNode("r_kj_fj_6", "r_kj_fj_7", "fjrt_e", "bend39");
 bendAroundNode("inlp_e", "wp_inamura_kaigan", "incl_nw", "bend40");
 bendAroundNode("hub_samukawa", "wp_samukawa_kita", "smrt_s", "bend41");
 bendAroundNode("r_cg_ts_2", "r_cg_ts_3", "r_local_cg_ts_1", "bend42");
-bendAroundNode("wp_ofuna", "r_sc_of_9", "r_sc_res_rokkai_join_5", "bend43");
 bendAroundNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2", "bend44");
 bendAroundNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5", "bend45");
 bendAroundNode("hrsp_e", "wp_hr_sakura", "hrsk_w", "bend46");
@@ -1279,6 +1304,8 @@ bendAroundNode("wp_chigasaki_kaigan_oku", "r_ts_shop_cg_kaigan_4", "cgklp_ne", "
 bendAroundNode("tslp_sw", "wp_ts_shop", "tssp_e", "bend53");
 bendAroundNode("wp_ts_shop", "r_ts_shop_cg_kaigan_1", "tssp_sw", "bend54");
 bendAroundNode("nklp_e", "wp_tamuragaoka", "tmgo_w", "bend55");
+bendAroundNode("r_sc_res_rokkai_h_6", "r_sc_res_rokkai_h_7", "r_sc_of_v_1", "bend56");
+nudgeNode("r_scof_zengyo_1", 15, -15);
 
 // ------------------------------------------------------------------
 // 座標の微調整(第2弾): 上記の輪の半径調整・迂回追加に伴い、隣接する別の輪・
