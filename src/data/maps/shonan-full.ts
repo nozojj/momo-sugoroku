@@ -573,21 +573,53 @@ buildRoad(enlpRing.s, enChigo, "coastal", "r_enlp_chigo", "稚児ヶ淵");
 smallLoop(enChigo, 32, "encg", "稚児ヶ淵", 1);
 
 // ============================================================
-// 湘南台: 600マス化・第3弾。これまで環状路が1つもなく、寒川・六会・大船の3方向が
-// 湘南台の1点で交わるだけだった(駅前に選択肢が無い)。3方向すべて駅のすぐ近くから
-// 出ているため、環状路は北側の空いた方角に衛星型で作る。
+// 湘南台: 「ロータリー(輪)」だと規模を大きくしても道路の交差点にしか見えない
+// ため、密な格子ブロック(3列×4行=12マス、全17辺で格子状に接続)に作り直す。
+// 全街区中もっとも大きい街として、他の街(4〜5マスのメッシュ)よりはっきり
+// 大きい面積にする。外周トランク(寒川・大船・六会・北ルート)は、格子の
+// 北端中央・南端中央の2点だけをゲートにして接続し(南口は寒川・大船・六会の
+// 3方向が集まる既存のhub_shonandaiに直結、北口は北ルートに直結)、格子の中心は
+// どのトランクからも直接は触れない。東端中央にもう1つだけ、湘南台住宅街の
+// 裏道(六会・大船方面へ抜ける裏ルート)用のゲートを設ける。
 // ============================================================
-// 街のシルエット再設計: 湘南台は全街区中もっとも大きい「大ロータリー+商店街」にする。
-// ゲートはshonandaiKita一本ではなく、ロータリー自体に2本のスポーク(gates:2)を
-// 持たせて「ロータリー内でも選択肢がある」構造にし、街としての規模を強調する。
-const shonandaiKita = addJunction("wp_shonandai_kita", "湘南台北口", shonandai.x + 20, shonandai.y - 55);
-buildRoad(shonandai, shonandaiKita, "residential", "r_sc_kita", "湘南台北口");
-const scrtRing = smallLoop(shonandaiKita, 45, "scrt", "湘南台ロータリー", 2, 45, 0, ["n", "w"]);
-// 住宅街: ロータリーの東点からさらに1本、小さな輪を足す(街の輪郭を保つため
-// オフセットを縮め、ロータリーの塊にくっつけて見えるようにする)。
-const scResidential = addJunction("wp_sc_residential", "湘南台住宅街入口", scrtRing.e.x + 55, scrtRing.e.y + 30);
-buildRoad(scrtRing.e, scResidential, "residential", "r_sc_residential", "湘南台住宅街");
-const scResRing = smallLoop(scResidential, 30, "scrs", "湘南台住宅街", 2);
+function buildGridBlock(
+  originX: number,
+  originY: number,
+  colSpacing: number,
+  rowSpacing: number,
+  cols: number,
+  rows: number,
+  idPrefix: string,
+  area: string,
+): Hub[][] {
+  const grid: Hub[][] = [];
+  for (let c = 0; c < cols; c++) {
+    const col: Hub[] = [];
+    for (let r = 0; r < rows; r++) {
+      const x = originX + c * colSpacing;
+      const y = originY + r * rowSpacing;
+      col.push(addJunction(`${idPrefix}_c${c}r${r}`, `${area}(${c},${r})`, x, y));
+    }
+    grid.push(col);
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      buildRoad(grid[c][r], grid[c + 1][r], "residential", `r_${idPrefix}_h${c}${r}`, area);
+    }
+  }
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows - 1; r++) {
+      buildRoad(grid[c][r], grid[c][r + 1], "residential", `r_${idPrefix}_v${c}${r}`, area);
+    }
+  }
+  return grid;
+}
+// 中央列(c=1)をhub_shonandai・北ルートと同じx=1080に揃え、南口・北口とも
+// 縦一直線の接続にする(斜めなし)。
+const sctw = buildGridBlock(1080 - 42, 0, 42, 38, 3, 4, "sctw", "湘南台");
+const shonandaiKita = sctw[1][0]; // 北口ゲート(北ルートへ)
+const scResidential = sctw[2][2]; // 東口ゲート(湘南台住宅街の裏道へ)
+buildRoad(shonandai, sctw[1][3], "residential", "r_sc_kita", "湘南台北口"); // 南口ゲート(hub_shonandaiへ)
 // 住宅街から六会方面へ抜ける裏道。湘南台駅前を経由しない、駅の外側を回るルートになる。
 // (六会⇄大船間の再設計に合わせて縦横のみのルートに引き直すため、実際の接続は
 // 円蔵⇄六会⇄大船のトランクを作った後段でまとめて行う。)
@@ -622,10 +654,10 @@ buildRoad(shinomiyaGate, snmD, "residential", "r_sm_sc_shinomiya_gate", "四之�
 // ============================================================
 const northRouteWest = addJunction("wp_north_route_west", "北ルート(寒川)", smrsRing.n.x, -40);
 const northRouteMid = addJunction("wp_north_route_mid", "北ルート(四之宮)", snmB.x, -40);
-const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南台)", scrtRing.n.x, -40);
+const northRouteEast = addJunction("wp_north_route_east", "北ルート(湘南台)", shonandaiKita.x, -40);
 buildRoad(northRouteWest, smrsRing.n, "main", "r_north_west_gate", "北ルート");
 buildRoad(northRouteMid, snmB, "main", "r_north_mid_gate", "北ルート");
-buildRoad(northRouteEast, scrtRing.n, "main", "r_north_east_gate", "北ルート");
+buildRoad(northRouteEast, shonandaiKita, "main", "r_north_east_gate", "北ルート");
 buildRoad(northRouteWest, northRouteMid, "main", "r_north_spine_1", "北ルート");
 buildRoad(northRouteMid, northRouteEast, "main", "r_north_spine_2", "北ルート");
 
@@ -908,10 +940,10 @@ buildRoad(fujisawaRing.nw, pickFillerAt(kagawa, rokkai, 0.85), "residential", "r
 // 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。大船銀座より
 // さらに東まで水平に迂回してから南下し、東側トランクの終端付近へつなぐ
 // (縦横のみ・既存の道と重ならない)。
-const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, scResRing.s.y);
-buildRoad(scResRing.s, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
+const scResBend1 = addJunction("wp_sc_res_bend1", "湘南台住宅街裏道(東)", ofuna.x + 220, scResidential.y);
+buildRoad(scResidential, scResBend1, "shortcut", "r_sc_res_rokkai_h", "湘南台住宅街");
 // 一本道防止: 東西に長い区間(9マス分)の途中から短い行き止まりの寄り道を1つ挟む。
-const scResHSpurBase = pickMidFiller(scResRing.s, scResBend1);
+const scResHSpurBase = pickMidFiller(scResidential, scResBend1);
 const scResHSpur = addJunction("wp_sc_res_hspur", "湘南台住宅街裏の外れ(西)", scResHSpurBase.x, scResHSpurBase.y - 50);
 buildRoad(scResHSpurBase, scResHSpur, "shortcut", "r_sc_res_hspur", "湘南台住宅街");
 const scResBend2 = addJunction("wp_sc_res_bend2", "湘南台住宅街裏道(南)", scResBend1.x, 388);
@@ -1160,7 +1192,6 @@ bendAroundNode("fjrt_n", "wp_fj_meiten_ent", "r_rk_fj_3", "bend11");
 bendAroundNode("fjrt_ne", "r_fj_ne_kitaguchi_1", "fjkt_s", "bend12");
 bendAroundNode("tssp_s", "wp_ts_midori", "tsmd_n", "bend13");
 bendAroundNode("enlp_s", "wp_en_chigo", "encg_n", "bend14");
-bendAroundNode("scrs_s", "r_sc_res_rokkai_h_1", "scrs_se", "bend15");
 bendAroundNode("wp_komachi3", "wp_komachi_oku", "kmclp_n", "bend16");
 bendAroundNode("wp_chigasaki_kaigan", "wp_chigasaki_kaigan_oku", "cgklp_n", "bend17");
 bendAroundNode("wp_yuigahama", "wp_yuigahama_sat", "yuilp_ne", "bend18");
@@ -1192,7 +1223,6 @@ bendAroundNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2", "bend44");
 bendAroundNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5", "bend45");
 bendAroundNode("hrsp_e", "wp_hr_sakura", "hrsk_w", "bend46");
 bendAroundNode("wp_koshigoe_sat", "r_ks_sat_1", "kslp_n", "bend47");
-bendAroundNode("scrt_e", "wp_sc_residential", "scrs_nw", "bend48");
 bendAroundNode("r_kk_km_1", "r_kk_km_2", "kklp_sw", "bend49");
 bendAroundNode("enlp_n", "r_enlp_candle_1", "enlp_nw", "bend50");
 bendAroundNode("r_cg_ne_mesh_1", "r_cg_ne_mesh_2", "r_short_cgts_kg_2", "bend51");
