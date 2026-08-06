@@ -30,7 +30,10 @@ export function pickRandomDestination(map: MapData, excludeNodeId?: string): str
   const candidates = map.nodes.filter(
     (n) => n.isDestinationCandidate && n.id !== excludeNodeId,
   );
-  const pool = candidates.length > 0 ? candidates : map.nodes.filter((n) => n.isDestinationCandidate);
+  const byFlag = map.nodes.filter((n) => n.isDestinationCandidate);
+  // 目的地候補が編集で1件も残っていない場合でもゲームが起動できるよう、
+  // 全ノードから選ぶところまでフォールバックする。
+  const pool = candidates.length > 0 ? candidates : byFlag.length > 0 ? byFlag : map.nodes;
   const picked = pool[Math.floor(Math.random() * pool.length)];
   return picked.id;
 }

@@ -4,49 +4,49 @@
       "id": "ed_mshbwqgz_b5vk",
       "name": "新しい交差点1",
       "x": 53,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwrbe_ww7x",
       "name": "新しい交差点2",
       "x": 107,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwslm_vudk",
       "name": "新しい交差点3",
       "x": 158,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwt3j_gmfk",
       "name": "新しい交差点4",
       "x": 213,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwtm4_58vb",
       "name": "新しい交差点5",
       "x": 267,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwu3n_y0wj",
       "name": "新しい交差点6",
       "x": 320,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbwuqf_mo2a",
       "name": "新しい交差点7",
       "x": 374,
-      "y": 300
+      "y": 303
     },
     {
       "id": "ed_mshbx1nr_itq8",
       "name": "新しい交差点8",
       "x": 320,
-      "y": 380
+      "y": 381
     },
     {
       "id": "ed_mshbx3sh_rk2i",
@@ -69,20 +69,26 @@
     {
       "id": "ed_mshbzer1_e4e4",
       "name": "新しい交差点12",
-      "x": 0,
-      "y": 880
+      "x": 60,
+      "y": 825
     },
     {
       "id": "ed_mshc1wb9_vu0l",
       "name": "新しい交差点13",
-      "x": 883,
-      "y": 335
+      "x": 930,
+      "y": 392
     },
     {
       "id": "ed_mshc1xir_997b",
       "name": "新しい交差点14",
       "x": 883,
-      "y": 391
+      "y": 392
+    },
+    {
+      "id": "ed_mshc7g0m_8tw1",
+      "name": "新しい交差点15",
+      "x": 1625,
+      "y": 611
     },
     {
       "id": "ed_mshcco84_n5vd",
@@ -97,679 +103,212 @@
       "y": 444
     },
     {
-      "id": "ed_bend_a4_1",
-      "name": "北鎌倉合流〜御成通り(角)",
-      "x": 1559,
+      "id": "ed_bend_a1",
+      "name": "寒川通り(角)",
+      "x": 0,
+      "y": 303
+    },
+    {
+      "id": "ed_bend_a4",
+      "name": "北鎌倉合流(角)",
+      "x": 1625,
       "y": 631
     },
     {
-      "id": "ed_bendB_01a",
-      "name": "r_bypass_5_5⇄r_bypass_5_6(角1)",
-      "x": 877,
-      "y": 240
-    },
-    {
-      "id": "ed_bendB_01b",
-      "name": "r_bypass_5_5⇄r_bypass_5_6(角2)",
+      "id": "ed_bend_b1",
+      "name": "バイパス合流(角1)",
       "x": 921,
-      "y": 240
+      "y": 288
     },
     {
-      "id": "ed_bendB_02n",
-      "name": "r_bypass_5_6⇄r_sm_sc_h1_9(角)",
-      "x": 886,
-      "y": 272
+      "id": "ed_bend_b2",
+      "name": "バイパス合流(角2)",
+      "x": 921,
+      "y": 200
     },
     {
-      "id": "ed_bendB_12n",
-      "name": "encd_ne⇄fjmesh_s(角)",
-      "x": 970,
-      "y": 920
+      "id": "ed_bend_b3",
+      "name": "バイパス合流(角3)",
+      "x": 921,
+      "y": 335
     },
     {
-      "id": "ed_bendB_17c",
-      "name": "wp_rk_ofuna_bende⇄wp_ofuna(角1)",
-      "x": 1430,
-      "y": 350
-    },
-    {
-      "id": "ed_bendB_17d",
-      "name": "wp_rk_ofuna_bende⇄wp_ofuna(角2)",
+      "id": "ed_bend_b4",
+      "name": "大船梶原合流(角)",
       "x": 1500,
-      "y": 350
+      "y": 611
+    },
+    {
+      "id": "ed_bend_b5",
+      "name": "北鎌倉梶原合流(角)",
+      "x": 1448,
+      "y": 669
+    },
+    {
+      "id": "ed_bend_b6",
+      "name": "北鎌倉御成合流(角1)",
+      "x": 1623,
+      "y": 659
+    },
+    {
+      "id": "ed_bend_b7",
+      "name": "北鎌倉合流(角2)",
+      "x": 1510,
+      "y": 659
+    },
+    {
+      "id": "ed_bend_b8",
+      "name": "湘南台住宅街合流(角)",
+      "x": 1400,
+      "y": 154
+    },
+    {
+      "id": "ed_bend_b10",
+      "name": "腰越合流(角)",
+      "x": 1288,
+      "y": 965
+    },
+    {
+      "id": "ed_bend_b11",
+      "name": "由比ヶ浜合流(角)",
+      "x": 1419,
+      "y": 1140
+    },
+    {
+      "id": "ed_bend_b12",
+      "name": "江の島合流(角)",
+      "x": 950,
+      "y": 865
+    },
+    {
+      "id": "ed_bend_b13",
+      "name": "茅ヶ崎合流(角)",
+      "x": 420,
+      "y": 658
+    },
+    {
+      "id": "ed_bend_b15",
+      "name": "大船合流(角)",
+      "x": 1500,
+      "y": 388
+    },
+    {
+      "id": "ed_bend_b16",
+      "name": "湘南台大船合流(角)",
+      "x": 1425,
+      "y": 200
+    },
+    {
+      "id": "ed_bend_b17",
+      "name": "茅ヶ崎辻堂合流(角1)",
+      "x": 620,
+      "y": 774
+    },
+    {
+      "id": "ed_bend_b18",
+      "name": "茅ヶ崎辻堂合流(角2)",
+      "x": 624,
+      "y": 756
+    },
+    {
+      "id": "ed_mshdz0nk_nkym",
+      "name": "新しい交差点38",
+      "x": 534,
+      "y": 259
+    },
+    {
+      "id": "ed_mshdz28z_isop",
+      "name": "新しい交差点39",
+      "x": 636,
+      "y": 261
+    },
+    {
+      "id": "ed_mshdz3iv_875n",
+      "name": "新しい交差点40",
+      "x": 735,
+      "y": 263
+    },
+    {
+      "id": "ed_mshdz5pt_418l",
+      "name": "新しい交差点41",
+      "x": 835,
+      "y": 266
+    },
+    {
+      "id": "ed_mshdzil0_v58t",
+      "name": "新しい交差点42",
+      "x": 1134,
+      "y": 309
+    },
+    {
+      "id": "ed_mshdzll5_yjog",
+      "name": "新しい交差点43",
+      "x": 1031,
+      "y": 263
+    },
+    {
+      "id": "ed_mshe04fn_23xp",
+      "name": "新しい交差点44",
+      "x": 551,
+      "y": -3
+    },
+    {
+      "id": "ed_mshe07ww_7xb9",
+      "name": "新しい交差点45",
+      "x": 648,
+      "y": 2
+    },
+    {
+      "id": "ed_mshe0dq4_cbni",
+      "name": "新しい交差点46",
+      "x": 937,
+      "y": -11
+    },
+    {
+      "id": "ed_mshe0gt3_trcf",
+      "name": "新しい交差点47",
+      "x": 988,
+      "y": -13
+    },
+    {
+      "id": "ed_mshoq9j9_hfu7",
+      "name": "新しい交差点47",
+      "x": 1283,
+      "y": 489
+    },
+    {
+      "id": "ed_mshoqage_sxop",
+      "name": "新しい交差点48",
+      "x": 1288,
+      "y": 573
+    },
+    {
+      "id": "ed_mshor87s_2uhu",
+      "name": "新しい交差点48",
+      "x": 538,
+      "y": 332
+    },
+    {
+      "id": "ed_mshor9ec_g6nz",
+      "name": "新しい交差点49",
+      "x": 541,
+      "y": 415
+    },
+    {
+      "id": "ed_mshoras4_dixr",
+      "name": "新しい交差点50",
+      "x": 598,
+      "y": 412
+    },
+    {
+      "id": "ed_mshore65_xlpx",
+      "name": "新しい交差点51",
+      "x": 637,
+      "y": 412
     }
   ],
-  "addedEdges": [
-    {
-      "from": "ed_mshbwqgz_b5vk",
-      "to": "ed_mshbwrbe_ww7x",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwrbe_ww7x",
-      "to": "ed_mshbwslm_vudk",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwslm_vudk",
-      "to": "ed_mshbwt3j_gmfk",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwt3j_gmfk",
-      "to": "ed_mshbwtm4_58vb",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwuqf_mo2a",
-      "to": "r_sm_kg_2",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwu3n_y0wj",
-      "to": "ed_mshbx1nr_itq8",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbx1nr_itq8",
-      "to": "ed_mshbx3sh_rk2i",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbx3sh_rk2i",
-      "to": "ed_mshbx4zk_qfz3",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbx4zk_qfz3",
-      "to": "r_sm_kg_5",
-      "roadType": "residential"
-    },
-    {
-      "from": "nklp_nw",
-      "to": "nklp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "nklp_w",
-      "to": "wp_nakahara",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_nakahara",
-      "to": "nklp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_nakahara",
-      "to": "nklp_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "nklp_w",
-      "to": "r_tm_hr_5",
-      "roadType": "residential"
-    },
-    {
-      "from": "tmgo_nw",
-      "to": "nklp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "ktlp_n",
-      "to": "r_kg_ks_3",
-      "roadType": "residential"
-    },
-    {
-      "from": "ktlp_nw",
-      "to": "ktlp_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "hrlp_s",
-      "to": "ed_mshbzdsq_9ew1",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbzdsq_9ew1",
-      "to": "ed_mshbzer1_e4e4",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbzer1_e4e4",
-      "to": "hrmesh_sw",
-      "roadType": "residential"
-    },
-    {
-      "from": "hrmesh_nw",
-      "to": "hrmesh_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_hrlp_gate_hrlp_e_1",
-      "to": "hrlp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_hrlp_ring7_1",
-      "to": "hrlp_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "hrlp_n",
-      "to": "r_tm_hr_8",
-      "roadType": "residential"
-    },
-    {
-      "from": "hrlp_n",
-      "to": "hub_hiratsuka",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwslm_vudk",
-      "to": "r_sm_tm_5",
-      "roadType": "residential"
-    },
-    {
-      "from": "tmlp_sw",
-      "to": "tmlp_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "tmlp_s",
-      "to": "wp_tamura_kado",
-      "roadType": "residential"
-    },
-    {
-      "from": "tmlp_s",
-      "to": "wp_tamura",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_fj_meiten_oku",
-      "to": "ed_mshc1wb9_vu0l",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshc1wb9_vu0l",
-      "to": "ed_mshc1xir_997b",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshc1xir_997b",
-      "to": "r_kg_rk_9",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_onari_ent",
-      "to": "onlp_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "onlp_s",
-      "to": "onlp_se",
-      "roadType": "residential"
-    },
-    {
-      "from": "onlp_se",
-      "to": "onlp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "onlp_e",
-      "to": "wp_onari_ent",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_onari_ent",
-      "to": "onlp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "kjlp_e",
-      "to": "kjlp_se",
-      "roadType": "residential"
-    },
-    {
-      "from": "kjlp_s",
-      "to": "wp_kenchoji_ent",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_kenchoji_ent",
-      "to": "kjlp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_kenchoji_ent",
-      "to": "kjlp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "fjrt_w",
-      "to": "r_fjrt_gate_fjrt_w_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_fjrt_gate_fjrt_e_1",
-      "to": "fjrt_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_fjrt_ring3_1",
-      "to": "fjrt_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "kslp_s",
-      "to": "kslp_sw",
-      "roadType": "residential"
-    },
-    {
-      "from": "kslp_s",
-      "to": "wp_koshigoe_sat",
-      "roadType": "residential"
-    },
-    {
-      "from": "kslp_nw",
-      "to": "kslp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "kslp_w",
-      "to": "wp_koshigoe_sat",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_koshigoe_sat",
-      "to": "kslp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "kklp_w",
-      "to": "wp_kitakamakura",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ts_shop",
-      "to": "tsmd_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "tsmd_n",
-      "to": "tsmd_ne",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ts_midori",
-      "to": "tsmd_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ts_midori",
-      "to": "tsmd_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ts_midori",
-      "to": "tsmd_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "encd_nw",
-      "to": "fjmesh_sw",
-      "roadType": "residential"
-    },
-    {
-      "from": "encd_se",
-      "to": "encd_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "encd_e",
-      "to": "wp_en_candle",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_en_candle",
-      "to": "encd_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_en_candle",
-      "to": "encd_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "hub_enoshima",
-      "to": "enlp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "hub_enoshima",
-      "to": "enlp_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "hub_enoshima",
-      "to": "enlp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "enlp_s",
-      "to": "encg_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "encg_ne",
-      "to": "encg_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "cgmesh_sw",
-      "to": "r_cg_ts_4",
-      "roadType": "residential"
-    },
-    {
-      "from": "cglp_e",
-      "to": "r_cglp_gate_cglp_e_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "cglp_n",
-      "to": "r_cglp_ring0_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "cglp_n",
-      "to": "hub_chigasaki",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_cglp_gate_cglp_w_1",
-      "to": "cglp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_komachi3",
-      "to": "kmclp_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_inamuragasaki",
-      "to": "inlp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "hub_kamakura",
-      "to": "kmlp_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "kmlp_s",
-      "to": "wp_inamuragasaki",
-      "roadType": "residential"
-    },
-    {
-      "from": "ofsp_s",
-      "to": "ofsp_se",
-      "roadType": "residential"
-    },
-    {
-      "from": "ofsp_s",
-      "to": "wp_ofuna_shop",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ofuna_shop",
-      "to": "ofsp_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ofuna_shop",
-      "to": "ofsp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_kkkm_merge1_1",
-      "to": "ed_bend_a4_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bend_a4_1",
-      "to": "onlp_nw",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_tm_hr_2",
-      "to": "ed_mshbwqgz_b5vk",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwtm4_58vb",
-      "to": "ed_mshbwu3n_y0wj",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_rk_ofuna_bende",
-      "to": "ed_mshcco84_n5vd",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshcco84_n5vd",
-      "to": "ed_mshccoug_azj8",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshccoug_azj8",
-      "to": "r_rk_ofuna_h1_6",
-      "roadType": "residential"
-    },
-    {
-      "from": "onlp_nw",
-      "to": "wp_kenchoji_bend",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_mshbwu3n_y0wj",
-      "to": "ed_mshbwuqf_mo2a",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_bypass_5_6",
-      "to": "wp_fj_meiten_oku",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_of_kj_2",
-      "to": "wp_kkkm_merge_bend",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_kkkm_merge2_1",
-      "to": "r_kj_fj_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_kk_km_5",
-      "to": "onlp_w",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_sc_res_hspur",
-      "to": "wp_sc_of_bend_e",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_ks_mesh_2",
-      "to": "kslp_se",
-      "roadType": "residential"
-    },
-    {
-      "from": "kslp_n",
-      "to": "kslp_nw",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_kk_km_5",
-      "to": "r_kkkm_merge2_1",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_cg_ts_4",
-      "to": "tssp_nw",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_ofuna",
-      "to": "ofsp_sw",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_sc_of_v_1",
-      "to": "r_sc_res_rokkai_h_7",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_bypass_5_5",
-      "to": "ed_bendB_01a",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_01a",
-      "to": "ed_bendB_01b",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_01b",
-      "to": "r_bypass_5_6",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_bypass_5_6",
-      "to": "ed_bendB_02n",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_02n",
-      "to": "r_sm_sc_h1_9",
-      "roadType": "residential"
-    },
-    {
-      "from": "encd_ne",
-      "to": "ed_bendB_12n",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_12n",
-      "to": "fjmesh_s",
-      "roadType": "residential"
-    },
-    {
-      "from": "cglp_n",
-      "to": "r_kg_cg_3",
-      "roadType": "residential"
-    },
-    {
-      "from": "wp_rk_ofuna_bende",
-      "to": "ed_bendB_17c",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_17c",
-      "to": "ed_bendB_17d",
-      "roadType": "residential"
-    },
-    {
-      "from": "ed_bendB_17d",
-      "to": "wp_ofuna",
-      "roadType": "residential"
-    },
-    {
-      "from": "yuilp_s",
-      "to": "kmmesh_n",
-      "roadType": "residential"
-    },
-    {
-      "from": "tssp_nw",
-      "to": "r_local_cg_ts_h1_1",
-      "roadType": "residential"
-    }
-  ],
-  "removedEdges": [
-    {
-      "from": "r_bypass_1_3",
-      "to": "r_bypass_1_4"
-    },
-    {
-      "from": "r_bypass_2_1",
-      "to": "r_bypass_2_2"
-    },
-    {
-      "from": "wp_katase_kaigan",
-      "to": "bend06_bend"
-    },
-    {
-      "from": "wp_tamura_kado",
-      "to": "bend03_bend"
-    },
-    {
-      "from": "r_north_spine_1_4",
-      "to": "r_hills_road1_1"
-    },
-    {
-      "from": "r_sm_sc_h1_9",
-      "to": "r_short_smsc_rk_1"
-    },
-    {
-      "from": "hub_enoshima",
-      "to": "bend01_bend"
-    },
-    {
-      "from": "wp_en_chigo",
-      "to": "encg_ne"
-    },
-    {
-      "from": "r_kk_km_7",
-      "to": "bend70_bend"
-    },
-    {
-      "from": "wp_onari_ent",
-      "to": "onlp_se"
-    },
-    {
-      "from": "wp_en_candle",
-      "to": "bend35_bend"
-    },
-    {
-      "from": "wp_ts_shop",
-      "to": "bend54_bend"
-    },
-    {
-      "from": "wp_koshigoe_sat",
-      "to": "kslp_nw"
-    },
-    {
-      "from": "r_kk_km_3",
-      "to": "r_kk_km_4"
-    },
-    {
-      "from": "tslp_w",
-      "to": "r_local_cg_ts_h2_1"
-    },
-    {
-      "from": "tslp_w",
-      "to": "r_tslp_ring6_1"
-    },
-    {
-      "from": "cglp_w",
-      "to": "wp_cg_chuo"
-    },
-    {
-      "from": "wp_ofuna_shop",
-      "to": "bend38_bend"
-    }
-  ],
+  "movedNodes": [],
+  "modifiedNodes": [],
   "removedNodes": [
     "r_bypass_0_1",
     "wp_bypass_p1",
@@ -925,6 +464,980 @@
     "wp_rk_ofuna_up",
     "wp_sc_of_bend_e2",
     "wp_sc_of_bend_s",
-    "bend56_bend"
-  ]
+    "bend56_bend",
+    "r_bypass_6_1",
+    "wp_bypass_p6",
+    "r_bypass_5_7",
+    "r_bypass_5_6",
+    "r_bypass_5_5",
+    "bend57_bend",
+    "r_bypass_5_3",
+    "r_bypass_5_4",
+    "r_bypass_5_2",
+    "r_bypass_5_1",
+    "wp_bypass_p5",
+    "r_bypass_4_2",
+    "r_short_smsc_kg_3",
+    "r_bypass_4_1",
+    "r_bypass_3_2",
+    "wp_bypass_p4",
+    "r_sm_sc_h1_10",
+    "r_fj_n_meiten3_1",
+    "wp_fj_meiten_naka",
+    "r_fj_n_meiten2_2",
+    "r_fj_n_meiten2_3",
+    "r_fj_n_meiten2_1",
+    "wp_fj_meiten_oku",
+    "bend12_bend",
+    "r_fj_ne_kitaguchi_1",
+    "bend44_bend",
+    "r_short_cgts_kg_5",
+    "r_short_cgts_kg_4",
+    "r_short_cgts_kg_3",
+    "r_short_cgts_kg_2",
+    "r_short_cgts_kg_1",
+    "bend01_bend"
+  ],
+  "addedEdges": [
+    {
+      "from": "r_tm_hr_2",
+      "to": "ed_bend_a1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_a1",
+      "to": "ed_mshbwqgz_b5vk",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwqgz_b5vk",
+      "to": "ed_mshbwrbe_ww7x",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwrbe_ww7x",
+      "to": "ed_mshbwslm_vudk",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwslm_vudk",
+      "to": "ed_mshbwt3j_gmfk",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwt3j_gmfk",
+      "to": "ed_mshbwtm4_58vb",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwtm4_58vb",
+      "to": "ed_mshbwu3n_y0wj",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwu3n_y0wj",
+      "to": "ed_mshbwuqf_mo2a",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwuqf_mo2a",
+      "to": "r_sm_kg_2",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_sm_kg_2",
+      "to": "ed_mshbwu3n_y0wj",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwu3n_y0wj",
+      "to": "ed_mshbx1nr_itq8",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbx1nr_itq8",
+      "to": "ed_mshbx3sh_rk2i",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbx3sh_rk2i",
+      "to": "ed_mshbx4zk_qfz3",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbx4zk_qfz3",
+      "to": "r_sm_kg_5",
+      "roadType": "residential"
+    },
+    {
+      "from": "nklp_nw",
+      "to": "nklp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "nklp_w",
+      "to": "wp_nakahara",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_nakahara",
+      "to": "nklp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_nakahara",
+      "to": "nklp_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "nklp_w",
+      "to": "r_tm_hr_5",
+      "roadType": "residential"
+    },
+    {
+      "from": "tmgo_nw",
+      "to": "nklp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "ktlp_n",
+      "to": "r_kg_ks_3",
+      "roadType": "residential"
+    },
+    {
+      "from": "ktlp_nw",
+      "to": "ktlp_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "hrlp_s",
+      "to": "ed_mshbzdsq_9ew1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbzdsq_9ew1",
+      "to": "ed_mshbzer1_e4e4",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbzer1_e4e4",
+      "to": "hrmesh_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "hrmesh_nw",
+      "to": "hrmesh_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_hrlp_gate_hrlp_e_1",
+      "to": "hrlp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_hrlp_ring7_1",
+      "to": "hrlp_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "hrlp_n",
+      "to": "r_tm_hr_8",
+      "roadType": "residential"
+    },
+    {
+      "from": "hrlp_n",
+      "to": "hub_hiratsuka",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshbwslm_vudk",
+      "to": "r_sm_tm_5",
+      "roadType": "residential"
+    },
+    {
+      "from": "tmlp_sw",
+      "to": "tmlp_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "tmlp_s",
+      "to": "wp_tamura_kado",
+      "roadType": "residential"
+    },
+    {
+      "from": "tmlp_s",
+      "to": "wp_tamura",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b2",
+      "to": "r_sm_sc_h1_9",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshc1wb9_vu0l",
+      "to": "ed_mshc1xir_997b",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshc1xir_997b",
+      "to": "r_kg_rk_9",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_of_kj_2",
+      "to": "ed_bend_b4",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b4",
+      "to": "wp_kkkm_merge_bend",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_kkkm_merge2_1",
+      "to": "ed_bend_b5",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b5",
+      "to": "r_kj_fj_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_kk_km_5",
+      "to": "ed_bend_b6",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b6",
+      "to": "onlp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_onari_ent",
+      "to": "onlp_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "onlp_s",
+      "to": "onlp_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "onlp_se",
+      "to": "onlp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "onlp_e",
+      "to": "wp_onari_ent",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_onari_ent",
+      "to": "onlp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_sc_res_hspur",
+      "to": "ed_bend_b8",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b8",
+      "to": "wp_sc_of_bend_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "kjlp_e",
+      "to": "kjlp_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "kjlp_s",
+      "to": "wp_kenchoji_ent",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_kenchoji_ent",
+      "to": "kjlp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_kenchoji_ent",
+      "to": "kjlp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "fjrt_w",
+      "to": "r_fjrt_gate_fjrt_w_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_fjrt_gate_fjrt_e_1",
+      "to": "fjrt_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_fjrt_ring3_1",
+      "to": "fjrt_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_s",
+      "to": "kslp_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_s",
+      "to": "wp_koshigoe_sat",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_n",
+      "to": "ed_bend_b10",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b10",
+      "to": "kslp_nw",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_nw",
+      "to": "kslp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_w",
+      "to": "wp_koshigoe_sat",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_koshigoe_sat",
+      "to": "kslp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "yuilp_s",
+      "to": "ed_bend_b11",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b11",
+      "to": "kmmesh_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_kkkm_merge1_1",
+      "to": "ed_mshc7g0m_8tw1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshc7g0m_8tw1",
+      "to": "wp_kenchoji_bend",
+      "roadType": "residential"
+    },
+    {
+      "from": "kklp_w",
+      "to": "wp_kitakamakura",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_kk_km_5",
+      "to": "ed_bend_b7",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b7",
+      "to": "r_kkkm_merge2_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshc7g0m_8tw1",
+      "to": "ed_bend_a4",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_a4",
+      "to": "onlp_nw",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ts_shop",
+      "to": "tsmd_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "tsmd_n",
+      "to": "tsmd_ne",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ts_midori",
+      "to": "tsmd_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ts_midori",
+      "to": "tsmd_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ts_midori",
+      "to": "tsmd_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "encd_nw",
+      "to": "fjmesh_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "encd_ne",
+      "to": "ed_bend_b12",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b12",
+      "to": "fjmesh_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "encd_se",
+      "to": "encd_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "encd_e",
+      "to": "wp_en_candle",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_en_candle",
+      "to": "encd_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_en_candle",
+      "to": "encd_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "hub_enoshima",
+      "to": "enlp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "hub_enoshima",
+      "to": "enlp_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "hub_enoshima",
+      "to": "enlp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "enlp_s",
+      "to": "encg_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "encg_ne",
+      "to": "encg_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "cgmesh_sw",
+      "to": "r_cg_ts_4",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_cg_ts_4",
+      "to": "ed_bend_b17",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b17",
+      "to": "tssp_nw",
+      "roadType": "residential"
+    },
+    {
+      "from": "tssp_nw",
+      "to": "ed_bend_b18",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b18",
+      "to": "r_local_cg_ts_h1_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "cglp_e",
+      "to": "r_cglp_gate_cglp_e_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "cglp_n",
+      "to": "r_cglp_ring0_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "cglp_n",
+      "to": "hub_chigasaki",
+      "roadType": "residential"
+    },
+    {
+      "from": "cglp_n",
+      "to": "ed_bend_b13",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b13",
+      "to": "r_kg_cg_3",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_cglp_gate_cglp_w_1",
+      "to": "cglp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_komachi3",
+      "to": "kmclp_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_inamuragasaki",
+      "to": "inlp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "hub_kamakura",
+      "to": "kmlp_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "kmlp_s",
+      "to": "wp_inamuragasaki",
+      "roadType": "residential"
+    },
+    {
+      "from": "ofsp_s",
+      "to": "ofsp_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "ofsp_s",
+      "to": "wp_ofuna_shop",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ofuna_shop",
+      "to": "ofsp_e",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ofuna_shop",
+      "to": "ofsp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_rk_ofuna_bende",
+      "to": "ed_bend_b15",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b15",
+      "to": "wp_ofuna",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_rk_ofuna_bende",
+      "to": "ed_mshcco84_n5vd",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshcco84_n5vd",
+      "to": "ed_mshccoug_azj8",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshccoug_azj8",
+      "to": "r_rk_ofuna_h1_6",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_sc_of_v_1",
+      "to": "ed_bend_b16",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b16",
+      "to": "r_sc_res_rokkai_h_7",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b2",
+      "to": "wp_sm_sc_bend_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b2",
+      "to": "ed_bend_b1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b1",
+      "to": "ed_bend_b3",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b3",
+      "to": "ed_mshc1wb9_vu0l",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshc1wb9_vu0l",
+      "to": "r_kg_rk_10",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_sm_kg_1",
+      "to": "ed_mshdz0nk_nkym",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz0nk_nkym",
+      "to": "ed_mshdz28z_isop",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz28z_isop",
+      "to": "ed_mshdz3iv_875n",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz3iv_875n",
+      "to": "ed_mshdz5pt_418l",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz5pt_418l",
+      "to": "r_sm_sc_h1_8",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz5pt_418l",
+      "to": "ed_bend_b1",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_sc_res_rokkai_h_1",
+      "to": "ed_mshdzil0_v58t",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdzil0_v58t",
+      "to": "r_sc_rk_3",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_sc_rk_2",
+      "to": "ed_mshdzll5_yjog",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdzll5_yjog",
+      "to": "r_sm_sc_h2_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_hills_bend2",
+      "to": "r_north_spine_1_6",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_north_spine_1_2",
+      "to": "ed_mshe04fn_23xp",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe04fn_23xp",
+      "to": "r_mid_west_h1_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe04fn_23xp",
+      "to": "ed_mshe07ww_7xb9",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe07ww_7xb9",
+      "to": "r_north_spine_1_4",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_north_spine_2_3",
+      "to": "ed_mshe0dq4_cbni",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe0dq4_cbni",
+      "to": "r_mid_east_h2_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe0dq4_cbni",
+      "to": "ed_mshe0gt3_trcf",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshe0gt3_trcf",
+      "to": "r_north_spine_2_4",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_fj_kitaguchi",
+      "to": "fjkt_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "fjkt_s",
+      "to": "fjkt_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "fjkt_s",
+      "to": "fjrt_ne",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_rokkai",
+      "to": "fjkt_nw",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_rk_fj_3",
+      "to": "fjkt_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "fjrt_n",
+      "to": "r_fjrt_ring7_1",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b17",
+      "to": "tssp_n",
+      "roadType": "residential"
+    },
+    {
+      "from": "tssp_ne",
+      "to": "tslp_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "tssp_e",
+      "to": "wp_ts_shop",
+      "roadType": "residential"
+    },
+    {
+      "from": "tssp_e",
+      "to": "tssp_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "wp_ts_shop",
+      "to": "tssp_w",
+      "roadType": "residential"
+    },
+    {
+      "from": "tssp_w",
+      "to": "ed_bend_b17",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b17",
+      "to": "ed_bend_b18",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b15",
+      "to": "ofsp_sw",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b1",
+      "to": "ed_mshdzll5_yjog",
+      "roadType": "residential"
+    },
+    {
+      "from": "r_rk_ofuna_h1_4",
+      "to": "ed_mshoq9j9_hfu7",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshoq9j9_hfu7",
+      "to": "ed_mshoqage_sxop",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshoqage_sxop",
+      "to": "r_kj_fj_4",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_s",
+      "to": "kslp_se",
+      "roadType": "residential"
+    },
+    {
+      "from": "kslp_se",
+      "to": "r_ks_mesh_2",
+      "roadType": "residential"
+    },
+    {
+      "from": "enlp_n",
+      "to": "enlp_ne",
+      "roadType": "residential"
+    },
+    {
+      "from": "enlp_n",
+      "to": "r_kg_en_bridge_2",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshdz0nk_nkym",
+      "to": "ed_mshor87s_2uhu",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshor87s_2uhu",
+      "to": "ed_mshor9ec_g6nz",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshor9ec_g6nz",
+      "to": "ed_mshoras4_dixr",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshoras4_dixr",
+      "to": "r_kg_rk_3",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshoras4_dixr",
+      "to": "ed_mshore65_xlpx",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_mshore65_xlpx",
+      "to": "r_kg_rk_4",
+      "roadType": "residential"
+    }
+  ],
+  "modifiedEdges": [],
+  "removedEdges": [
+    {
+      "from": "r_bypass_1_3",
+      "to": "r_bypass_1_4"
+    },
+    {
+      "from": "r_bypass_2_1",
+      "to": "r_bypass_2_2"
+    },
+    {
+      "from": "wp_katase_kaigan",
+      "to": "bend06_bend"
+    },
+    {
+      "from": "wp_tamura_kado",
+      "to": "bend03_bend"
+    },
+    {
+      "from": "r_north_spine_1_4",
+      "to": "r_hills_road1_1"
+    },
+    {
+      "from": "r_sm_sc_h1_9",
+      "to": "r_short_smsc_rk_1"
+    },
+    {
+      "from": "hub_enoshima",
+      "to": "bend01_bend"
+    },
+    {
+      "from": "wp_en_chigo",
+      "to": "encg_ne"
+    },
+    {
+      "from": "r_kk_km_7",
+      "to": "bend70_bend"
+    },
+    {
+      "from": "wp_onari_ent",
+      "to": "onlp_se"
+    },
+    {
+      "from": "wp_en_candle",
+      "to": "bend35_bend"
+    },
+    {
+      "from": "wp_ts_shop",
+      "to": "bend54_bend"
+    },
+    {
+      "from": "wp_koshigoe_sat",
+      "to": "kslp_nw"
+    },
+    {
+      "from": "r_kk_km_3",
+      "to": "r_kk_km_4"
+    },
+    {
+      "from": "tslp_w",
+      "to": "r_local_cg_ts_h2_1"
+    },
+    {
+      "from": "tslp_w",
+      "to": "r_tslp_ring6_1"
+    },
+    {
+      "from": "cglp_w",
+      "to": "wp_cg_chuo"
+    },
+    {
+      "from": "wp_ofuna_shop",
+      "to": "bend38_bend"
+    },
+    {
+      "from": "r_bypass_5_3",
+      "to": "r_bypass_5_4"
+    },
+    {
+      "from": "r_bypass_5_1",
+      "to": "r_bypass_5_2"
+    },
+    {
+      "from": "wp_bypass_p5",
+      "to": "r_bypass_5_1"
+    },
+    {
+      "from": "wp_bypass_p4",
+      "to": "r_bypass_3_2"
+    },
+    {
+      "from": "wp_fj_meiten_oku",
+      "to": "r_fj_n_meiten3_1"
+    },
+    {
+      "from": "wp_fj_meiten_naka",
+      "to": "r_fj_n_meiten3_1"
+    }
+  ],
+  "customProperties": []
 }

@@ -1,5 +1,6 @@
 import type { PropertyDef } from "@/types/game";
 import { generatedPropertyDefs } from "@/data/maps/shonan-full";
+import overridesData from "@/data/maps/overrides.json";
 
 /**
  * 物件の静的データ。
@@ -121,7 +122,22 @@ const curatedPropertyDefs: PropertyDef[] = [
   },
 ];
 
-export const propertyDefs: PropertyDef[] = [...curatedPropertyDefs, ...generatedPropertyDefs];
+// /editorで作成した物件定義。overrides.jsonが壊れていてもアプリ全体を落とさないよう防御する。
+function loadCustomPropertyDefs(): PropertyDef[] {
+  try {
+    const list = (overridesData as { customProperties?: unknown }).customProperties;
+    return Array.isArray(list) ? (list as PropertyDef[]) : [];
+  } catch (err) {
+    console.error("overrides.jsonのcustomPropertiesの読み込みに失敗しました。", err);
+    return [];
+  }
+}
+
+export const propertyDefs: PropertyDef[] = [
+  ...curatedPropertyDefs,
+  ...generatedPropertyDefs,
+  ...loadCustomPropertyDefs(),
+];
 
 export function getPropertyDef(id: string): PropertyDef | undefined {
   return propertyDefs.find((p) => p.id === id);
