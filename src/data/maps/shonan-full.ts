@@ -913,23 +913,38 @@ const cgShop = addJunction(
   chigasakiRing.nw.x - 25,
   chigasakiRing.nw.y - 55,
 );
-// nw角から直接斜めにつなぐと道が斜めになるため、nw角の真上(輪の外側、w-nw辺とは
-// 重ならない範囲)で1回だけ折れてから入口へ横に入るL字にする。
-const cgShopBend = addJunction(
-  "wp_cg_shop_bend",
-  "茅ヶ崎銀座入口(角)",
-  chigasakiRing.nw.x,
-  cgShop.y,
+const cgspRing = smallLoop(cgShop, 26, "cgsp", "茅ヶ崎銀座", 1);
+// 縦横化リファクタ: nw角の真上で1回だけ折れてcgShop中心へ直接入るL字だと、
+// 半径26のcgsp自身の輪の周点(輪はどの方角も中心から半径ぴったりの位置にある)の
+// すぐそばを開けた場所で素通りしてしまっていた。nw角のxがそもそも輪のx方向の
+// 幅(x281〜349)に収まってしまっているため、縦に何度折れてもこのxのままでは
+// 輪のy方向の帯(y595〜663)を必ず通ってしまう。輪のx方向の外側まで一旦横に
+// 逃がしてから輪の真上(y方向の帯の外)を通り、実際のゲートである北の点cgsp_nへ
+// 縦に降りる、4区間の枡形にする。
+const cgShopBend1 = addJunction(
+  "wp_cg_shop_bend1",
+  "茅ヶ崎銀座入口(角1)",
+  cgspRing.w.x - 20,
+  chigasakiRing.nw.y,
 );
-buildRoad(
-  chigasakiRing.nw,
-  cgShopBend,
+const cgShopBend2 = addJunction(
+  "wp_cg_shop_bend2",
+  "茅ヶ崎銀座入口(角2)",
+  cgShopBend1.x,
+  cgspRing.n.y - 26,
+);
+const cgShopBend3 = addJunction(
+  "wp_cg_shop_bend3",
+  "茅ヶ崎銀座入口(角3)",
+  cgShop.x,
+  cgShopBend2.y,
+);
+connectRoad(
+  [chigasakiRing.nw, cgShopBend1, cgShopBend2, cgShopBend3, cgspRing.n],
   "residential",
-  "r_cg_nw_shop1",
   "茅ヶ崎銀座",
+  ["r_cg_nw_shop1", "r_cg_nw_shop2", "r_cg_nw_shop3", "r_cg_nw_shop4"],
 );
-buildRoad(cgShopBend, cgShop, "residential", "r_cg_nw_shop2", "茅ヶ崎銀座");
-smallLoop(cgShop, 26, "cgsp", "茅ヶ崎銀座", 1);
 
 // 住宅街メッシュ: ロータリー北東点から辻堂ロータリーの北西点(ゲート)へ抜ける
 // 3列×2行の格子。海沿い幹線・裏道(r_local_cg_ts)・寒川方面の近道
@@ -1009,23 +1024,29 @@ const tsShop = addJunction(
   tsujidoRing.sw.x - 50,
   tsujidoRing.sw.y + 20,
 );
-// sw角から直接斜めにつなぐと道が斜めになるため、sw角と同じ高さで一旦横に振ってから
-// (s-sw辺の延長線上、輪とは重ならない範囲)、入口へ縦に降りるL字にする。
-const tsShopBend = addJunction(
-  "wp_ts_shop_bend",
-  "辻堂海浜商店街入口(角)",
-  tsShop.x,
-  tsujidoRing.sw.y,
-);
-buildRoad(
-  tsujidoRing.sw,
-  tsShopBend,
-  "residential",
-  "r_ts_sw_shop1",
-  "辻堂海浜商店街",
-);
-buildRoad(tsShopBend, tsShop, "residential", "r_ts_sw_shop2", "辻堂海浜商店街");
 const tsShopRing = smallLoop(tsShop, 26, "tssp", "辻堂海浜商店街", 1);
+// 縦横化リファクタ: sw角と同じ高さ(y=780)で横に振るL字だと、輪(半径26)自身の
+// 北側の点(tssp_n/tssp_ne)のy帯[766,782]とちょうど重なり、開けた場所で
+// 素通りしてしまっていた。輪の外側(北側の帯より上)まで上がってから横に振り、
+// 実際のゲートであるtssp_nへ縦に降りるコの字に作り直す。
+const tsShopBend1 = addJunction(
+  "wp_ts_shop_bend1",
+  "辻堂海浜商店街入口(角1)",
+  tsujidoRing.sw.x,
+  tsShopRing.n.y - 19,
+);
+const tsShopBend2 = addJunction(
+  "wp_ts_shop_bend2",
+  "辻堂海浜商店街入口(角2)",
+  tsShop.x,
+  tsShopBend1.y,
+);
+connectRoad(
+  [tsujidoRing.sw, tsShopBend1, tsShopBend2, tsShopRing.n],
+  "residential",
+  "辻堂海浜商店街",
+  ["r_ts_sw_shop1", "r_ts_sw_shop2", "r_ts_sw_shop3"],
+);
 // 商店街からさらに1本、小さな輪(辻堂緑ヶ浜イメージ)を足す。
 const tsMidori = addJunction(
   "wp_ts_midori",
@@ -1665,12 +1686,11 @@ buildRoad(fjmN, fjmS, "residential", "r_fjmesh_col2", "藤沢住宅街");
 buildRoad(fjmNe, fjmSe, "residential", "r_fjmesh_col3", "藤沢住宅街");
 // sw角から直接斜めにつなぐと道が斜めになるため、sw角の真下(輪の外側)→
 // メッシュ入口の真上、の順に2回折れて縦横のみで入るコの字にする。
-const fjSwMeshBend1 = addJunction(
-  "fjmesh_sw_bend1",
-  "藤沢住宅街入口(角1)",
-  fujisawaRing.sw.x,
-  780,
-);
+// 縦横化リファクタ: この角1は fujisawaRing.sw.x と y=780(=辻堂ロータリー南東点の
+// y、辻堂⇄藤沢裏道の角tsFjBendと同じ計算式)から独立に求めていたため、
+// tsFjBend(wp_ts_fj_bend)と完全に同じ座標になり2つのノードが重なっていた。
+// 新規ノードを作らずtsFjBendをそのまま角1として再利用する(sw⇄角1の区間は
+// 辻堂⇄藤沢裏道の r_local2_ts_fj_v と共通なので二重に作らない)。
 const fjSwMeshBend2 = addJunction(
   "fjmesh_sw_bend2",
   "藤沢住宅街入口(角2)",
@@ -1678,10 +1698,10 @@ const fjSwMeshBend2 = addJunction(
   780,
 );
 connectRoad(
-  [fujisawaRing.sw, fjSwMeshBend1, fjSwMeshBend2, fjmNe],
+  [tsFjBend, fjSwMeshBend2, fjmNe],
   "residential",
   "藤沢住宅街",
-  ["r_fj_sw_mesh_h1", "r_fj_sw_mesh_v", "r_fj_sw_mesh_h2"],
+  ["r_fj_sw_mesh_v", "r_fj_sw_mesh_h2"],
 );
 // 出口はロータリー南西点(sw)からの入口とは別に、北西の角(nw)からロータリー南点(s)へ
 // 直接抜ける近道にする。格子を斜めに横切る形になるので、sw⇄nw⇄sで回るか、
@@ -2857,6 +2877,83 @@ edgeSpliceThroughNode("r_bypass_5_5", "r_bypass_5_6", "bend58_bend");
 // 素通りしてしまうため、bend1・bend2のxをr_cg_ts_4に合わせて選び、実際にそこを
 // 経由する交差点にする。
 edgeSpliceThroughNode("wp_cg_ts_bend1", "wp_cg_ts_bend2", "r_cg_ts_4");
+
+// ------------------------------------------------------------------
+// 縦横化リファクタ(ゲート方角変更)の副作用: hubのすぐそばで、新しく縦横になった
+// ゲート引き込み線と、既存の海沿い幹線(coastal/main)がほぼ同じ方向に並走し、
+// 互いのフィラーノードのすぐそばを開けた場所で素通りしてしまう箇所が5対(hub側・
+// 環状路側の両方向、計10件)+単独3件、計13件見つかった。既存のbAndSegmentHitsRect
+// と同じ判定式で再走査して発見したもので、hubから見て2方向の道がほぼ同じ角度で
+// 出ていく場合は避けられないため、bendAroundNode/edgeSpliceThroughNodeで個別に迂回する。
+bendAroundNode("hub_hiratsuka", "r_hr_cg_1", "r_hrlp_gate_hrlp_e_1", "bend59");
+bendAroundNode("hrlp_e", "r_hrlp_gate_hrlp_e_1", "r_hr_cg_1", "bend60");
+bendAroundNode(
+  "hub_chigasaki",
+  "r_hr_cg_7",
+  "r_cglp_gate_cglp_w_1",
+  "bend61",
+);
+bendAroundNode("cglp_w", "r_cglp_gate_cglp_w_1", "r_hr_cg_7", "bend62");
+bendAroundNode(
+  "hub_chigasaki",
+  "r_cg_ts_1",
+  "r_cglp_gate_cglp_e_1",
+  "bend63",
+);
+bendAroundNode("cglp_e", "r_cglp_gate_cglp_e_1", "r_cg_ts_1", "bend64");
+bendAroundNode(
+  "hub_fujisawa",
+  "r_ts_fj_5",
+  "r_fjrt_gate_fjrt_w_1",
+  "bend65",
+);
+bendAroundNode("fjrt_w", "r_fjrt_gate_fjrt_w_1", "r_ts_fj_5", "bend66");
+bendAroundNode(
+  "hub_fujisawa",
+  "r_kj_fj_7",
+  "r_fjrt_gate_fjrt_e_1",
+  "bend67",
+);
+bendAroundNode("fjrt_e", "r_fjrt_gate_fjrt_e_1", "r_kj_fj_7", "bend68");
+bendAroundNode("hub_tsujido", "tslp_w", "r_cg_ts_6", "bend69");
+bendAroundNode(
+  "hub_kamakura",
+  "r_kk_km_7",
+  "r_kmlp_gate_kmlp_n_1",
+  "bend70",
+);
+// r_tslp_ring5_1は辻堂ロータリー自身の外周点で、幹線(r_cg_ts_4⇄r_cg_ts_5)の
+// 素通りをちょうど経由できる位置にあるため、迂回ではなく実際の交差点にする。
+edgeSpliceThroughNode("r_cg_ts_4", "r_cg_ts_5", "r_tslp_ring5_1");
+// 藤沢ロータリー⇄六会合流の迂回点(wp_fj_nw_rk_bend)を、香川⇄六会幹線の
+// フィラー間(r_kg_rk_11⇄r_kg_rk_12)が開けた場所で素通りしていた分の解消。
+bendAroundNode("r_kg_rk_11", "r_kg_rk_12", "wp_fj_nw_rk_bend", "bend71");
+bendAroundNode(
+  "r_fj_mesh_exit_1",
+  "r_fj_mesh_exit_2",
+  "r_local2_ts_fj_h_2",
+  "bend72",
+);
+
+// ------------------------------------------------------------------
+// 縦横化リファクタ(前回セッションのB対応)の副作用: 衛星区画の入口を「角で1回だけ
+// 折れるL字」にした際、その角(bend)の座標が親環状路の角のx(またはy)と衛星区画
+// 自身のy(またはx)からだけ独立に決まっていたため、衛星区画自身の小さな輪
+// (smallLoop)の外周点のすぐそばを素通りしてしまうケースが5箇所(計14件)見つかった。
+// bendAroundNodeで個別に迂回する(同じ辺に迂回対象が2つある場合は再走査後の
+// 実際のノードIDを見てから2回目を追加する)。
+// ------------------------------------------------------------------
+// cgsp・tsspの入口bendは、輪(radius 26)のすぐ内側に食い込むほど近く、
+// bendAroundNodeの迂回探索でも安全な迂回点が見つからないほど手狭だったため、
+// 個別の迂回ではなく入口自体の形(下のcgShop/tsShop定義側)を直接引き直した。
+bendAroundNode("wp_hr_shop", "wp_hr_shop_bend", "hrsp_w", "bend82");
+bendAroundNode("hrmesh_nw", "hrmesh_n", "hrmesh_se_bend", "bend83");
+bendAroundNode(
+  "wp_fj_higashiguchi",
+  "r_fj_se_higashiguchi2_2",
+  "fjhg_w",
+  "bend84",
+);
 
 // ------------------------------------------------------------------
 // 座標の微調整(第2弾): 上記の輪の半径調整・迂回追加に伴い、隣接する別の輪・
