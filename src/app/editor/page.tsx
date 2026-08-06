@@ -74,9 +74,10 @@ export default function EditorPage() {
   const gridSnapEnabled = useEditorStore((s) => s.gridSnapEnabled);
   const gridSize = useEditorStore((s) => s.gridSize);
   const message = useEditorStore((s) => s.message);
-  const armedNodeId = useEditorStore((s) => s.armedNodeId);
   const discardArmed = useEditorStore((s) => s.discardArmed);
-  const selectionDeleteArmed = useEditorStore((s) => s.selectionDeleteArmed);
+  const toast = useEditorStore((s) => s.toast);
+  const historyLength = useEditorStore((s) => s.history.length);
+  const futureLength = useEditorStore((s) => s.future.length);
 
   const load = useEditorStore((s) => s.load);
   const setMode = useEditorStore((s) => s.setMode);
@@ -89,9 +90,8 @@ export default function EditorPage() {
   const addToSelection = useEditorStore((s) => s.addToSelection);
   const setPendingFrom = useEditorStore((s) => s.setPendingFrom);
   const setMessage = useEditorStore((s) => s.setMessage);
-  const setArmedNodeId = useEditorStore((s) => s.setArmedNodeId);
   const setDiscardArmedAction = useEditorStore((s) => s.setDiscardArmed);
-  const setSelectionDeleteArmed = useEditorStore((s) => s.setSelectionDeleteArmed);
+  const showToast = useEditorStore((s) => s.showToast);
   const addEdge = useEditorStore((s) => s.addEdge);
   const removeEdge = useEditorStore((s) => s.removeEdge);
   const addNodeAt = useEditorStore((s) => s.addNodeAt);
@@ -101,6 +101,8 @@ export default function EditorPage() {
   const moveNodes = useEditorStore((s) => s.moveNodes);
   const save = useEditorStore((s) => s.save);
   const discard = useEditorStore((s) => s.discard);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
 
   useEffect(() => {
     fetch("/api/editor/overrides")
@@ -154,6 +156,24 @@ export default function EditorPage() {
     setDiscardArmedAction(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overrides]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      // インスペクタのテキスト入力中はブラウザ標準のテキストUndoに譲る。
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const ctrlOrCmd = e.ctrlKey || e.metaKey;
+      if (!ctrlOrCmd || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        useEditorStore.getState().redo();
+      } else {
+        useEditorStore.getState().undo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   function gameCoordsFromEvent(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const rect = containerRef.current!.getBoundingClientRect();
@@ -292,9 +312,6 @@ export default function EditorPage() {
         } else if (mode === "draw" && pendingFrom !== null) {
           const id = addNodeAt(gx, gy, pendingFrom, roadType, overrides.addedNodes.length);
           setPendingFrom(id);
-        } else if (mode === "erase") {
-          setArmedNodeId(null);
-          setMessage(null);
         }
       }
       return;
@@ -375,14 +392,9 @@ export default function EditorPage() {
 
   function handleDeleteSelection() {
     if (selection.size === 0) return;
-    if (!selectionDeleteArmed) {
-      setSelectionDeleteArmed(true);
-      setMessage(`選択した${selection.size}件をもう一度クリックすると削除します`);
-      return;
-    }
+    const count = selection.size;
     removeNodes([...selection], addedNodeIds);
-    setSelectionDeleteArmed(false);
-    setMessage(null);
+    showToast(`${count}件を削除しました 元に戻す(Ctrl+Z)`);
   }
 
   function onWheel(e: React.WheelEvent) {
@@ -402,19 +414,14 @@ export default function EditorPage() {
     e.stopPropagation();
     if (mode !== "erase") return;
     removeEdge(from, to);
+    showToast("道を削除しました 元に戻す(Ctrl+Z)");
   }
 
   function handleNodeEraseClick(node: MapNode, e: React.MouseEvent) {
     e.stopPropagation();
     if (mode !== "erase") return;
-    if (armedNodeId !== node.id) {
-      setArmedNodeId(node.id);
-      setMessage(`「${node.name}」をもう一度クリックすると削除します(つながっている道も一緒に消えます)`);
-      return;
-    }
     removeNode(node.id, addedNodeIds.has(node.id));
-    setArmedNodeId(null);
-    setMessage(null);
+    showToast(`「${node.name}」を削除しました 元に戻す(Ctrl+Z)`);
   }
 
   async function handleSave() {
@@ -487,11 +494,34 @@ export default function EditorPage() {
           <button
             type="button"
             onClick={handleDeleteSelection}
-            className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${selectionDeleteArmed ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300" : "border-black/10 text-slate-600 dark:border-white/10 dark:text-slate-300"}`}
+            className="rounded-lg border px-3 py-1.5 text-sm font-medium border-black/10 text-slate-600 dark:border-white/10 dark:text-slate-300"
           >
-            {selectionDeleteArmed ? "もう一度押して削除" : `選択を削除(${selection.size}件)`}
+            {`選択を削除(${selection.size}件)`}
           </button>
         )}
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => undo()}
+            disabled={historyLength === 0}
+            className="h-8 w-8 rounded-lg border border-black/10 text-sm font-medium text-slate-600 disabled:opacity-30 dark:border-white/10 dark:text-slate-300"
+            aria-label="元に戻す"
+            title="元に戻す(Ctrl+Z)"
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            onClick={() => redo()}
+            disabled={futureLength === 0}
+            className="h-8 w-8 rounded-lg border border-black/10 text-sm font-medium text-slate-600 disabled:opacity-30 dark:border-white/10 dark:text-slate-300"
+            aria-label="やり直す"
+            title="やり直す(Ctrl+Shift+Z)"
+          >
+            ↷
+          </button>
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">未保存の変更あり</span>}
@@ -530,7 +560,7 @@ export default function EditorPage() {
           </>
         )}
         {mode === "erase" && (
-          <>道(線)をクリックすると削除します。交差点(マス)は、クリック→もう一度同じ交差点をクリックで削除します(つながっている道も一緒に消えます)。</>
+          <>道(線)や交差点(マス)をクリックすると即削除します(交差点は繋がっている道も一緒に消えます)。誤って消したときはCtrl+Zで元に戻せます。</>
         )}
         {message && <span className="ml-2 font-semibold">{message}</span>}
       </div>
@@ -624,7 +654,6 @@ export default function EditorPage() {
                   const cx = px - minX;
                   const cy = py - minY;
                   const isPending = pendingFrom === node.id;
-                  const isArmed = armedNodeId === node.id;
                   const isAdded = addedNodeIds.has(node.id);
                   const isSelected = selection.has(node.id);
                   return (
@@ -634,7 +663,6 @@ export default function EditorPage() {
                       style={{ cursor: mode === "erase" ? "pointer" : mode === "select" ? "grab" : "crosshair" }}
                     >
                       {isPending && <circle cx={cx} cy={cy} r={radius + 8} fill="none" stroke="#f5a623" strokeWidth={3} />}
-                      {isArmed && <circle cx={cx} cy={cy} r={radius + 8} fill="none" stroke="#e11d48" strokeWidth={3} />}
                       {isSelected && <circle cx={cx} cy={cy} r={radius + 8} fill="none" stroke="#2563eb" strokeWidth={3} />}
                       <rect
                         x={cx - radius}
@@ -642,11 +670,11 @@ export default function EditorPage() {
                         width={radius * 2}
                         height={radius * 2}
                         rx={6}
-                        fill={isArmed ? "#fecdd3" : isAdded ? "#dbeafe" : "#f5f1e6"}
-                        stroke={isArmed ? "#e11d48" : isAdded ? "#2563eb" : "#9c9284"}
+                        fill={isAdded ? "#dbeafe" : "#f5f1e6"}
+                        stroke={isAdded ? "#2563eb" : "#9c9284"}
                         strokeWidth={node.isMajorHub ? 3.5 : 2.5}
                       />
-                      {(node.isMajorHub || isAdded || isArmed || isPending || isSelected) && (
+                      {(node.isMajorHub || isAdded || isPending || isSelected) && (
                         <text
                           x={cx}
                           y={cy + radius + 13}
@@ -688,6 +716,12 @@ export default function EditorPage() {
             −
           </button>
         </div>
+
+        {toast && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg bg-slate-900/90 px-4 py-2 text-sm text-white shadow-lg dark:bg-slate-100/90 dark:text-slate-900">
+            {toast}
+          </div>
+        )}
       </div>
     </div>
   );

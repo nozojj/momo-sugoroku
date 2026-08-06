@@ -26,12 +26,16 @@ function applyNodeMove(overrides: MapOverrides, id: string, x: number, y: number
   return { ...overrides, movedNodes };
 }
 
+const MAX_HISTORY = 100;
+
 interface EditorStore {
   // --- データ ---
   overrides: MapOverrides;
   lastSaved: MapOverrides;
   loaded: boolean;
   saveStatus: "idle" | "saving" | "saved" | "error";
+  history: MapOverrides[];
+  future: MapOverrides[];
 
   // --- モード・選択 ---
   mode: EditorMode;
@@ -47,9 +51,11 @@ interface EditorStore {
 
   // --- 一時UI ---
   message: string | null;
-  armedNodeId: string | null;
+  /** 「変更を破棄」だけは影響範囲が大きいため2段階確認を残す。それ以外の削除は
+   * Undoが安全網になるので即実行+トースト通知に統一している(Step4)。 */
   discardArmed: boolean;
-  selectionDeleteArmed: boolean;
+  toast: string | null;
+  toastToken: number;
 
   // --- actions ---
   load: (overrides: MapOverrides) => void;
@@ -63,12 +69,13 @@ interface EditorStore {
   addToSelection: (ids: Set<string>) => void;
   setPendingFrom: (id: string | null) => void;
   setMessage: (msg: string | null) => void;
-  setArmedNodeId: (id: string | null) => void;
   setDiscardArmed: (v: boolean) => void;
-  setSelectionDeleteArmed: (v: boolean) => void;
+  showToast: (msg: string) => void;
 
-  /** overridesを直接置き換える(Step4でここに履歴pushを足す)。 */
+  /** overridesを直接置き換え、直前の状態をUndo履歴へ積む。 */
   commit: (next: MapOverrides) => void;
+  undo: () => void;
+  redo: () => void;
   addEdge: (a: string, b: string, type: RoadType, existingConnections: (from: string, to: string) => boolean) => void;
   removeEdge: (a: string, b: string) => void;
   addNodeAt: (x: number, y: number, from: string, roadType: RoadType, addedCount: number) => string;
@@ -88,6 +95,8 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   lastSaved: EMPTY_OVERRIDES,
   loaded: false,
   saveStatus: "idle",
+  history: [],
+  future: [],
 
   mode: "select",
   roadType: "residential",
@@ -100,36 +109,69 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   gridSize: 10,
 
   message: null,
-  armedNodeId: null,
   discardArmed: false,
-  selectionDeleteArmed: false,
+  toast: null,
+  toastToken: 0,
 
-  load: (overrides) => set({ overrides, lastSaved: overrides, loaded: true }),
-  setMode: (mode) =>
-    set({ mode, pendingFrom: null, armedNodeId: null, message: null, selection: new Set(), selectionDeleteArmed: false }),
+  load: (overrides) => set({ overrides, lastSaved: overrides, loaded: true, history: [], future: [] }),
+  setMode: (mode) => set({ mode, pendingFrom: null, message: null, selection: new Set() }),
   setRoadType: (roadType) => set({ roadType }),
   setPan: (pan) => set({ pan }),
   setZoom: (zoom) => set({ zoom }),
   setGridSnapEnabled: (gridSnapEnabled) => set({ gridSnapEnabled }),
-  setSelection: (selection) => set({ selection, selectionDeleteArmed: false }),
+  setSelection: (selection) => set({ selection }),
   toggleSelection: (id) => {
     const next = new Set(get().selection);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    set({ selection: next, selectionDeleteArmed: false });
+    set({ selection: next });
   },
   addToSelection: (ids) => {
     const next = new Set(get().selection);
     for (const id of ids) next.add(id);
-    set({ selection: next, selectionDeleteArmed: false });
+    set({ selection: next });
   },
   setPendingFrom: (pendingFrom) => set({ pendingFrom }),
   setMessage: (message) => set({ message }),
-  setArmedNodeId: (armedNodeId) => set({ armedNodeId }),
   setDiscardArmed: (discardArmed) => set({ discardArmed }),
-  setSelectionDeleteArmed: (selectionDeleteArmed) => set({ selectionDeleteArmed }),
+  showToast: (msg) => {
+    const token = get().toastToken + 1;
+    set({ toast: msg, toastToken: token });
+    setTimeout(() => {
+      if (get().toastToken === token) set({ toast: null });
+    }, 4000);
+  },
 
-  commit: (next) => set({ overrides: next, discardArmed: false, selectionDeleteArmed: false }),
+  commit: (next) => {
+    const history = [...get().history, get().overrides].slice(-MAX_HISTORY);
+    set({ overrides: next, history, future: [], discardArmed: false });
+  },
+
+  undo: () => {
+    const { history, overrides, future } = get();
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    set({
+      overrides: prev,
+      history: history.slice(0, -1),
+      future: [overrides, ...future].slice(0, MAX_HISTORY),
+      selection: new Set(),
+      discardArmed: false,
+    });
+  },
+
+  redo: () => {
+    const { future, overrides, history } = get();
+    if (future.length === 0) return;
+    const next = future[0];
+    set({
+      overrides: next,
+      history: [...history, overrides].slice(-MAX_HISTORY),
+      future: future.slice(1),
+      selection: new Set(),
+      discardArmed: false,
+    });
+  },
 
   addEdge: (a, b, type, alreadyConnected) => {
     if (a === b) return;
@@ -220,15 +262,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   },
 
   discard: () => {
-    const { lastSaved } = get();
-    set({
-      overrides: lastSaved,
-      pendingFrom: null,
-      armedNodeId: null,
-      discardArmed: false,
-      selectionDeleteArmed: false,
-      message: null,
-      selection: new Set(),
-    });
+    get().commit(get().lastSaved);
+    set({ pendingFrom: null, discardArmed: false, message: null, selection: new Set() });
   },
 }));
