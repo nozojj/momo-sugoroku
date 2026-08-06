@@ -46,7 +46,10 @@ function hitTestNode(nodes: MapNode[], gx: number, gy: number, extra = 4): MapNo
 type DragState =
   | { kind: "pan"; startX: number; startY: number; startPan: { x: number; y: number } }
   | { kind: "move"; nodeId: string; startGameX: number; startGameY: number; origX: number; origY: number }
+  | { kind: "move-group"; anchorId: string; startGameX: number; startGameY: number; origPositions: Map<string, { x: number; y: number }> }
   | { kind: "draw"; fromId: string; lastId: string }
+  | { kind: "toggle"; nodeId: string }
+  | { kind: "rubberband"; startClientX: number; startClientY: number }
   | null;
 
 export default function EditorPage() {
@@ -54,8 +57,9 @@ export default function EditorPage() {
   const dragStateRef = useRef<DragState>(null);
   const didDragRef = useRef(false);
   const [dragging, setDragging] = useState(false);
-  const [dragPreview, setDragPreview] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [dragPreview, setDragPreview] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [drawPreview, setDrawPreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [rubberBand, setRubberBand] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   const overrides = useEditorStore((s) => s.overrides);
   const loaded = useEditorStore((s) => s.loaded);
@@ -72,6 +76,7 @@ export default function EditorPage() {
   const message = useEditorStore((s) => s.message);
   const armedNodeId = useEditorStore((s) => s.armedNodeId);
   const discardArmed = useEditorStore((s) => s.discardArmed);
+  const selectionDeleteArmed = useEditorStore((s) => s.selectionDeleteArmed);
 
   const load = useEditorStore((s) => s.load);
   const setMode = useEditorStore((s) => s.setMode);
@@ -80,15 +85,20 @@ export default function EditorPage() {
   const setZoom = useEditorStore((s) => s.setZoom);
   const setGridSnapEnabled = useEditorStore((s) => s.setGridSnapEnabled);
   const setSelection = useEditorStore((s) => s.setSelection);
+  const toggleSelection = useEditorStore((s) => s.toggleSelection);
+  const addToSelection = useEditorStore((s) => s.addToSelection);
   const setPendingFrom = useEditorStore((s) => s.setPendingFrom);
   const setMessage = useEditorStore((s) => s.setMessage);
   const setArmedNodeId = useEditorStore((s) => s.setArmedNodeId);
   const setDiscardArmedAction = useEditorStore((s) => s.setDiscardArmed);
+  const setSelectionDeleteArmed = useEditorStore((s) => s.setSelectionDeleteArmed);
   const addEdge = useEditorStore((s) => s.addEdge);
   const removeEdge = useEditorStore((s) => s.removeEdge);
   const addNodeAt = useEditorStore((s) => s.addNodeAt);
   const removeNode = useEditorStore((s) => s.removeNode);
+  const removeNodes = useEditorStore((s) => s.removeNodes);
   const moveNode = useEditorStore((s) => s.moveNode);
+  const moveNodes = useEditorStore((s) => s.moveNodes);
   const save = useEditorStore((s) => s.save);
   const discard = useEditorStore((s) => s.discard);
 
@@ -158,15 +168,36 @@ export default function EditorPage() {
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    // 実際のポインタ操作なら基本的に失敗しないが、万一失敗してもドラッグ種別の
+    // 判定自体は続行できるようにする(ここで例外が漏れるとハンドラ全体が
+    // 中断し、以降のmove/upが一切効かなくなってしまうため)。
+    try {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    } catch {
+      // no-op
+    }
     didDragRef.current = false;
     const { x: gx, y: gy } = gameCoordsFromEvent(e);
     const hit = mode !== "erase" ? hitTestNode(map.nodes, gx, gy) : null;
 
-    if (mode === "select" && hit) {
-      dragStateRef.current = { kind: "move", nodeId: hit.id, startGameX: gx, startGameY: gy, origX: hit.x, origY: hit.y };
+    if (mode === "select" && hit && e.shiftKey) {
+      dragStateRef.current = { kind: "toggle", nodeId: hit.id };
+    } else if (mode === "select" && hit) {
+      if (selection.has(hit.id) && selection.size > 1) {
+        const origPositions = new Map<string, { x: number; y: number }>();
+        for (const id of selection) {
+          const n = nodeById.get(id);
+          if (n) origPositions.set(id, { x: n.x, y: n.y });
+        }
+        dragStateRef.current = { kind: "move-group", anchorId: hit.id, startGameX: gx, startGameY: gy, origPositions };
+      } else {
+        dragStateRef.current = { kind: "move", nodeId: hit.id, startGameX: gx, startGameY: gy, origX: hit.x, origY: hit.y };
+      }
     } else if (mode === "draw" && hit) {
       dragStateRef.current = { kind: "draw", fromId: hit.id, lastId: hit.id };
+    } else if (mode === "select" && !hit && e.shiftKey) {
+      dragStateRef.current = { kind: "rubberband", startClientX: e.clientX, startClientY: e.clientY };
+      setRubberBand({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
     } else {
       dragStateRef.current = { kind: "pan", startX: e.clientX, startY: e.clientY, startPan: pan };
     }
@@ -185,6 +216,16 @@ export default function EditorPage() {
       return;
     }
 
+    if (drag.kind === "toggle") {
+      return;
+    }
+
+    if (drag.kind === "rubberband") {
+      didDragRef.current = true;
+      setRubberBand((prev) => (prev ? { ...prev, x2: e.clientX, y2: e.clientY } : prev));
+      return;
+    }
+
     const { x: gx, y: gy } = gameCoordsFromEvent(e);
 
     if (drag.kind === "move") {
@@ -197,7 +238,28 @@ export default function EditorPage() {
         nx = snapToGrid(nx, gridSize);
         ny = snapToGrid(ny, gridSize);
       }
-      setDragPreview({ id: drag.nodeId, x: nx, y: ny });
+      setDragPreview(new Map([[drag.nodeId, { x: nx, y: ny }]]));
+      return;
+    }
+
+    if (drag.kind === "move-group") {
+      const dx = gx - drag.startGameX;
+      const dy = gy - drag.startGameY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true;
+      const anchorOrig = drag.origPositions.get(drag.anchorId)!;
+      let anchorNx = anchorOrig.x + dx;
+      let anchorNy = anchorOrig.y + dy;
+      if (gridSnapEnabled) {
+        anchorNx = snapToGrid(anchorNx, gridSize);
+        anchorNy = snapToGrid(anchorNy, gridSize);
+      }
+      const snapDx = anchorNx - anchorOrig.x;
+      const snapDy = anchorNy - anchorOrig.y;
+      const preview = new Map<string, { x: number; y: number }>();
+      for (const [id, pos] of drag.origPositions) {
+        preview.set(id, { x: pos.x + snapDx, y: pos.y + snapDy });
+      }
+      setDragPreview(preview);
       return;
     }
 
@@ -238,11 +300,49 @@ export default function EditorPage() {
       return;
     }
 
+    if (drag.kind === "toggle") {
+      toggleSelection(drag.nodeId);
+      return;
+    }
+
+    if (drag.kind === "rubberband") {
+      setRubberBand(null);
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const toGame = (clientX: number, clientY: number) => ({
+          x: (clientX - rect.left - pan.x) / zoom + minX,
+          y: (clientY - rect.top - pan.y) / zoom + minY,
+        });
+        const p1 = toGame(drag.startClientX, drag.startClientY);
+        const p2 = toGame(e.clientX, e.clientY);
+        const minGX = Math.min(p1.x, p2.x);
+        const maxGX = Math.max(p1.x, p2.x);
+        const minGY = Math.min(p1.y, p2.y);
+        const maxGY = Math.max(p1.y, p2.y);
+        const matched = new Set(
+          map.nodes.filter((n) => n.x >= minGX && n.x <= maxGX && n.y >= minGY && n.y <= maxGY).map((n) => n.id),
+        );
+        addToSelection(matched);
+      }
+      return;
+    }
+
     if (drag.kind === "move") {
-      if (didDragRef.current && dragPreview) {
-        moveNode(dragPreview.id, dragPreview.x, dragPreview.y);
+      const preview = dragPreview?.get(drag.nodeId);
+      if (didDragRef.current && preview) {
+        moveNode(drag.nodeId, preview.x, preview.y);
       } else {
         setSelection(new Set([drag.nodeId]));
+      }
+      setDragPreview(null);
+      return;
+    }
+
+    if (drag.kind === "move-group") {
+      if (didDragRef.current && dragPreview) {
+        moveNodes([...dragPreview.entries()].map(([id, pos]) => ({ id, x: pos.x, y: pos.y })));
+      } else {
+        setSelection(new Set([drag.anchorId]));
       }
       setDragPreview(null);
       return;
@@ -271,6 +371,18 @@ export default function EditorPage() {
       }
       setDrawPreview(null);
     }
+  }
+
+  function handleDeleteSelection() {
+    if (selection.size === 0) return;
+    if (!selectionDeleteArmed) {
+      setSelectionDeleteArmed(true);
+      setMessage(`選択した${selection.size}件をもう一度クリックすると削除します`);
+      return;
+    }
+    removeNodes([...selection], addedNodeIds);
+    setSelectionDeleteArmed(false);
+    setMessage(null);
   }
 
   function onWheel(e: React.WheelEvent) {
@@ -371,6 +483,16 @@ export default function EditorPage() {
           グリッド吸着
         </label>
 
+        {mode === "select" && selection.size > 0 && (
+          <button
+            type="button"
+            onClick={handleDeleteSelection}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${selectionDeleteArmed ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300" : "border-black/10 text-slate-600 dark:border-white/10 dark:text-slate-300"}`}
+          >
+            {selectionDeleteArmed ? "もう一度押して削除" : `選択を削除(${selection.size}件)`}
+          </button>
+        )}
+
         <div className="ml-auto flex items-center gap-2">
           {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">未保存の変更あり</span>}
           {saveStatus === "saved" && !dirty && <span className="text-xs text-emerald-600 dark:text-emerald-400">保存済み</span>}
@@ -395,7 +517,12 @@ export default function EditorPage() {
       </header>
 
       <div className="flex items-center gap-2 border-b border-black/10 bg-amber-50 px-4 py-1.5 text-xs text-amber-800 dark:bg-amber-950/40 dark:border-white/10 dark:text-amber-200">
-        {mode === "select" && <>ノードをドラッグで移動、クリックで選択します。空白をクリックすると選択解除。</>}
+        {mode === "select" && (
+          <>
+            ノードをドラッグで移動、クリックで選択します。Shift+クリックで複数選択の追加/解除、Shift+ドラッグで範囲選択できます。空白をクリックすると選択解除。
+            {selection.size > 0 && ` ${selection.size}件選択中。`}
+          </>
+        )}
         {mode === "draw" && (
           <>
             ノードからドラッグすると連続して道を敷設できます(空白でドロップすると新しい交差点を作って接続)。単純なクリックでも1本ずつ接続できます。
@@ -421,6 +548,17 @@ export default function EditorPage() {
             cursor: dragging ? "grabbing" : mode === "draw" ? "crosshair" : mode === "erase" ? "not-allowed" : "default",
           }}
         >
+          {rubberBand && (
+            <div
+              className="pointer-events-none fixed border-2 border-blue-500 bg-blue-500/10"
+              style={{
+                left: Math.min(rubberBand.x1, rubberBand.x2),
+                top: Math.min(rubberBand.y1, rubberBand.y2),
+                width: Math.abs(rubberBand.x2 - rubberBand.x1),
+                height: Math.abs(rubberBand.y2 - rubberBand.y1),
+              }}
+            />
+          )}
           {loaded && (
             <div
               style={{
@@ -435,10 +573,12 @@ export default function EditorPage() {
                   const to = nodeById.get(edge.to);
                   if (!from || !to) return null;
                   const style = ROAD_STYLE[edge.roadType];
-                  const fx = dragPreview?.id === edge.from ? dragPreview.x : from.x;
-                  const fy = dragPreview?.id === edge.from ? dragPreview.y : from.y;
-                  const tx = dragPreview?.id === edge.to ? dragPreview.x : to.x;
-                  const ty = dragPreview?.id === edge.to ? dragPreview.y : to.y;
+                  const fromPreview = dragPreview?.get(edge.from);
+                  const toPreview = dragPreview?.get(edge.to);
+                  const fx = fromPreview?.x ?? from.x;
+                  const fy = fromPreview?.y ?? from.y;
+                  const tx = toPreview?.x ?? to.x;
+                  const ty = toPreview?.y ?? to.y;
                   const x1 = fx - minX;
                   const y1 = fy - minY;
                   const x2 = tx - minX;
@@ -478,8 +618,9 @@ export default function EditorPage() {
 
                 {map.nodes.map((node) => {
                   const radius = node.isMajorHub ? MAJOR_HUB_RADIUS : NODE_RADIUS;
-                  const px = dragPreview?.id === node.id ? dragPreview.x : node.x;
-                  const py = dragPreview?.id === node.id ? dragPreview.y : node.y;
+                  const preview = dragPreview?.get(node.id);
+                  const px = preview?.x ?? node.x;
+                  const py = preview?.y ?? node.y;
                   const cx = px - minX;
                   const cy = py - minY;
                   const isPending = pendingFrom === node.id;

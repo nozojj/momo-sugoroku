@@ -12,6 +12,20 @@ function newNodeId(): string {
   return `ed_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function applyNodeMove(overrides: MapOverrides, id: string, x: number, y: number): MapOverrides {
+  const addedIdx = overrides.addedNodes.findIndex((n) => n.id === id);
+  if (addedIdx !== -1) {
+    const addedNodes = [...overrides.addedNodes];
+    addedNodes[addedIdx] = { ...addedNodes[addedIdx], x, y };
+    return { ...overrides, addedNodes };
+  }
+  const movedIdx = overrides.movedNodes.findIndex((n) => n.id === id);
+  const movedNodes = [...overrides.movedNodes];
+  if (movedIdx !== -1) movedNodes[movedIdx] = { id, x, y };
+  else movedNodes.push({ id, x, y });
+  return { ...overrides, movedNodes };
+}
+
 interface EditorStore {
   // --- データ ---
   overrides: MapOverrides;
@@ -35,6 +49,7 @@ interface EditorStore {
   message: string | null;
   armedNodeId: string | null;
   discardArmed: boolean;
+  selectionDeleteArmed: boolean;
 
   // --- actions ---
   load: (overrides: MapOverrides) => void;
@@ -44,10 +59,13 @@ interface EditorStore {
   setZoom: (zoom: number) => void;
   setGridSnapEnabled: (v: boolean) => void;
   setSelection: (ids: Set<string>) => void;
+  toggleSelection: (id: string) => void;
+  addToSelection: (ids: Set<string>) => void;
   setPendingFrom: (id: string | null) => void;
   setMessage: (msg: string | null) => void;
   setArmedNodeId: (id: string | null) => void;
   setDiscardArmed: (v: boolean) => void;
+  setSelectionDeleteArmed: (v: boolean) => void;
 
   /** overridesを直接置き換える(Step4でここに履歴pushを足す)。 */
   commit: (next: MapOverrides) => void;
@@ -55,7 +73,9 @@ interface EditorStore {
   removeEdge: (a: string, b: string) => void;
   addNodeAt: (x: number, y: number, from: string, roadType: RoadType, addedCount: number) => string;
   removeNode: (id: string, isAdded: boolean) => void;
+  removeNodes: (ids: string[], addedIds: Set<string>) => void;
   moveNode: (id: string, x: number, y: number) => void;
+  moveNodes: (moves: { id: string; x: number; y: number }[]) => void;
 
   save: () => Promise<void>;
   discard: () => void;
@@ -82,21 +102,34 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   message: null,
   armedNodeId: null,
   discardArmed: false,
+  selectionDeleteArmed: false,
 
   load: (overrides) => set({ overrides, lastSaved: overrides, loaded: true }),
   setMode: (mode) =>
-    set({ mode, pendingFrom: null, armedNodeId: null, message: null, selection: new Set() }),
+    set({ mode, pendingFrom: null, armedNodeId: null, message: null, selection: new Set(), selectionDeleteArmed: false }),
   setRoadType: (roadType) => set({ roadType }),
   setPan: (pan) => set({ pan }),
   setZoom: (zoom) => set({ zoom }),
   setGridSnapEnabled: (gridSnapEnabled) => set({ gridSnapEnabled }),
-  setSelection: (selection) => set({ selection }),
+  setSelection: (selection) => set({ selection, selectionDeleteArmed: false }),
+  toggleSelection: (id) => {
+    const next = new Set(get().selection);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    set({ selection: next, selectionDeleteArmed: false });
+  },
+  addToSelection: (ids) => {
+    const next = new Set(get().selection);
+    for (const id of ids) next.add(id);
+    set({ selection: next, selectionDeleteArmed: false });
+  },
   setPendingFrom: (pendingFrom) => set({ pendingFrom }),
   setMessage: (message) => set({ message }),
   setArmedNodeId: (armedNodeId) => set({ armedNodeId }),
   setDiscardArmed: (discardArmed) => set({ discardArmed }),
+  setSelectionDeleteArmed: (selectionDeleteArmed) => set({ selectionDeleteArmed }),
 
-  commit: (next) => set({ overrides: next, discardArmed: false }),
+  commit: (next) => set({ overrides: next, discardArmed: false, selectionDeleteArmed: false }),
 
   addEdge: (a, b, type, alreadyConnected) => {
     if (a === b) return;
@@ -145,20 +178,29 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     });
   },
 
-  moveNode: (id, x, y) => {
+  removeNodes: (ids, addedIds) => {
+    const idSet = new Set(ids);
     const prev = get().overrides;
-    const addedIdx = prev.addedNodes.findIndex((n) => n.id === id);
-    if (addedIdx !== -1) {
-      const addedNodes = [...prev.addedNodes];
-      addedNodes[addedIdx] = { ...addedNodes[addedIdx], x, y };
-      get().commit({ ...prev, addedNodes });
-      return;
-    }
-    const movedIdx = prev.movedNodes.findIndex((n) => n.id === id);
-    const movedNodes = [...prev.movedNodes];
-    if (movedIdx !== -1) movedNodes[movedIdx] = { id, x, y };
-    else movedNodes.push({ id, x, y });
-    get().commit({ ...prev, movedNodes });
+    const newlyRemovedBase = ids.filter((id) => !addedIds.has(id) && !prev.removedNodes.includes(id));
+    get().commit({
+      ...prev,
+      addedNodes: prev.addedNodes.filter((n) => !idSet.has(n.id)),
+      addedEdges: prev.addedEdges.filter((e) => !idSet.has(e.from) && !idSet.has(e.to)),
+      movedNodes: prev.movedNodes.filter((n) => !idSet.has(n.id)),
+      modifiedNodes: prev.modifiedNodes.filter((n) => !idSet.has(n.id)),
+      removedNodes: [...prev.removedNodes, ...newlyRemovedBase],
+    });
+    set({ selection: new Set() });
+  },
+
+  moveNode: (id, x, y) => {
+    get().commit(applyNodeMove(get().overrides, id, x, y));
+  },
+
+  moveNodes: (moves) => {
+    let next = get().overrides;
+    for (const m of moves) next = applyNodeMove(next, m.id, m.x, m.y);
+    get().commit(next);
   },
 
   save: async () => {
@@ -184,6 +226,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       pendingFrom: null,
       armedNodeId: null,
       discardArmed: false,
+      selectionDeleteArmed: false,
       message: null,
       selection: new Set(),
     });
