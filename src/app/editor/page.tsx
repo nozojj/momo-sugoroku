@@ -181,10 +181,17 @@ export default function EditorPage() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      const ctrlOrCmd = e.ctrlKey || e.metaKey;
+      // Ctrl+Sはブラウザの「名前を付けて保存」ダイアログを避けるため、
+      // フォーカス位置(インスペクタの入力欄など)によらず常に横取りする。
+      if (ctrlOrCmd && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void useEditorStore.getState().save();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       // インスペクタのテキスト入力中はブラウザ標準のテキストUndoに譲る。
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
-      const ctrlOrCmd = e.ctrlKey || e.metaKey;
       if (!ctrlOrCmd || e.key.toLowerCase() !== "z") return;
       e.preventDefault();
       if (e.shiftKey) {
@@ -196,6 +203,45 @@ export default function EditorPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // デバウンス自動保存: 編集が1.8秒落ち着いたら自動的に保存する。
+  useEffect(() => {
+    if (!loaded || !dirty || saveStatus === "saving") return;
+    const t = setTimeout(() => {
+      void save();
+    }, 1800);
+    return () => clearTimeout(t);
+  }, [overrides, loaded, dirty, saveStatus, save]);
+
+  // 近すぎるノードの軽量警告: 追加/移動されたノードだけを対象に最近傍距離をチェックする
+  // (線分交差判定などは作り込まず、目視で気づける非ブロッキングな警告に留める)。
+  const [warnNodeIds, setWarnNodeIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const candidateIds = new Set([...overrides.addedNodes.map((n) => n.id), ...overrides.movedNodes.map((n) => n.id)]);
+      if (candidateIds.size === 0) {
+        setWarnNodeIds(new Set());
+        return;
+      }
+      const warn = new Set<string>();
+      for (const id of candidateIds) {
+        const n = nodeById.get(id);
+        if (!n) continue;
+        const rN = n.isMajorHub ? MAJOR_HUB_RADIUS : NODE_RADIUS;
+        for (const other of map.nodes) {
+          if (other.id === id) continue;
+          const rO = other.isMajorHub ? MAJOR_HUB_RADIUS : NODE_RADIUS;
+          if (Math.hypot(other.x - n.x, other.y - n.y) < rN + rO) {
+            warn.add(id);
+            warn.add(other.id);
+            break;
+          }
+        }
+      }
+      setWarnNodeIds(warn);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [overrides, map, nodeById]);
 
   function gameCoordsFromEvent(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const rect = containerRef.current!.getBoundingClientRect();
@@ -706,6 +752,9 @@ export default function EditorPage() {
                     >
                       {isPending && <circle cx={cx} cy={cy} r={radius + 8} fill="none" stroke="#f5a623" strokeWidth={3} />}
                       {isSelected && <circle cx={cx} cy={cy} r={radius + 8} fill="none" stroke="#2563eb" strokeWidth={3} />}
+                      {warnNodeIds.has(node.id) && (
+                        <circle cx={cx} cy={cy} r={radius + 11} fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 3" pointerEvents="none" />
+                      )}
                       <rect
                         x={cx - radius}
                         y={cy - radius}

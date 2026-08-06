@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PropertyDef, RoadType } from "@/types/game";
-import { EMPTY_OVERRIDES, type MapOverrides, type ModifiedEdge, type NodePatch } from "@/data/maps/applyOverrides";
+import { applyMapOverrides, EMPTY_OVERRIDES, type MapOverrides, type ModifiedEdge, type NodePatch } from "@/data/maps/applyOverrides";
+import { shonanFullMap as baseMap } from "@/data/maps/shonan-full";
 
 export type EditorMode = "select" | "draw" | "erase";
 
@@ -320,16 +321,27 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   },
 
   save: async () => {
+    if (get().saveStatus === "saving") return;
     set({ saveStatus: "saving" });
     try {
-      const overrides = get().overrides;
+      const current = get().overrides;
+      // 物件タイプのノードから参照されなくなったcustomPropertiesを保存時に整理する
+      // (削除・種別変更・Undo/Redoの繰り返しでゴミが溜まらないようにするため)。
+      const merged = applyMapOverrides(baseMap, current);
+      const referencedPropIds = new Set(
+        merged.nodes.filter((n) => n.propertyId).map((n) => n.propertyId as string),
+      );
+      const customProperties = current.customProperties.filter((p) => referencedPropIds.has(p.id));
+      const overrides =
+        customProperties.length === current.customProperties.length ? current : { ...current, customProperties };
+
       const res = await fetch("/api/editor/overrides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(overrides),
       });
       if (!res.ok) throw new Error(await res.text());
-      set({ lastSaved: overrides, saveStatus: "saved" });
+      set({ overrides, lastSaved: overrides, saveStatus: "saved" });
     } catch {
       set({ saveStatus: "error" });
     }

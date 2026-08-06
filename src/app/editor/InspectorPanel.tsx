@@ -70,6 +70,7 @@ export function InspectorPanel({ node, edge, isStartNode, existingAreas, existin
       area: node?.area || "エディタ物件",
     };
     upsertCustomProperty(def);
+    if (node?.propertyId !== def.id) updateNode(nodeId, { propertyId: def.id });
   }
 
   return (
@@ -98,7 +99,10 @@ export function InspectorPanel({ node, edge, isStartNode, existingAreas, existin
             <select
               className={inputCls}
               value={node.type}
-              onChange={(e) => updateNode(node.id, { type: e.target.value as NodeType })}
+              onChange={(e) => {
+                const type = e.target.value as NodeType;
+                updateNode(node.id, { type, propertyId: type === "property" ? node.propertyId : undefined });
+              }}
             >
               {NODE_TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>
