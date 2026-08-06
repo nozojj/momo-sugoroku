@@ -1482,18 +1482,21 @@ buildRoad(hillsBend2, hillsEnd, "residential", "r_hills_road3", "丘陵連絡路
 // 間引いた。茅ヶ崎⇄辻堂は幹線+裏道1本の計2ルート、辻堂⇄藤沢は幹線+裏道1本+近道の
 // 計3ルートを確保している。
 // 茅ヶ崎ロータリー東点と辻堂ロータリー西点は高さ(y)が違うため、直接つなぐと道が
-// 斜めになる。両方の輪の辺(縦の列)を避けた中間のx(600)で1回南北方向に振ってから
-// 辻堂側へ入る、縦横のみの3区間(コの字)にする。
+// 斜めになる。両方の輪の辺(縦の列)を避けた中間のx(620)で1回南北方向に振ってから
+// 辻堂側へ入る、縦横のみの3区間(コの字)にする。x=620は、海沿い幹線(茅ヶ崎⇄辻堂の
+// r_cg_ts)のフィラーr_cg_ts_4(620,724)とちょうど同じ列になる位置を選び、
+// 素通り(開けた場所での交差)を避けて実際にそこを経由する交差点にする
+// (下のedgeSpliceThroughNode参照)。
 const cgTsBend1 = addJunction(
   "wp_cg_ts_bend1",
   "茅ヶ崎辻堂裏道(角1)",
-  600,
+  620,
   chigasakiRing.e.y,
 );
 const cgTsBend2 = addJunction(
   "wp_cg_ts_bend2",
   "茅ヶ崎辻堂裏道(角2)",
-  600,
+  620,
   tsujidoRing.w.y,
 );
 connectRoad(
@@ -2849,6 +2852,11 @@ edgeSpliceThroughNode("ofsp_se", "ofsp_s", "bend38_bend");
 edgeSpliceThroughNode("r_bypass_3_1", "r_bypass_3_2", "r_sm_kg_2");
 edgeSpliceThroughNode("r_bypass_4_1", "r_bypass_4_2", "r_short_smsc_kg_3");
 edgeSpliceThroughNode("r_bypass_5_5", "r_bypass_5_6", "bend58_bend");
+// 縦横化リファクタ: 茅ヶ崎⇄辻堂裏道のコの字の縦区間(wp_cg_ts_bend1⇄bend2、x=620)は、
+// 海沿い幹線(r_cg_ts)のフィラーr_cg_ts_4(620,724)をちょうど同じx列で開けた場所で
+// 素通りしてしまうため、bend1・bend2のxをr_cg_ts_4に合わせて選び、実際にそこを
+// 経由する交差点にする。
+edgeSpliceThroughNode("wp_cg_ts_bend1", "wp_cg_ts_bend2", "r_cg_ts_4");
 
 // ------------------------------------------------------------------
 // 座標の微調整(第2弾): 上記の輪の半径調整・迂回追加に伴い、隣接する別の輪・
