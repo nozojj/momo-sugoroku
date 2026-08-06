@@ -5,8 +5,10 @@ import Link from "next/link";
 import type { MapData, MapNode, RoadType } from "@/types/game";
 import { shonanFullMap as baseMap } from "@/data/maps/shonan-full";
 import { applyMapOverrides } from "@/data/maps/applyOverrides";
-import { ROAD_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, straightRoadPath } from "@/lib/game/mapStyle";
+import { ROAD_STYLE, NODE_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, straightRoadPath } from "@/lib/game/mapStyle";
 import { useEditorStore, snapToGrid, type EditorMode } from "@/store/editorStore";
+import { InspectorPanel } from "./InspectorPanel";
+import { getPropertyDef } from "@/data/properties";
 
 const PADDING = 80;
 
@@ -68,6 +70,7 @@ export default function EditorPage() {
   const mode = useEditorStore((s) => s.mode);
   const roadType = useEditorStore((s) => s.roadType);
   const selection = useEditorStore((s) => s.selection);
+  const selectedEdge = useEditorStore((s) => s.selectedEdge);
   const pendingFrom = useEditorStore((s) => s.pendingFrom);
   const pan = useEditorStore((s) => s.pan);
   const zoom = useEditorStore((s) => s.zoom);
@@ -88,6 +91,7 @@ export default function EditorPage() {
   const setSelection = useEditorStore((s) => s.setSelection);
   const toggleSelection = useEditorStore((s) => s.toggleSelection);
   const addToSelection = useEditorStore((s) => s.addToSelection);
+  const setSelectedEdge = useEditorStore((s) => s.setSelectedEdge);
   const setPendingFrom = useEditorStore((s) => s.setPendingFrom);
   const setMessage = useEditorStore((s) => s.setMessage);
   const setDiscardArmedAction = useEditorStore((s) => s.setDiscardArmed);
@@ -138,6 +142,24 @@ export default function EditorPage() {
   const minX = Math.min(...map.nodes.map((n) => n.x)) - PADDING;
   const minY = Math.min(...map.nodes.map((n) => n.y)) - PADDING;
   const nodeById = useMemo(() => new Map(map.nodes.map((n) => [n.id, n])), [map]);
+
+  const existingAreas = useMemo(
+    () => [...new Set(map.nodes.map((n) => n.area).filter((a): a is string => !!a))].sort(),
+    [map],
+  );
+  const inspectedNode = mode === "select" && selection.size === 1 ? (nodeById.get([...selection][0]) ?? null) : null;
+  const inspectedEdge =
+    mode === "select" && selectedEdge
+      ? (() => {
+          const from = nodeById.get(selectedEdge.from);
+          const to = nodeById.get(selectedEdge.to);
+          if (!from || !to) return null;
+          const conn = from.connections.find((c) => c.to === to.id);
+          if (!conn) return null;
+          return { from, to, roadType: conn.roadType, requiresCardId: conn.requiresCardId };
+        })()
+      : null;
+  const inspectedPropertyDef = inspectedNode?.propertyId ? getPropertyDef(inspectedNode.propertyId) : undefined;
 
   function clampZoom(z: number) {
     return Math.min(3, Math.max(0.08, z));
@@ -392,6 +414,10 @@ export default function EditorPage() {
 
   function handleDeleteSelection() {
     if (selection.size === 0) return;
+    if (selection.has(map.startNodeId)) {
+      showToast("現在の開始地点は削除できません(先に別のノードを開始地点に変更してください)");
+      return;
+    }
     const count = selection.size;
     removeNodes([...selection], addedNodeIds);
     showToast(`${count}件を削除しました 元に戻す(Ctrl+Z)`);
@@ -412,14 +438,21 @@ export default function EditorPage() {
 
   function handleEdgeClick(from: string, to: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (mode !== "erase") return;
-    removeEdge(from, to);
-    showToast("道を削除しました 元に戻す(Ctrl+Z)");
+    if (mode === "erase") {
+      removeEdge(from, to);
+      showToast("道を削除しました 元に戻す(Ctrl+Z)");
+    } else if (mode === "select") {
+      setSelectedEdge({ from, to });
+    }
   }
 
   function handleNodeEraseClick(node: MapNode, e: React.MouseEvent) {
     e.stopPropagation();
     if (mode !== "erase") return;
+    if (node.id === map.startNodeId) {
+      showToast("現在の開始地点は削除できません(先に別のノードを開始地点に変更してください)");
+      return;
+    }
     removeNode(node.id, addedNodeIds.has(node.id));
     showToast(`「${node.name}」を削除しました 元に戻す(Ctrl+Z)`);
   }
@@ -614,11 +647,18 @@ export default function EditorPage() {
                   const x2 = tx - minX;
                   const y2 = ty - minY;
                   const d = straightRoadPath(x1, y1, x2, y2);
+                  const isEdgeSelected =
+                    selectedEdge &&
+                    ((selectedEdge.from === edge.from && selectedEdge.to === edge.to) ||
+                      (selectedEdge.from === edge.to && selectedEdge.to === edge.from));
                   return (
                     <g key={`${edge.from}-${edge.to}`}>
+                      {isEdgeSelected && (
+                        <path d={d} fill="none" stroke="#2563eb" strokeWidth={style.width + 6} strokeLinecap="round" opacity={0.5} />
+                      )}
                       <path d={d} fill="none" stroke={style.base} strokeWidth={style.width} strokeLinecap="round" />
                       <path d={d} fill="none" stroke={style.top} strokeWidth={style.width * 0.72} strokeLinecap="round" strokeDasharray={style.dash} />
-                      {mode === "erase" && (
+                      {(mode === "erase" || mode === "select") && (
                         <path
                           d={d}
                           fill="none"
@@ -656,6 +696,8 @@ export default function EditorPage() {
                   const isPending = pendingFrom === node.id;
                   const isAdded = addedNodeIds.has(node.id);
                   const isSelected = selection.has(node.id);
+                  const isStart = node.id === map.startNodeId;
+                  const icon = NODE_STYLE[node.type].icon;
                   return (
                     <g
                       key={node.id}
@@ -674,6 +716,16 @@ export default function EditorPage() {
                         stroke={isAdded ? "#2563eb" : "#9c9284"}
                         strokeWidth={node.isMajorHub ? 3.5 : 2.5}
                       />
+                      {icon && (
+                        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={node.isMajorHub ? 15 : 11} pointerEvents="none">
+                          {icon}
+                        </text>
+                      )}
+                      {isStart && (
+                        <text x={cx} y={cy - radius - 6} textAnchor="middle" fontSize={14} pointerEvents="none">
+                          🚩
+                        </text>
+                      )}
                       {(node.isMajorHub || isAdded || isPending || isSelected) && (
                         <text
                           x={cx}
@@ -720,6 +772,42 @@ export default function EditorPage() {
         {toast && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg bg-slate-900/90 px-4 py-2 text-sm text-white shadow-lg dark:bg-slate-100/90 dark:text-slate-900">
             {toast}
+          </div>
+        )}
+
+        {(inspectedNode || inspectedEdge) && (
+          <InspectorPanel
+            node={inspectedNode}
+            edge={inspectedEdge}
+            isStartNode={inspectedNode?.id === map.startNodeId}
+            existingAreas={existingAreas}
+            existingPropertyDef={inspectedPropertyDef}
+            onClose={() => {
+              setSelection(new Set());
+              setSelectedEdge(null);
+            }}
+          />
+        )}
+
+        {mode === "select" && !inspectedNode && !inspectedEdge && existingAreas.length > 0 && (
+          <div className="absolute left-3 top-3 w-48 rounded-xl border border-black/10 bg-white/95 p-3 shadow-lg backdrop-blur dark:bg-slate-900/95 dark:border-white/10">
+            <h2 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">エリア</h2>
+            <ul className="flex flex-col gap-1">
+              {existingAreas.map((area) => (
+                <li key={area} className="flex items-center justify-between gap-1">
+                  <span className="truncate text-xs text-slate-600 dark:text-slate-300" title={area}>
+                    {area}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelection(new Set(map.nodes.filter((n) => n.area === area).map((n) => n.id)))}
+                    className="shrink-0 rounded border border-black/10 px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    選択
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

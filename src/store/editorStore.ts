@@ -1,8 +1,13 @@
 import { create } from "zustand";
-import type { RoadType } from "@/types/game";
-import { EMPTY_OVERRIDES, type MapOverrides } from "@/data/maps/applyOverrides";
+import type { PropertyDef, RoadType } from "@/types/game";
+import { EMPTY_OVERRIDES, type MapOverrides, type ModifiedEdge, type NodePatch } from "@/data/maps/applyOverrides";
 
 export type EditorMode = "select" | "draw" | "erase";
+
+export interface EdgeRef {
+  from: string;
+  to: string;
+}
 
 function edgeKey(a: string, b: string): string {
   return [a, b].sort().join("__");
@@ -26,6 +31,23 @@ function applyNodeMove(overrides: MapOverrides, id: string, x: number, y: number
   return { ...overrides, movedNodes };
 }
 
+function applyNodePatch(overrides: MapOverrides, id: string, patch: NodePatch): MapOverrides {
+  const addedIdx = overrides.addedNodes.findIndex((n) => n.id === id);
+  if (addedIdx !== -1) {
+    const addedNodes = [...overrides.addedNodes];
+    addedNodes[addedIdx] = { ...addedNodes[addedIdx], ...patch };
+    return { ...overrides, addedNodes };
+  }
+  const modifiedIdx = overrides.modifiedNodes.findIndex((n) => n.id === id);
+  const modifiedNodes = [...overrides.modifiedNodes];
+  if (modifiedIdx !== -1) {
+    modifiedNodes[modifiedIdx] = { id, patch: { ...modifiedNodes[modifiedIdx].patch, ...patch } };
+  } else {
+    modifiedNodes.push({ id, patch });
+  }
+  return { ...overrides, modifiedNodes };
+}
+
 const MAX_HISTORY = 100;
 
 interface EditorStore {
@@ -41,6 +63,7 @@ interface EditorStore {
   mode: EditorMode;
   roadType: RoadType;
   selection: Set<string>;
+  selectedEdge: EdgeRef | null;
   pendingFrom: string | null;
 
   // --- viewport ---
@@ -67,6 +90,7 @@ interface EditorStore {
   setSelection: (ids: Set<string>) => void;
   toggleSelection: (id: string) => void;
   addToSelection: (ids: Set<string>) => void;
+  setSelectedEdge: (edge: EdgeRef | null) => void;
   setPendingFrom: (id: string | null) => void;
   setMessage: (msg: string | null) => void;
   setDiscardArmed: (v: boolean) => void;
@@ -83,6 +107,10 @@ interface EditorStore {
   removeNodes: (ids: string[], addedIds: Set<string>) => void;
   moveNode: (id: string, x: number, y: number) => void;
   moveNodes: (moves: { id: string; x: number; y: number }[]) => void;
+  updateNode: (id: string, patch: NodePatch) => void;
+  updateEdge: (a: string, b: string, patch: { roadType?: RoadType; requiresCardId?: string | null }) => void;
+  upsertCustomProperty: (propDef: PropertyDef) => void;
+  setStartNode: (id: string) => void;
 
   save: () => Promise<void>;
   discard: () => void;
@@ -101,6 +129,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   mode: "select",
   roadType: "residential",
   selection: new Set(),
+  selectedEdge: null,
   pendingFrom: null,
 
   pan: { x: 20, y: 20 },
@@ -114,23 +143,24 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
   toastToken: 0,
 
   load: (overrides) => set({ overrides, lastSaved: overrides, loaded: true, history: [], future: [] }),
-  setMode: (mode) => set({ mode, pendingFrom: null, message: null, selection: new Set() }),
+  setMode: (mode) => set({ mode, pendingFrom: null, message: null, selection: new Set(), selectedEdge: null }),
   setRoadType: (roadType) => set({ roadType }),
   setPan: (pan) => set({ pan }),
   setZoom: (zoom) => set({ zoom }),
   setGridSnapEnabled: (gridSnapEnabled) => set({ gridSnapEnabled }),
-  setSelection: (selection) => set({ selection }),
+  setSelection: (selection) => set({ selection, selectedEdge: null }),
   toggleSelection: (id) => {
     const next = new Set(get().selection);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    set({ selection: next });
+    set({ selection: next, selectedEdge: null });
   },
   addToSelection: (ids) => {
     const next = new Set(get().selection);
     for (const id of ids) next.add(id);
-    set({ selection: next });
+    set({ selection: next, selectedEdge: null });
   },
+  setSelectedEdge: (edge) => set({ selectedEdge: edge, selection: new Set() }),
   setPendingFrom: (pendingFrom) => set({ pendingFrom }),
   setMessage: (message) => set({ message }),
   setDiscardArmed: (discardArmed) => set({ discardArmed }),
@@ -156,6 +186,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       history: history.slice(0, -1),
       future: [overrides, ...future].slice(0, MAX_HISTORY),
       selection: new Set(),
+      selectedEdge: null,
       discardArmed: false,
     });
   },
@@ -169,6 +200,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       history: [...history, overrides].slice(-MAX_HISTORY),
       future: future.slice(1),
       selection: new Set(),
+      selectedEdge: null,
       discardArmed: false,
     });
   },
@@ -245,6 +277,48 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     get().commit(next);
   },
 
+  updateNode: (id, patch) => {
+    get().commit(applyNodePatch(get().overrides, id, patch));
+  },
+
+  updateEdge: (a, b, patch) => {
+    const prev = get().overrides;
+    const key = edgeKey(a, b);
+    const addedIdx = prev.addedEdges.findIndex((e) => edgeKey(e.from, e.to) === key);
+    if (addedIdx !== -1) {
+      const addedEdges = [...prev.addedEdges];
+      const cur = addedEdges[addedIdx];
+      addedEdges[addedIdx] = {
+        ...cur,
+        roadType: patch.roadType ?? cur.roadType,
+        requiresCardId: patch.requiresCardId === undefined ? cur.requiresCardId : (patch.requiresCardId ?? undefined),
+      };
+      get().commit({ ...prev, addedEdges });
+      return;
+    }
+    const modifiedIdx = prev.modifiedEdges.findIndex((e) => edgeKey(e.from, e.to) === key);
+    const modifiedEdges: ModifiedEdge[] = [...prev.modifiedEdges];
+    if (modifiedIdx !== -1) {
+      modifiedEdges[modifiedIdx] = { ...modifiedEdges[modifiedIdx], ...patch };
+    } else {
+      modifiedEdges.push({ from: a, to: b, ...patch });
+    }
+    get().commit({ ...prev, modifiedEdges });
+  },
+
+  upsertCustomProperty: (propDef) => {
+    const prev = get().overrides;
+    const idx = prev.customProperties.findIndex((p) => p.id === propDef.id);
+    const customProperties = [...prev.customProperties];
+    if (idx !== -1) customProperties[idx] = propDef;
+    else customProperties.push(propDef);
+    get().commit({ ...prev, customProperties });
+  },
+
+  setStartNode: (id) => {
+    get().commit({ ...get().overrides, startNodeId: id });
+  },
+
   save: async () => {
     set({ saveStatus: "saving" });
     try {
@@ -263,6 +337,6 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
 
   discard: () => {
     get().commit(get().lastSaved);
-    set({ pendingFrom: null, discardArmed: false, message: null, selection: new Set() });
+    set({ pendingFrom: null, discardArmed: false, message: null, selection: new Set(), selectedEdge: null });
   },
 }));
