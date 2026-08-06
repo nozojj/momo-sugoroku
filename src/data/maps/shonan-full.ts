@@ -647,9 +647,9 @@ const decorations: MapDecoration[] = [
       { x: 270, y: 780 },
     ],
   },
+  // 海沿いの街並みと海の間に砂浜の帯を挟むための下地(coastlineと同じ形を海側に塗る前段)。
   {
-    kind: "coastline",
-    side: "south",
+    kind: "beach",
     points: [
       { x: -100, y: 850 },
       { x: 300, y: 920 },
@@ -659,6 +659,20 @@ const decorations: MapDecoration[] = [
       { x: 1320, y: 1150 },
       { x: 1565, y: 1120 },
       { x: 1750, y: 1050 },
+    ],
+  },
+  {
+    kind: "coastline",
+    side: "south",
+    points: [
+      { x: -100, y: 935 },
+      { x: 300, y: 1005 },
+      { x: 650, y: 965 },
+      { x: 950, y: 915 },
+      { x: 1080, y: 1165 },
+      { x: 1320, y: 1235 },
+      { x: 1565, y: 1205 },
+      { x: 1750, y: 1135 },
     ],
   },
 ];

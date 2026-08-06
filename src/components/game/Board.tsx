@@ -395,6 +395,16 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
       </g>
     );
   }
+  if (deco.kind === "beach") {
+    const points = deco.points.map((p) => ({ x: p.x - minX, y: p.y - minY }));
+    if (points.length === 0) return null;
+    const curveD = smoothPathThroughPoints(points);
+    const first = points[0];
+    const last = points[points.length - 1];
+    const farY = 6000;
+    const fillD = `${curveD} L${last.x},${farY} L${first.x},${farY} Z`;
+    return <path d={fillD} fill="#efdfae" />;
+  }
   return null;
 }
 

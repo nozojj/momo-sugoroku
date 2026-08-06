@@ -62,6 +62,9 @@ export type MapDecoration =
   /** 点列を滑らかにつないだ曲線の海岸線。曲線の外側(pointsの並び順に対してside側)を海として塗る。
    * 道路自体には影響しない見た目だけの背景装飾(道路は縦横グリッドのまま)。 */
   | { kind: "coastline"; points: { x: number; y: number }[]; side: "south" }
+  /** coastlineと同じ曲線塗りつぶしだが、砂浜の色で塗る。coastlineより手前(装飾配列で先)に
+   * 置くことで、coastlineの海(青)が砂浜の南側を覆い、間の帯だけが砂浜として見える。 */
+  | { kind: "beach"; points: { x: number; y: number }[] }
   /** 道路のない空白エリアを「何もない」ではなく「地形」として見せるための背景装飾。
    * forest=森、farmland=農地、hills=丘陵。parkBlobと同じ楕円形だが、種類ごとに
    * 色・質感を変える。道路配置には影響しない(空白を埋めるための地形であって、
