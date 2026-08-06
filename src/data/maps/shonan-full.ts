@@ -877,29 +877,30 @@ const smrsRing = smallLoop(smResidential, 27, "smrs", "寒川住宅街", 1);
 // 「碁盤の目」ではない曲がりくねった路地の雰囲気を出している。
 // 街どうしの間隔を詰めてある分、環状路の半径は隣の街・幹線と干渉しない範囲に抑えている
 // (以前より一回り小さいが、ゲート数・形の違いで密度のメリハリは維持している)。
-// 藤沢: 実際の幹線(辻堂=西・鵠沼=南・六会=北・梶原=東)が東西南北をすべて使っているため、
-// ゲートは斜め4点(北東・南東・南西・北西)にして、hubから伸びる直線どうしが重ならないようにする。
-const fujisawaRing = smallLoop(
-  fujisawa,
-  80,
-  "fjrt",
-  "藤沢ロータリー",
-  4,
-  65,
-  0,
-  ["ne", "se", "sw", "nw"],
-); // ★★★★★
-// 鎌倉: 実際の幹線が南(稲村ヶ崎)・北(北鎌倉)を使っているため、ゲートは東寄り3点にする。
-const kamakuraRing = smallLoop(kamakura, 55, "kmlp", "鎌倉小路", 3, 75, 0, [
+// 藤沢: 南北(六会・鵠沼)は湘南台⇄六会⇄藤沢⇄鵠沼をx=1080で完全に縦一直線に揃えている
+// 意図的な設計のため、hubからの縦ゲートは必ずこの縦幹線と重なる(北も南も塞がっている)。
+// 東(梶原)・西(辻堂)の幹線はhubから見て完全な横一直線ではなく数度傾いているため、
+// 横ゲートは幹線と重ならずに済む。南北ゲートは使えないので、ゲート数を4→2に絞り、
+// 東西のみ縦横ゲートにする(無理に斜めを残さない)。
+const fujisawaRing = smallLoop(fujisawa, 80, "fjrt", "藤沢ロータリー", 2, 65, 0, [
   "e",
-  "se",
-  "nw",
+  "w",
+]); // ★★★★★
+// 鎌倉: 南(稲村ヶ崎)はx=1565で完全に縦一直線のため塞がっている。北(北鎌倉)はhubから
+// 見て縦一直線ではなく傾いているため北ゲートは使える。東・西は幹線が通っていないため
+// そのまま使える。ゲート数3はそのまま、方角だけ縦横(北・東・西)に置き換える。
+const kamakuraRing = smallLoop(kamakura, 55, "kmlp", "鎌倉小路", 3, 75, 0, [
+  "n",
+  "e",
+  "w",
 ]); // ★★★★☆
-// 茅ヶ崎: 実際の幹線が東(辻堂)・西(平塚)・北(香川)を使っているため、ゲートは南寄り3点にする。
+// 茅ヶ崎: 東(辻堂)・西(平塚)の幹線はhubから見て横一直線ではなく傾いているため東西ゲートは
+// 使える。北(香川)はhubからほぼ真上に近く角度差が小さいため避け、南は幹線が通っていない
+// ため使う。ゲート数3はそのまま、方角だけ縦横(南・東・西)に置き換える。
 const chigasakiRing = smallLoop(chigasaki, 80, "cglp", "茅ヶ崎小路", 3, 72, 0, [
   "s",
-  "se",
-  "sw",
+  "e",
+  "w",
 ]); // ★★★★☆
 
 // ============================================================
@@ -912,13 +913,22 @@ const cgShop = addJunction(
   chigasakiRing.nw.x - 25,
   chigasakiRing.nw.y - 55,
 );
+// nw角から直接斜めにつなぐと道が斜めになるため、nw角の真上(輪の外側、w-nw辺とは
+// 重ならない範囲)で1回だけ折れてから入口へ横に入るL字にする。
+const cgShopBend = addJunction(
+  "wp_cg_shop_bend",
+  "茅ヶ崎銀座入口(角)",
+  chigasakiRing.nw.x,
+  cgShop.y,
+);
 buildRoad(
   chigasakiRing.nw,
-  cgShop,
+  cgShopBend,
   "residential",
-  "r_cg_nw_shop",
+  "r_cg_nw_shop1",
   "茅ヶ崎銀座",
 );
+buildRoad(cgShopBend, cgShop, "residential", "r_cg_nw_shop2", "茅ヶ崎銀座");
 smallLoop(cgShop, 26, "cgsp", "茅ヶ崎銀座", 1);
 
 // 住宅街メッシュ: ロータリー北東点から辻堂ロータリーの北西点(ゲート)へ抜ける
@@ -947,11 +957,26 @@ connectMany(
 buildRoad(cgmNw, cgmSw, "residential", "r_cgmesh_col1", "茅ヶ崎住宅街");
 buildRoad(cgmN, cgmS, "residential", "r_cgmesh_col2", "茅ヶ崎住宅街");
 buildRoad(cgmNe, cgmSe, "residential", "r_cgmesh_col3", "茅ヶ崎住宅街");
+// ne角から直接斜めにつなぐと道が斜めになるため、ne角の真上で1回折れてから
+// 住宅街メッシュの入口へ横に入るL字にする。
+const cgNeMeshBend = addJunction(
+  "cgmesh_ne_bend",
+  "茅ヶ崎住宅街入口(角)",
+  chigasakiRing.ne.x,
+  cgmNw.y,
+);
 buildRoad(
   chigasakiRing.ne,
+  cgNeMeshBend,
+  "residential",
+  "r_cg_ne_mesh1",
+  "茅ヶ崎住宅街",
+);
+buildRoad(
+  cgNeMeshBend,
   cgmNw,
   "residential",
-  "r_cg_ne_mesh",
+  "r_cg_ne_mesh2",
   "茅ヶ崎住宅街",
 );
 // 辻堂ロータリーへの接続は、辻堂ロータリー定義後にまとめて追加する。
@@ -965,9 +990,12 @@ const cgChuo = addJunction(
 );
 buildRoad(chigasakiRing.w, cgChuo, "residential", "r_cg_w_chuo", "茅ヶ崎中央");
 smallLoop(cgChuo, 25, "cgcyu", "茅ヶ崎中央", 1);
+// 辻堂: hub自体の幹線は東(藤沢)・西(茅ヶ崎)のみで、どちらもhubから見て横一直線ではなく
+// 傾いているため東西ゲートは使える。南北は幹線が通っていないためそのまま使える。
+// ゲート数2はそのまま、方角だけ縦横(北・西)に置き換える。
 const tsujidoRing = smallLoop(tsujido, 70, "tslp", "辻堂小路", 2, 80, 0, [
   "n",
-  "nw",
+  "w",
 ]); // ★★★☆☆
 
 // 辻堂: 600マス化・第6弾。実際の幹線・行き来ルートが西(茅ヶ崎)・東(藤沢方面、
@@ -981,13 +1009,22 @@ const tsShop = addJunction(
   tsujidoRing.sw.x - 50,
   tsujidoRing.sw.y + 20,
 );
+// sw角から直接斜めにつなぐと道が斜めになるため、sw角と同じ高さで一旦横に振ってから
+// (s-sw辺の延長線上、輪とは重ならない範囲)、入口へ縦に降りるL字にする。
+const tsShopBend = addJunction(
+  "wp_ts_shop_bend",
+  "辻堂海浜商店街入口(角)",
+  tsShop.x,
+  tsujidoRing.sw.y,
+);
 buildRoad(
   tsujidoRing.sw,
-  tsShop,
+  tsShopBend,
   "residential",
-  "r_ts_sw_shop",
+  "r_ts_sw_shop1",
   "辻堂海浜商店街",
 );
+buildRoad(tsShopBend, tsShop, "residential", "r_ts_sw_shop2", "辻堂海浜商店街");
 const tsShopRing = smallLoop(tsShop, 26, "tssp", "辻堂海浜商店街", 1);
 // 商店街からさらに1本、小さな輪(辻堂緑ヶ浜イメージ)を足す。
 const tsMidori = addJunction(
@@ -1008,10 +1045,12 @@ buildRoad(
   "茅ヶ崎住宅街",
 );
 // 平塚: 西側最大の都市として、環状路を鎌倉・茅ヶ崎と同格まで拡大する。
-// 実際の幹線が東(茅ヶ崎)・北(田村)を使っているため、ゲートは南〜西寄り3点にする。
+// 北(田村)はx=0で完全に縦一直線のため塞がっている。東(茅ヶ崎)はhubから見て横一直線
+// ではなく傾いているため使える。西はhiratsukaが最西端のためもともと幹線がなく使える。
+// ゲート数3はそのまま、方角だけ縦横(南・東・西)に置き換える。
 const hiratsukaRing = smallLoop(hiratsuka, 85, "hrlp", "平塚小路", 3, 70, 0, [
   "s",
-  "sw",
+  "e",
   "w",
 ]); // ★★★★☆(西側最大都市)
 
@@ -1026,7 +1065,23 @@ const hrShop = addJunction(
   hiratsukaRing.ne.x + 50,
   hiratsukaRing.ne.y - 40,
 );
-buildRoad(hiratsukaRing.ne, hrShop, "residential", "r_hr_ne_shop", "平塚銀座");
+// ne角から直接斜めにつなぐと道が斜めになるため、ne角の真上で1回折れてから
+// 入口へ横に入るL字にする(旧: bend33でhrsp_swを迂回していたが、経路を
+// 変えたことでhrsp_swから十分離れるため迂回は不要になった)。
+const hrShopBend = addJunction(
+  "wp_hr_shop_bend",
+  "平塚銀座入口(角)",
+  hiratsukaRing.ne.x,
+  hrShop.y,
+);
+buildRoad(
+  hiratsukaRing.ne,
+  hrShopBend,
+  "residential",
+  "r_hr_ne_shop1",
+  "平塚銀座",
+);
+buildRoad(hrShopBend, hrShop, "residential", "r_hr_ne_shop2", "平塚銀座");
 const hrShopRing = smallLoop(hrShop, 28, "hrsp", "平塚銀座", 1);
 
 // 平塚: 銀座の輪からさらに1本、小さな輪(桜ヶ丘イメージ)を足す。
@@ -1065,7 +1120,22 @@ connectMany(
 buildRoad(hrmNw, hrmSw, "residential", "r_hrmesh_col1", "平塚住宅街");
 buildRoad(hrmN, hrmS, "residential", "r_hrmesh_col2", "平塚住宅街");
 buildRoad(hrmNe, hrmSe, "residential", "r_hrmesh_col3", "平塚住宅街");
-buildRoad(hiratsukaRing.se, hrmNw, "residential", "r_hr_se_mesh", "平塚住宅街");
+// se角から直接斜めにつなぐと道が斜めになるため、se角の真下で1回折れてから
+// 住宅街メッシュの入口へ横に入るL字にする。
+const hrSeMeshBend = addJunction(
+  "hrmesh_se_bend",
+  "平塚住宅街入口(角)",
+  hiratsukaRing.se.x,
+  hrmNw.y,
+);
+buildRoad(
+  hiratsukaRing.se,
+  hrSeMeshBend,
+  "residential",
+  "r_hr_se_mesh1",
+  "平塚住宅街",
+);
+buildRoad(hrSeMeshBend, hrmNw, "residential", "r_hr_se_mesh2", "平塚住宅街");
 buildRoad(
   hrmSw,
   hiratsukaRing.s,
@@ -1411,19 +1481,40 @@ buildRoad(hillsBend2, hillsEnd, "residential", "r_hills_road3", "丘陵連絡路
 // マスの重なりを避けるため、混雑していた区間の裏道を必要最小限(要件を満たす本数)に
 // 間引いた。茅ヶ崎⇄辻堂は幹線+裏道1本の計2ルート、辻堂⇄藤沢は幹線+裏道1本+近道の
 // 計3ルートを確保している。
-buildRoad(
-  chigasakiRing.e,
-  tsujidoRing.w,
-  "residential",
-  "r_local_cg_ts",
-  "茅ヶ崎",
+// 茅ヶ崎ロータリー東点と辻堂ロータリー西点は高さ(y)が違うため、直接つなぐと道が
+// 斜めになる。両方の輪の辺(縦の列)を避けた中間のx(600)で1回南北方向に振ってから
+// 辻堂側へ入る、縦横のみの3区間(コの字)にする。
+const cgTsBend1 = addJunction(
+  "wp_cg_ts_bend1",
+  "茅ヶ崎辻堂裏道(角1)",
+  600,
+  chigasakiRing.e.y,
 );
-buildRoad(
-  tsujidoRing.se,
-  fujisawaRing.sw,
+const cgTsBend2 = addJunction(
+  "wp_cg_ts_bend2",
+  "茅ヶ崎辻堂裏道(角2)",
+  600,
+  tsujidoRing.w.y,
+);
+connectRoad(
+  [chigasakiRing.e, cgTsBend1, cgTsBend2, tsujidoRing.w],
   "residential",
-  "r_local2_ts_fj",
+  "茅ヶ崎",
+  ["r_local_cg_ts_h1", "r_local_cg_ts_v", "r_local_cg_ts_h2"],
+);
+// 辻堂ロータリー南東点と藤沢ロータリー南西点も高さが違うため、南東点からいったん
+// 東へ横に振ってから、藤沢側の南西点へ縦に上がるL字にする(輪の辺とは重ならない)。
+const tsFjBend = addJunction(
+  "wp_ts_fj_bend",
+  "辻堂藤沢裏道(角)",
+  fujisawaRing.sw.x,
+  tsujidoRing.se.y,
+);
+connectRoad(
+  [tsujidoRing.se, tsFjBend, fujisawaRing.sw],
+  "residential",
   "辻堂",
+  ["r_local2_ts_fj_h", "r_local2_ts_fj_v"],
 );
 
 // 藤沢: ロータリーの斜めの点から梶原へのショートカットは、梶原が大船と一緒に
@@ -1518,11 +1609,26 @@ const fjHigashiguchi = addJunction(
   fujisawaRing.se.x + 160,
   fujisawaRing.se.y + 60,
 );
+// se角から直接斜めにつなぐと道が斜めになるため、se角の真下(輪の外側)で1回折れて
+// から入口へ横に入るL字にする。
+const fjHigashiguchiBend = addJunction(
+  "wp_fj_higashiguchi_bend",
+  "藤沢東口(角)",
+  fujisawaRing.se.x,
+  fjHigashiguchi.y,
+);
 buildRoad(
   fujisawaRing.se,
+  fjHigashiguchiBend,
+  "residential",
+  "r_fj_se_higashiguchi1",
+  "藤沢東口",
+);
+buildRoad(
+  fjHigashiguchiBend,
   fjHigashiguchi,
   "residential",
-  "r_fj_se_higashiguchi",
+  "r_fj_se_higashiguchi2",
   "藤沢東口",
 );
 smallLoop(fjHigashiguchi, 32, "fjhg", "藤沢東口通り", 1);
@@ -1554,7 +1660,26 @@ connectMany(
 buildRoad(fjmNw, fjmSw, "residential", "r_fjmesh_col1", "藤沢住宅街");
 buildRoad(fjmN, fjmS, "residential", "r_fjmesh_col2", "藤沢住宅街");
 buildRoad(fjmNe, fjmSe, "residential", "r_fjmesh_col3", "藤沢住宅街");
-buildRoad(fujisawaRing.sw, fjmNe, "residential", "r_fj_sw_mesh", "藤沢住宅街");
+// sw角から直接斜めにつなぐと道が斜めになるため、sw角の真下(輪の外側)→
+// メッシュ入口の真上、の順に2回折れて縦横のみで入るコの字にする。
+const fjSwMeshBend1 = addJunction(
+  "fjmesh_sw_bend1",
+  "藤沢住宅街入口(角1)",
+  fujisawaRing.sw.x,
+  780,
+);
+const fjSwMeshBend2 = addJunction(
+  "fjmesh_sw_bend2",
+  "藤沢住宅街入口(角2)",
+  fjmNe.x,
+  780,
+);
+connectRoad(
+  [fujisawaRing.sw, fjSwMeshBend1, fjSwMeshBend2, fjmNe],
+  "residential",
+  "藤沢住宅街",
+  ["r_fj_sw_mesh_h1", "r_fj_sw_mesh_v", "r_fj_sw_mesh_h2"],
+);
 // 出口はロータリー南西点(sw)からの入口とは別に、北西の角(nw)からロータリー南点(s)へ
 // 直接抜ける近道にする。格子を斜めに横切る形になるので、sw⇄nw⇄sで回るか、
 // nwから直接sへ抜けるかの選択が生まれる。
@@ -1687,8 +1812,25 @@ const kenchojiEnt = addJunction(
   kitakamakuraRing.sw.x - 200,
   kitakamakuraRing.sw.y + 20,
 );
+// sw角から直接斜めにつなぐと道が斜めになるため、sw角の真下(輪の外側)で1回折れて
+// から入口へ横に入るL字にする。2区間目のidPrefixは既存のbend27
+// (r_kk_kenchoji_3を参照)が引き続き成立するよう、入口側の区間に"r_kk_kenchoji"を
+// そのまま使う。
+const kenchojiBend = addJunction(
+  "wp_kenchoji_bend",
+  "建長寺参道入口(角)",
+  kitakamakuraRing.sw.x,
+  kenchojiEnt.y,
+);
 buildRoad(
   kitakamakuraRing.sw,
+  kenchojiBend,
+  "residential",
+  "r_kk_kenchoji_pre",
+  "建長寺参道",
+);
+buildRoad(
+  kenchojiBend,
   kenchojiEnt,
   "residential",
   "r_kk_kenchoji",
@@ -1895,12 +2037,20 @@ buildRoad(
 // 新しい行き止まりを作るのではなく、既存の環状路に合流させることで
 // 「鎌倉へ抜ける2本目のルート」として機能させる。蛇行なし(まっすぐ合流させ、
 // 鎌倉小路のリング自体と交差しないようにする)。
-buildRoad(
-  pickMidFiller(kitakamakura, kamakura),
-  kamakuraRing.nw,
+// 中間地点からnw角へ直接つなぐと道が斜めになるため、nw角の真上(輪の外側、
+// w-nw辺とは重ならない範囲)で1回折れてから中間地点へ横に入るL字にする。
+const kkKmMergeMid = pickMidFiller(kitakamakura, kamakura);
+const kkKmMergeBend = addJunction(
+  "wp_kkkm_merge_bend",
+  "鎌倉小路北ゲート合流(角)",
+  kamakuraRing.nw.x,
+  kkKmMergeMid.y,
+);
+connectRoad(
+  [kkKmMergeMid, kkKmMergeBend, kamakuraRing.nw],
   "residential",
-  "r_kkkm_merge",
   "鎌倉小路",
+  ["r_kkkm_merge1", "r_kkkm_merge2"],
 );
 
 // ============================================================
@@ -2037,12 +2187,20 @@ buildRoad(
 
 // 藤沢ロータリー⇄六会。ロータリーの北西点(藤沢北口とは反対側、他の接続に
 // 未使用の点)から、同じく香川⇄六会の幹線トランクへ合流。
-buildRoad(
-  fujisawaRing.nw,
-  pickFillerAt(kagawa, rokkai, 0.85),
+// nw角から直接つなぐと道が斜めになるため、nw角の真上(輪の外側、w-nw辺とは
+// 重ならない範囲)で1回折れてから合流点へ横に入るL字にする。
+const fjNwRkTarget = pickFillerAt(kagawa, rokkai, 0.85);
+const fjNwRkBend = addJunction(
+  "wp_fj_nw_rk_bend",
+  "藤沢ロータリー六会合流(角)",
+  fujisawaRing.nw.x,
+  fjNwRkTarget.y,
+);
+connectRoad(
+  [fujisawaRing.nw, fjNwRkBend, fjNwRkTarget],
   "residential",
-  "r_fj_nw_rk",
   "藤沢ロータリー",
+  ["r_fj_nw_rk1", "r_fj_nw_rk2"],
 );
 
 // 湘南台住宅街から六会方面へ抜ける裏道(駅前を経由しない)。街区の中は通さず
@@ -2492,9 +2650,12 @@ bendAroundNode(
   "bend17",
 );
 bendAroundNode("wp_yuigahama", "wp_yuigahama_sat", "yuilp_ne", "bend18");
-bendAroundNode("r_cg_ts_3", "r_cg_ts_4", "r_local_cg_ts_2", "bend19");
+// 縦横化リファクタ: bend19・21・32・34・36・42・45(旧r_local_cg_ts・旧tslp_nwゲート道の
+// 迂回)、bend33・53(旧hrlp_ne⇄wp_hr_shop・旧tslp_sw⇄wp_ts_shopの迂回)、bend51
+// (旧chigasakiRing.ne⇄cgmNwの迂回)は、経路自体を縦横のみのL字/コの字に作り直した
+// ことで対象の辺が存在しなくなったため削除した(新しい経路は目視確認済みで、
+// 迂回が必要な重なりは発生していない)。
 bendAroundNode("wp_kitakamakura", "r_of_kk_2", "kklp_w", "bend20");
-bendAroundNode("r_local_cg_ts_2", "r_local_cg_ts_3", "r_cg_ts_4", "bend21");
 bendAroundNode("r_in_km_1", "r_in_km_2", "kmlp_s", "bend22");
 bendAroundNode("smrt_e", "wp_sm_residential", "smrt_ne", "bend23");
 bendAroundNode("kklp_w", "kklp_nw", "r_sc_res_rokkai_join_2", "bend25");
@@ -2503,11 +2664,7 @@ bendAroundNode("wp_kenchoji_ent", "r_kk_kenchoji_3", "kjlp_e", "bend27");
 bendAroundNode("wp_onari_ent", "r_km_n_onari_1", "onlp_sw", "bend28");
 bendAroundNode("kklp_ne", "kklp_e", "r_sc_res_rokkai_join_1", "bend29");
 bendAroundNode("wp_koshigoe_sat", "r_ks_mesh_1", "kslp_s", "bend30");
-bendAroundNode("r_local_cg_ts_1", "r_local_cg_ts_2", "r_cg_ts_3", "bend32");
-bendAroundNode("hrlp_ne", "wp_hr_shop", "hrsp_sw", "bend33");
-bendAroundNode("r_cg_ts_4", "r_cg_ts_5", "r_local_cg_ts_3", "bend34");
 bendAroundNode("wp_en_candle", "r_enlp_candle_2", "encd_e", "bend35");
-bendAroundNode("tslp_nw", "r_tslp_gate_tslp_nw_1", "r_cgmesh_col3_1", "bend36");
 bendAroundNode("r_kg_cg_3", "r_kg_cg_4", "cglp_n", "bend37");
 bendAroundNode("wp_ofuna_shop", "r_of_shop_1", "ofsp_s", "bend38");
 bendAroundNode("r_kj_fj_6", "r_kj_fj_7", "fjrt_e", "bend39");
@@ -2539,26 +2696,17 @@ bendAroundNode("inlp_e", "wp_inamura_kaigan", "incl_nw", "bend40");
     roadType: orig.roadType,
   });
 }
-bendAroundNode("r_cg_ts_2", "r_cg_ts_3", "r_local_cg_ts_1", "bend42");
 bendAroundNode("wp_fj_meiten_ent", "r_fj_n_meiten2_1", "r_rk_fj_2", "bend44");
-bendAroundNode("tslp_w", "r_local_cg_ts_3", "r_cg_ts_5", "bend45");
 bendAroundNode("hrsp_e", "wp_hr_sakura", "hrsk_w", "bend46");
 bendAroundNode("wp_koshigoe_sat", "r_ks_sat_1", "kslp_n", "bend47");
 bendAroundNode("r_kk_km_1", "r_kk_km_2", "kklp_sw", "bend49");
 bendAroundNode("enlp_n", "r_enlp_candle_1", "enlp_nw", "bend50");
-bendAroundNode(
-  "r_cg_ne_mesh_1",
-  "r_cg_ne_mesh_2",
-  "r_short_cgts_kg_2",
-  "bend51",
-);
 bendAroundNode(
   "wp_chigasaki_kaigan_oku",
   "r_ts_shop_cg_kaigan_4",
   "cgklp_ne",
   "bend52",
 );
-bendAroundNode("tslp_sw", "wp_ts_shop", "tssp_e", "bend53");
 bendAroundNode("wp_ts_shop", "r_ts_shop_cg_kaigan_1", "tssp_sw", "bend54");
 bendAroundNode("nklp_e", "wp_tamuragaoka", "tmgo_w", "bend55");
 bendAroundNode(
@@ -2588,15 +2736,15 @@ bendAroundNode(
 nudgeNode("r_cg_ts_5", 61, 35);
 nudgeNode("wp_tamuragaoka", 0, -50);
 nudgeNode("wp_hr_sakura", 0, -50);
-nudgeNode("wp_fj_higashiguchi", -35, -61);
+// wp_fj_higashiguchi・kklp_swのnudgeは、旧・斜め経路を前提にした補正だったため
+// 縦横化リファクタで削除した(新しいL字経路はこれらのノードの元の座標を
+// そのまま使っており、nudgeで動かすと逆にL字が崩れて斜めに戻ってしまう)。
 nudgeNode("r_km_w_in_1", -49, 49);
-nudgeNode("kklp_sw", -35, -35);
 nudgeNode("wp_inamuragasaki_park", -13, -48);
 nudgeNode("inlp_se", -25, -25);
 nudgeNode("wp_komachi_oku", -13, -48);
 nudgeNode("wp_yuigahama_sat", -35, -61);
 nudgeNode("r_scof_zengyo_1", -35, -35);
-nudgeNode("bend19_bend", -35, -61);
 
 // ------------------------------------------------------------------
 // 道の線同士が(マスとは無関係な)開けた場所で交差してしまっている箇所の解消
@@ -2648,7 +2796,6 @@ edgeSpliceThroughNode(
 edgeSpliceThroughNode("r_hr_cg_1", "r_hr_cg_2", "hrlp_e");
 edgeSpliceThroughNode("r_hr_cg_6", "r_hr_cg_7", "cglp_w");
 edgeSpliceThroughNode("r_cg_ts_1", "r_cg_ts_2", "cglp_e");
-edgeSpliceThroughNode("r_cg_ts_4", "bend34_bend", "bend21_bend");
 edgeSpliceThroughNode("tslp_sw", "r_tslp_ring5_1", "r_cg_ts_5");
 edgeSpliceThroughNode("tslp_e", "r_tslp_ring1_1", "r_ts_fj_1");
 edgeSpliceThroughNode("r_ts_fj_4", "r_ts_fj_5", "fjrt_w");
@@ -2672,16 +2819,12 @@ edgeSpliceThroughNode("tmlp_s", "tmlp_sw", "bend03_bend");
 edgeSpliceThroughNode("nklp_w", "nklp_nw", "bend09_bend");
 edgeSpliceThroughNode("smrs_se", "smrs_s", "wp_sm_residential");
 edgeSpliceThroughNode("fjkt_se", "fjkt_s", "bend12_bend");
-edgeSpliceThroughNode("r_fj_mesh_exit_2", "r_fj_mesh_exit_3", "r_fj_sw_mesh_1");
 edgeSpliceThroughNode("cgcyu_ne", "cgcyu_e", "wp_cg_chuo");
 edgeSpliceThroughNode("cgsp_se", "cgsp_s", "wp_cg_shop");
 edgeSpliceThroughNode("cgmesh_ne", "r_cgmesh_col3_1", "tslp_nw");
 edgeSpliceThroughNode("cgmesh_s", "cgmesh_se", "tslp_w");
-edgeSpliceThroughNode("r_cg_ne_mesh_1", "bend51_bend", "r_short_cgts_kg_2");
-edgeSpliceThroughNode("tssp_e", "tssp_se", "bend53_bend");
 edgeSpliceThroughNode("tssp_s", "tssp_sw", "bend54_bend");
 edgeSpliceThroughNode("tsmd_n", "tsmd_ne", "bend13_bend");
-edgeSpliceThroughNode("hrsp_s", "hrsp_sw", "bend33_bend");
 edgeSpliceThroughNode("encd_e", "encd_se", "bend35_bend");
 edgeSpliceThroughNode("encg_ne", "encg_e", "wp_en_chigo");
 edgeSpliceThroughNode(
