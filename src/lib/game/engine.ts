@@ -94,6 +94,7 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     routeOptions: [],
     pendingPropertyId: null,
     arrivalInfo: null,
+    moneyRouletteInfo: null,
     log: [
       {
         id: makeLogId(),

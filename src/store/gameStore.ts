@@ -23,6 +23,7 @@ const IDLE_STATE: GameState = {
   routeOptions: [],
   pendingPropertyId: null,
   arrivalInfo: null,
+  moneyRouletteInfo: null,
   log: [],
   winnerIds: null,
 };
@@ -41,6 +42,8 @@ interface GameStore extends GameState {
   skipProperty: () => void;
   /** 到着演出モーダルを閉じて次のプレイヤーへ手番を送る */
   continueAfterArrival: () => void;
+  /** ルーレット演出モーダルを閉じて先の着地処理(到着判定・ターン送り)を続行する */
+  continueAfterMoneyRoulette: () => void;
 }
 
 function currentPlayer(state: GameState): Player {
@@ -155,6 +158,18 @@ export const useGameStore = create<GameStore>()(
             set({ players, status: "resolvingEvent", log: pushLog(state, outcome.message) });
             finishLandingAndEndTurn();
             return;
+          }
+          case "moneyRoulette": {
+            // 金額は既に確定済み(ゲームロジック)。ここでは即座に反映し、演出(モーダル)を
+            // 挟んでから finishLandingAndEndTurn() を呼ぶ(到着演出と同じ「確認待ち」の位置づけ)。
+            const players = updatePlayer(state.players, player.id, (p) => ({ ...p, money: p.money + outcome.amount }));
+            set({
+              players,
+              status: "moneyRoulette",
+              moneyRouletteInfo: { playerId: player.id, playerName: player.name, ...outcome.rouletteInfo },
+              log: pushLog(state, outcome.message),
+            });
+            return; // continueAfterMoneyRoulette()待ち
           }
           case "card": {
             const players = updatePlayer(state.players, player.id, (p) => ({
@@ -333,6 +348,13 @@ export const useGameStore = create<GameStore>()(
           if (state.status !== "destinationArrived") return;
           set({ arrivalInfo: null });
           endTurn();
+        },
+
+        continueAfterMoneyRoulette: () => {
+          const state = get();
+          if (state.status !== "moneyRoulette") return;
+          set({ moneyRouletteInfo: null });
+          finishLandingAndEndTurn();
         },
       };
     },

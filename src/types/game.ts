@@ -178,6 +178,7 @@ export type GameStatus =
   | "resolvingEvent" // マスの効果を解決中(お金/カード/物件購入確認など)
   | "purchaseOffer" // 物件購入の確認待ち
   | "destinationArrived" // 目的地到着演出中(ボーナス表示・次の目的地提示の確認待ち)
+  | "moneyRoulette" // プラス/マイナスマスのルーレット演出中(確定額表示・次へ待ち)
   | "finished"; // ゲーム終了
 
 /** 分岐地点で選べる進行先候補。 */
@@ -205,6 +206,19 @@ export interface ArrivalInfo {
   nextDestinationName: string;
 }
 
+/** status: "moneyRoulette" のときに表示するルーレット演出の内容。
+ *  amountは既に確定済みのゲームロジック上の結果、candidatesは演出用の見せかけの候補一覧。 */
+export interface MoneyRouletteInfo {
+  playerId: string;
+  playerName: string;
+  kind: "moneyGain" | "moneyLoss";
+  nodeName: string;
+  /** 確定した金額(符号付き) */
+  amount: number;
+  /** 演出用の候補一覧(符号付き)。amountを必ず含む。 */
+  candidates: number[];
+}
+
 export interface GameState {
   mapId: string;
   players: Player[];
@@ -226,6 +240,8 @@ export interface GameState {
   pendingPropertyId: string | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
+  /** moneyRoulette状態のときに表示するルーレット演出の内容 */
+  moneyRouletteInfo: MoneyRouletteInfo | null;
   log: LogEntry[];
   winnerIds: string[] | null;
 }

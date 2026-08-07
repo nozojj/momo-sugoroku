@@ -24,18 +24,43 @@ const PADDING = 80;
 /** スマホの通常時(移動していないとき)の初期ズーム倍率。全体を見渡すことより、
  *  マス/道路/プレイヤーの視認性を優先した値。実機確認後はこの1箇所だけ変更すればよい。 */
 const MOBILE_INITIAL_ZOOM = 2.0;
-/** スマホで移動中(サイコロを振った後)に使う、通常時より少し車周辺を大きく見せるズーム倍率。 */
-const MOBILE_MOVEMENT_ZOOM = 2.3;
+/** スマホで移動中(サイコロを振った後)に使う、通常時より車周辺を大きく見せるズーム倍率。
+ *  マスの種類(+/−/カード/イベント)を一目で判別できることを優先して2.5に設定。 */
+const MOBILE_MOVEMENT_ZOOM = 2.5;
 /** PCで移動中に使うズーム倍率。通常時は全体フィット(かなり小さい)なので、移動中だけこの倍率に寄せる。
  *  調整用定数。実機確認後はこの1箇所だけ変更すればよい。 */
 const DESKTOP_MOVEMENT_ZOOM = 1.4;
 /** パン/ズームのCSSトランジション時間。CarTokenの移動アニメーション(420ms)と揃え、
  *  カメラ追従が駒の移動に自然に同期して見えるようにする。 */
 const CAMERA_TRANSITION_MS = 420;
-/** このズーム未満では建物イラストを間引き、マスの色分け表示だけにする(LOD)。
- *  PC通常表示(全体フィット)は下回るため間引かれ、移動中ズーム(PC 1.4/スマホ2.0〜2.3)は
- *  上回るため建物がしっかり見える。 */
-const BUILDING_DETAIL_MIN_ZOOM = 0.9;
+/** このズーム未満は「全体表示」段階(建物イラストを間引き、マスの色分け表示だけにする)。
+ *  移動中(isMovingPhase)はズーム値に関わらず常に詳細表示にする。 */
+const ZOOM_DETAIL_THRESHOLD = 0.9;
+
+/**
+ * マスの大きさ・アイコンサイズのLOD(3段階)。
+ * 「全体表示」より大きくする段階でも、マス同士の最小間隔(24, mapBuilder.tsのMIN_NODE_DIST)を
+ * 超えて重ならないよう、通常ズーム・移動中ズームの半径はどちらも12(直径24)に揃えている。
+ * 見やすさの向上はアイコンサイズの拡大側で稼ぐ。主要ハブは間隔に余裕があることが多いため
+ * やや大きめだが、密集地では見た目を確認して調整すること。
+ */
+type BoardLodTier = "overview" | "normal" | "movement";
+
+const LOD_RADIUS: Record<BoardLodTier, { node: number; hub: number }> = {
+  overview: { node: NODE_RADIUS, hub: MAJOR_HUB_RADIUS },
+  normal: { node: 12, hub: 20 },
+  movement: { node: 12, hub: 22 },
+};
+const LOD_ICON_SIZE: Record<BoardLodTier, { node: number; hub: number }> = {
+  overview: { node: 13, hub: 16 },
+  normal: { node: 15, hub: 18 },
+  movement: { node: 18, hub: 20 },
+};
+
+function resolveLodTier(zoom: number, isMovingPhase: boolean): BoardLodTier {
+  if (isMovingPhase) return "movement";
+  return zoom >= ZOOM_DETAIL_THRESHOLD ? "normal" : "overview";
+}
 
 type DragState =
   | { kind: "pan"; startX: number; startY: number; startPan: { x: number; y: number } }
@@ -140,6 +165,9 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   }
 
   const isMovingPhase = status === "moving" || status === "selectingRoute";
+  const lodTier = resolveLodTier(zoom, isMovingPhase);
+  const lodRadius = LOD_RADIUS[lodTier];
+  const lodIconSize = LOD_ICON_SIZE[lodTier];
   const wasMovingPhaseRef = useRef(false);
 
   // 初回表示、および isMobile が切り替わった瞬間の通常カメラ。
@@ -366,7 +394,8 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
               const icon = propDef?.icon ?? style.icon;
               const isDestination = node.id === destinationNodeId;
               const isSelectable = selectableIds.has(node.id);
-              const radius = node.isMajorHub ? MAJOR_HUB_RADIUS : NODE_RADIUS;
+              const radius = node.isMajorHub ? lodRadius.hub : lodRadius.node;
+              const iconSize = node.isMajorHub ? lodIconSize.hub : lodIconSize.node;
               const cx = node.x - minX;
               const cy = node.y - minY;
               return (
@@ -387,7 +416,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                     stroke={strokeColor}
                     strokeWidth={node.isMajorHub ? 3.5 : isLandmark ? 3 : 2.5}
                   />
-                  <text x={cx} y={cy + 4} textAnchor="middle" fontSize={node.isMajorHub ? 16 : 13} pointerEvents="none">
+                  <text x={cx} y={cy + 4} textAnchor="middle" fontSize={iconSize} fontWeight={700} pointerEvents="none">
                     {icon}
                   </text>
                   {isDestination && (
@@ -416,7 +445,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
             })}
 
             {/* 建物(マス・道路とは独立した見た目レイヤー。低ズーム時はマスの色分けだけで十分見やすいので間引く) */}
-            {zoom >= BUILDING_DETAIL_MIN_ZOOM &&
+            {zoom >= ZOOM_DETAIL_THRESHOLD &&
               map.nodes.map((node) => {
                 const propDef = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
                 const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);

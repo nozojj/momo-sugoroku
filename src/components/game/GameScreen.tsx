@@ -13,6 +13,7 @@ import { GameDrawer } from "./GameDrawer";
 import { RouteChoiceOverlay } from "./RouteChoiceOverlay";
 import { PurchaseModal } from "./PurchaseModal";
 import { ArrivalModal } from "./ArrivalModal";
+import { MoneyRouletteModal } from "./MoneyRouletteModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
@@ -32,6 +33,7 @@ export function GameScreen() {
   const routeOptions = useGameStore((s) => s.routeOptions);
   const pendingPropertyId = useGameStore((s) => s.pendingPropertyId);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
+  const moneyRouletteInfo = useGameStore((s) => s.moneyRouletteInfo);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
 
@@ -44,6 +46,7 @@ export function GameScreen() {
   const skipProperty = useGameStore((s) => s.skipProperty);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
+  const continueAfterMoneyRoulette = useGameStore((s) => s.continueAfterMoneyRoulette);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -149,6 +152,10 @@ export function GameScreen() {
 
       {status === "destinationArrived" && arrivalInfo && (
         <ArrivalModal arrivalInfo={arrivalInfo} onContinue={continueAfterArrival} />
+      )}
+
+      {status === "moneyRoulette" && moneyRouletteInfo && (
+        <MoneyRouletteModal info={moneyRouletteInfo} onContinue={continueAfterMoneyRoulette} />
       )}
 
       {status === "finished" && winnerIds && (
