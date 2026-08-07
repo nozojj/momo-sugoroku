@@ -73,6 +73,40 @@ export type MapDecoration =
    * 道路がこの上を通ってもよい/避けてもよい、あくまで背景)。 */
   | { kind: "terrain"; variant: "forest" | "farmland" | "hills"; cx: number; cy: number; rx: number; ry: number; rotation?: number };
 
+/**
+ * 建物の種類。マス(MapNode)とは完全に分離した見た目だけの分類で、
+ * ゲームロジック(移動判定・停止判定・物件購入判定)には一切関与しない。
+ */
+export type BuildingType =
+  | "station" // 駅舎
+  | "restaurant" // 飲食店(レストラン・ラーメン屋・居酒屋など)
+  | "shop" // 商店
+  | "house" // 住宅系
+  | "commercial" // 商業施設・ビル・大型店舗
+  | "landmark" // 観光施設
+  | "hotel" // ホテル・旅館
+  | "generic"; // 分類不明時のデフォルト
+
+/**
+ * ノードごとの建物設定の「上書き」。1ノードにつき最大1件を想定する。
+ * どのフィールドも省略可能で、省略した項目は自動推測(buildingStyle.tsのresolveBuildingForNode)
+ * の既定値が使われる。つまりこのレコード自体が存在しなくても、対象ノード(物件/駅)には
+ * 自動推測された建物が表示される。エディタはこのレコードの追加・変更・削除だけを行う。
+ */
+export interface BuildingOverride {
+  /** 対応するマスのID。マス側はこのレコードの存在を一切知らない(一方向参照)。 */
+  nodeId: string;
+  /** 省略時は自動推測(物件のcategoryや駅かどうか)を使う */
+  buildingType?: BuildingType;
+  /** trueなら自動推測分も含めて建物を表示しない */
+  hidden?: boolean;
+  /** ノード座標からのオフセット(マップ座標系)。省略時は既定オフセット(ノードの少し上)。 */
+  offsetX?: number;
+  offsetY?: number;
+  /** 表示倍率。省略時は1。 */
+  scale?: number;
+}
+
 export interface MapData {
   id: string;
   name: string;
@@ -81,6 +115,8 @@ export interface MapData {
   startNodeId: string;
   /** 背景装飾(海・川・公園・街並みなど)。省略時は無装飾。 */
   decorations?: MapDecoration[];
+  /** 建物の個別設定。省略した物件/駅ノードは自動推測された建物が表示される。 */
+  buildingOverrides?: BuildingOverride[];
 }
 
 /** 物件の定義(静的データ)。 */

@@ -6,8 +6,9 @@ import { shonanFullMap as shonanFullMapGenerated } from "@/data/maps/shonan-full
 
 const OVERRIDES_PATH = path.join(process.cwd(), "src", "data", "maps", "overrides.json");
 
-const NODE_TYPES = new Set(["normal", "money", "card", "property", "gasStation", "warp", "event"]);
+const NODE_TYPES = new Set(["normal", "money", "moneyGain", "moneyLoss", "card", "property", "gasStation", "warp", "event"]);
 const ROAD_TYPES = new Set(["national", "main", "coastal", "residential", "shortcut"]);
+const BUILDING_TYPES = new Set(["station", "restaurant", "shop", "house", "commercial", "landmark", "hotel", "generic"]);
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -97,6 +98,19 @@ function isValidCustomProperty(v: unknown): boolean {
   );
 }
 
+function isValidBuildingOverride(v: unknown): boolean {
+  if (!v || typeof v !== "object") return false;
+  const b = v as Record<string, unknown>;
+  return (
+    isNonEmptyString(b.nodeId) &&
+    (b.buildingType === undefined || (typeof b.buildingType === "string" && BUILDING_TYPES.has(b.buildingType))) &&
+    isOptionalBoolean(b.hidden) &&
+    (b.offsetX === undefined || isFiniteNumber(b.offsetX)) &&
+    (b.offsetY === undefined || isFiniteNumber(b.offsetY)) &&
+    (b.scale === undefined || isFiniteNumber(b.scale))
+  );
+}
+
 function isValidOverrides(body: unknown): body is MapOverrides {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
@@ -117,6 +131,8 @@ function isValidOverrides(body: unknown): body is MapOverrides {
     b.removedEdges.every(isValidRemovedEdge) &&
     Array.isArray(b.customProperties) &&
     b.customProperties.every(isValidCustomProperty) &&
+    Array.isArray(b.buildingOverrides) &&
+    b.buildingOverrides.every(isValidBuildingOverride) &&
     (b.startNodeId === undefined || isNonEmptyString(b.startNodeId))
   );
 }

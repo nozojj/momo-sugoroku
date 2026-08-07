@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PropertyDef, RoadType } from "@/types/game";
+import type { BuildingOverride, PropertyDef, RoadType } from "@/types/game";
 import { applyMapOverrides, EMPTY_OVERRIDES, type MapOverrides, type ModifiedEdge, type NodePatch } from "@/data/maps/applyOverrides";
 import { shonanFullMap as baseMap } from "@/data/maps/shonan-full";
 
@@ -111,6 +111,10 @@ interface EditorStore {
   updateNode: (id: string, patch: NodePatch) => void;
   updateEdge: (a: string, b: string, patch: { roadType?: RoadType; requiresCardId?: string | null }) => void;
   upsertCustomProperty: (propDef: PropertyDef) => void;
+  /** ノードの建物設定を追加/変更する。上書きが既に存在すればマージし、無ければ新規作成する。 */
+  upsertBuildingOverride: (nodeId: string, patch: Partial<Omit<BuildingOverride, "nodeId">>) => void;
+  /** ノードの建物の個別上書きを削除する(自動推測の見た目に戻る)。 */
+  removeBuildingOverride: (nodeId: string) => void;
   setStartNode: (id: string) => void;
 
   save: () => Promise<void>;
@@ -316,6 +320,20 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     get().commit({ ...prev, customProperties });
   },
 
+  upsertBuildingOverride: (nodeId, patch) => {
+    const prev = get().overrides;
+    const idx = prev.buildingOverrides.findIndex((o) => o.nodeId === nodeId);
+    const buildingOverrides = [...prev.buildingOverrides];
+    if (idx !== -1) buildingOverrides[idx] = { ...buildingOverrides[idx], ...patch };
+    else buildingOverrides.push({ nodeId, ...patch });
+    get().commit({ ...prev, buildingOverrides });
+  },
+
+  removeBuildingOverride: (nodeId) => {
+    const prev = get().overrides;
+    get().commit({ ...prev, buildingOverrides: prev.buildingOverrides.filter((o) => o.nodeId !== nodeId) });
+  },
+
   setStartNode: (id) => {
     get().commit({ ...get().overrides, startNodeId: id });
   },
@@ -325,15 +343,17 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     set({ saveStatus: "saving" });
     try {
       const current = get().overrides;
-      // 物件タイプのノードから参照されなくなったcustomPropertiesを保存時に整理する
+      // 物件タイプのノードから参照されなくなったcustomProperties、
+      // 削除されたノードを指したままのbuildingOverridesを保存時に整理する
       // (削除・種別変更・Undo/Redoの繰り返しでゴミが溜まらないようにするため)。
       const merged = applyMapOverrides(baseMap, current);
       const referencedPropIds = new Set(
         merged.nodes.filter((n) => n.propertyId).map((n) => n.propertyId as string),
       );
+      const validNodeIds = new Set(merged.nodes.map((n) => n.id));
       const customProperties = current.customProperties.filter((p) => referencedPropIds.has(p.id));
-      const overrides =
-        customProperties.length === current.customProperties.length ? current : { ...current, customProperties };
+      const buildingOverrides = current.buildingOverrides.filter((o) => validNodeIds.has(o.nodeId));
+      const overrides = { ...current, customProperties, buildingOverrides };
 
       const res = await fetch("/api/editor/overrides", {
         method: "POST",

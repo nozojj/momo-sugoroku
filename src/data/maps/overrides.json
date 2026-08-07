@@ -16,7 +16,8 @@
       "id": "ed_mshbwslm_vudk",
       "name": "新しい交差点3",
       "x": 158,
-      "y": 303
+      "y": 303,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshbwt3j_gmfk",
@@ -40,7 +41,8 @@
       "id": "ed_mshbwuqf_mo2a",
       "name": "新しい交差点7",
       "x": 374,
-      "y": 303
+      "y": 303,
+      "type": "card"
     },
     {
       "id": "ed_mshbx1nr_itq8",
@@ -52,7 +54,8 @@
       "id": "ed_mshbx3sh_rk2i",
       "name": "新しい交差点9",
       "x": 320,
-      "y": 458
+      "y": 458,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshbx4zk_qfz3",
@@ -64,7 +67,8 @@
       "id": "ed_mshbzdsq_9ew1",
       "name": "新しい交差点11",
       "x": 0,
-      "y": 825
+      "y": 825,
+      "type": "moneyLoss"
     },
     {
       "id": "ed_mshc1wb9_vu0l",
@@ -82,7 +86,8 @@
       "id": "ed_mshc7g0m_8tw1",
       "name": "新しい交差点15",
       "x": 1625,
-      "y": 611
+      "y": 611,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshcco84_n5vd",
@@ -118,7 +123,8 @@
       "id": "ed_bend_b12",
       "name": "江の島合流(角)",
       "x": 950,
-      "y": 865
+      "y": 865,
+      "type": "event"
     },
     {
       "id": "ed_bend_b13",
@@ -130,7 +136,8 @@
       "id": "ed_bend_b15",
       "name": "大船合流(角)",
       "x": 1500,
-      "y": 388
+      "y": 388,
+      "type": "card"
     },
     {
       "id": "ed_mshdz0nk_nkym",
@@ -142,13 +149,15 @@
       "id": "ed_mshdz28z_isop",
       "name": "新しい交差点39",
       "x": 636,
-      "y": 261
+      "y": 261,
+      "type": "card"
     },
     {
       "id": "ed_mshdz3iv_875n",
       "name": "新しい交差点40",
       "x": 735,
-      "y": 263
+      "y": 263,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshdz5pt_418l",
@@ -184,7 +193,8 @@
       "id": "ed_mshe0dq4_cbni",
       "name": "新しい交差点46",
       "x": 937,
-      "y": -11
+      "y": -11,
+      "type": "moneyLoss"
     },
     {
       "id": "ed_mshe0gt3_trcf",
@@ -202,19 +212,22 @@
       "id": "ed_mshoqage_sxop",
       "name": "新しい交差点48",
       "x": 1288,
-      "y": 573
+      "y": 573,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshor87s_2uhu",
       "name": "新しい交差点48",
       "x": 538,
-      "y": 332
+      "y": 332,
+      "type": "moneyGain"
     },
     {
       "id": "ed_mshor9ec_g6nz",
       "name": "新しい交差点49",
       "x": 541,
-      "y": 415
+      "y": 415,
+      "type": "event"
     },
     {
       "id": "ed_mshoras4_dixr",
@@ -232,13 +245,15 @@
       "id": "ed_mshvh3rs_rgil",
       "name": "新しい交差点50",
       "x": 620,
-      "y": 770
+      "y": 770,
+      "type": "moneyLoss"
     },
     {
       "id": "ed_mshvi6na_svsy",
       "name": "新しい交差点51",
       "x": 700,
-      "y": 700
+      "y": 700,
+      "type": "moneyLoss"
     },
     {
       "id": "ed_mshvid73_06va",
@@ -272,7 +287,1749 @@
     }
   ],
   "movedNodes": [],
-  "modifiedNodes": [],
+  "modifiedNodes": [
+    {
+      "id": "r_hrlp_gate_hrlp_w_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_cglp_gate_cglp_e_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_cglp_gate_cglp_w_1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_tslp_gate_tslp_n_1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_fjrt_gate_fjrt_e_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_fjrt_gate_fjrt_w_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kg_ks_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_kg_ks_2",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_kg_ks_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_ks_in_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_ks_in_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_ks_in_3",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_sc_of_h_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_of_h_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sm_tm_6",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_kg_cg_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kg_cg_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_kg_rk_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_rk_ofuna_h1_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kklp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kklp_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_hr_cg_3",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_hr_cg_6",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_ts_fj_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_short_tsfj_rk_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_short_tsfj_rk_3",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sm_sc_h1_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sm_sc_h1_3",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sc_of_v_2",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_sc_of_v_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_h_6",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_h_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_h_2",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sm_kg_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_kk_kenchoji_2",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kk_kenchoji_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kj_fj_5",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kj_fj_6",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_tm_hr_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_tm_hr_7",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_tm_hr_8",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmlp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmlp_e",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "tmlp_se",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmlp_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmgo_w",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "tmgo_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmgo_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "tmgo_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "smrt_nw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "smrt_w",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "smrt_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "smrs_se",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "smrs_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "smrs_w",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "smrs_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_north_west_gate_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_fjrt_ring0_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjrt_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_fj_nw_rk1_2",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "kmlp_ne",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_kmlp_ring1_1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_kmlp_ring2_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "kmlp_se",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "wp_komachi1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "kmlp_sw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kmlp_ring5_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_cglp_ring7_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgmesh_ne_bend",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_cglp_ring3_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_local_cg_ts_h1_1",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_cg_nw_shop2_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgsp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgsp_se",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgsp_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_cgmesh_col2_1",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "cgmesh_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_cg_ts_4",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgcyu_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgcyu_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_tslp_ring1_1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_local2_ts_fj_h_2",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "tslp_sw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "tsmd_se",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "tsmd_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_hrlp_ring7_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "hrlp_se",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_hrlp_ring3_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_hrlp_ring4_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "hrlp_sw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "hrsp_w",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "hrsp_s",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "hrsk_se",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "hrsk_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "hrmesh_sw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "hrmesh_ne",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "enlp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encd_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "encg_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encg_nw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "encg_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encg_se",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "sctw_c0r1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "sctw_c0r3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_mid_east_h2_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "sctw_c2r1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "sctw_c2r2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "sctw_c1r1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "wp_north_route_east",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_hills_road3_1",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "wp_hills_bend2",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "wp_snm_f",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_north_mid_gate_2",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_mid_west_h2_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_mid_east_h1_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_north_spine_2_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_north_spine_1_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_north_spine_1_5",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "fjkt_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjkt_e",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "wp_fj_kitaguchi",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "fjhg_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjhg_sw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_fjmesh_row1a_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_fjmesh_row1b_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjmesh_se",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_fjmesh_row2a_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "inlp_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "inlp_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "inlp_e",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "inlp_n",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "onlp_se",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "onlp_sw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_ks_mesh_2",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "kmmesh_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kjlp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "incl_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "incl_nw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "incl_sw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "kslp_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kmclp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kmclp_w",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "kmclp_nw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "bend17_bend",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgklp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "yuilp_nw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "yuilp_w",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "yuilp_sw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "ktlp_ne",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "ktlp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "ktlp_s",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "ktlp_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "ktlp_w",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "ktlp_nw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kkkm_merge1_1",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_kg_rk_5",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_enzo_gate_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "wp_enzo_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_rk_ofuna_h1_5",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_h_11",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_h_12",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_v_1",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_sc_res_rokkai_v_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kslp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_enzo_w",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_ts_fj_bend",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_of_kj_2",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_kj_fj_4",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "fjhg_n",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encd_w",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tsmd_n",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "incl_n",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgmesh_nw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "fjrt_nw",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sc_rk_1",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "fjrt_n",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_north_spine_1_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjmesh_n",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "wp_en_candle",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "encd_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "sctw_c1r3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_kenchoji_ent",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjrt_sw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjmesh_s",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_rk_fj_2",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "wp_inamuragasaki",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_inamura_kaigan",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kjlp_s",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "r_kg_rk_7",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_ofuna_shop",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "hrsk_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgsp_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cglp_sw",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "tslp_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "r_rk_ofuna_h1_6",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "nklp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjkt_n",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "ofsp_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_north_spine_2_4",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tmgo_nw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "fjrt_w",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_sm_tm_5",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "fjhg_w",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "kklp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encg_e",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cgklp_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cglp_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "hrsp_e",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_tm_hr_5",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "enlp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_rokkai",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kklp_w",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "fjmesh_ne",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sm_kg_5",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "hrsk_nw",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgmesh_sw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "tmlp_n",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "r_kg_rk_3",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "smrt_s",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_sm_sc_h1_8",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "hrlp_w",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "encd_s",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "hrlp_n",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_kugenuma",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "cgklp_e",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "kjlp_w",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "tssp_ne",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_rk_ofuna_bende",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "cglp_n",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "kmlp_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "wp_sc_of_bend_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "onlp_nw",
+      "patch": {
+        "type": "event"
+      }
+    },
+    {
+      "id": "onlp_s",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "kmlp_n",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "ofsp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "smrs_n",
+      "patch": {
+        "type": "moneyLoss"
+      }
+    },
+    {
+      "id": "wp_kkkm_merge_bend",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "kmlp_e",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_koshigoe",
+      "patch": {
+        "type": "card"
+      }
+    },
+    {
+      "id": "r_kk_km_5",
+      "patch": {
+        "type": "moneyGain"
+      }
+    },
+    {
+      "id": "wp_fj_nw_rk_bend",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_fj_nw_rk_bend_prop"
+      }
+    },
+    {
+      "id": "r_fj_kg_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_fj_kg_1_prop"
+      }
+    },
+    {
+      "id": "wp_fj_meiten_ent",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_fj_meiten_ent_prop"
+      }
+    },
+    {
+      "id": "r_fj_kg_2",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_fj_kg_2_prop"
+      }
+    },
+    {
+      "id": "wp_fj_higashiguchi",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_fj_higashiguchi_prop"
+      }
+    },
+    {
+      "id": "r_fjrt_ring4_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_fjrt_ring4_1_prop"
+      }
+    },
+    {
+      "id": "cgklp_nw",
+      "patch": {
+        "type": "property",
+        "propertyId": "cgklp_nw_prop"
+      }
+    },
+    {
+      "id": "cgcyu_e",
+      "patch": {
+        "type": "property",
+        "propertyId": "cgcyu_e_prop"
+      }
+    },
+    {
+      "id": "cgcyu_ne",
+      "patch": {
+        "type": "property",
+        "propertyId": "cgcyu_ne_prop"
+      }
+    },
+    {
+      "id": "r_cg_ne_mesh2_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_cg_ne_mesh2_1_prop"
+      }
+    },
+    {
+      "id": "cgklp_sw",
+      "patch": {
+        "type": "property",
+        "propertyId": "cgklp_sw_prop"
+      }
+    },
+    {
+      "id": "wp_hr_sakura",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_hr_sakura_prop"
+      }
+    },
+    {
+      "id": "wp_hr_shop",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_hr_shop_prop"
+      }
+    },
+    {
+      "id": "wp_hr_shop_bend",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_hr_shop_bend_prop"
+      }
+    },
+    {
+      "id": "r_hrlp_ring0_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_hrlp_ring0_1_prop"
+      }
+    },
+    {
+      "id": "wp_sc_res_bend2",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_sc_res_bend2_prop"
+      }
+    },
+    {
+      "id": "r_sc_rk_4",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sc_rk_4_prop"
+      }
+    },
+    {
+      "id": "wp_sc_res_spur",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_sc_res_spur_prop"
+      }
+    },
+    {
+      "id": "r_sc_of_h_4",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sc_of_h_4_prop"
+      }
+    },
+    {
+      "id": "wp_samukawa_kita",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_samukawa_kita_prop"
+      }
+    },
+    {
+      "id": "r_sm_tm_4",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sm_tm_4_prop"
+      }
+    },
+    {
+      "id": "r_sm_sc_h1_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sm_sc_h1_1_prop"
+      }
+    },
+    {
+      "id": "r_sm_sc_h1_4",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sm_sc_h1_4_prop"
+      }
+    },
+    {
+      "id": "tssp_se",
+      "patch": {
+        "type": "property",
+        "propertyId": "tssp_se_prop"
+      }
+    },
+    {
+      "id": "wp_tsujido_kaigan",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_tsujido_kaigan_prop"
+      }
+    },
+    {
+      "id": "tssp_sw",
+      "patch": {
+        "type": "property",
+        "propertyId": "tssp_sw_prop"
+      }
+    },
+    {
+      "id": "tsmd_nw",
+      "patch": {
+        "type": "property",
+        "propertyId": "tsmd_nw_prop"
+      }
+    },
+    {
+      "id": "r_kmlp_ring6_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_kmlp_ring6_1_prop"
+      }
+    },
+    {
+      "id": "r_kmlp_gate_kmlp_n_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_kmlp_gate_kmlp_n_1_prop"
+      }
+    },
+    {
+      "id": "kmmesh_sw",
+      "patch": {
+        "type": "property",
+        "propertyId": "kmmesh_sw_prop"
+      }
+    },
+    {
+      "id": "enlp_se",
+      "patch": {
+        "type": "property",
+        "propertyId": "enlp_se_prop"
+      }
+    },
+    {
+      "id": "r_kg_en_bridge_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_kg_en_bridge_1_prop"
+      }
+    },
+    {
+      "id": "enlp_sw",
+      "patch": {
+        "type": "property",
+        "propertyId": "enlp_sw_prop"
+      }
+    },
+    {
+      "id": "wp_tamura_kado",
+      "patch": {
+        "type": "property",
+        "propertyId": "wp_tamura_kado_prop"
+      }
+    },
+    {
+      "id": "tmlp_w",
+      "patch": {
+        "type": "property",
+        "propertyId": "tmlp_w_prop"
+      }
+    },
+    {
+      "id": "inlp_nw",
+      "patch": {
+        "type": "property",
+        "propertyId": "inlp_nw_prop"
+      }
+    },
+    {
+      "id": "r_of_kk_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_of_kk_1_prop"
+      }
+    },
+    {
+      "id": "r_ks_in_2",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_ks_in_2_prop"
+      }
+    },
+    {
+      "id": "r_kg_rk_8",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_kg_rk_8_prop"
+      }
+    },
+    {
+      "id": "r_rk_fj_4",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_rk_fj_4_prop"
+      }
+    },
+    {
+      "id": "kklp_nw",
+      "patch": {
+        "type": "property",
+        "propertyId": "kklp_nw_prop"
+      }
+    },
+    {
+      "id": "nklp_nw",
+      "patch": {
+        "type": "property",
+        "propertyId": "nklp_nw_prop"
+      }
+    },
+    {
+      "id": "r_sm_sc_shinomiya_gate_1",
+      "patch": {
+        "type": "property",
+        "propertyId": "r_sm_sc_shinomiya_gate_1_prop"
+      }
+    }
+  ],
   "removedNodes": [
     "r_bypass_0_1",
     "wp_bypass_p1",
@@ -1552,5 +3309,351 @@
       "to": "incl_sw"
     }
   ],
-  "customProperties": []
+  "customProperties": [
+    {
+      "id": "wp_fj_nw_rk_bend_prop",
+      "name": "藤沢薬局",
+      "category": "薬局",
+      "price": 900,
+      "assetValue": 900,
+      "area": "藤沢ロータリー六会合流(角)"
+    },
+    {
+      "id": "r_fj_kg_1_prop",
+      "name": "藤沢カフェ",
+      "category": "カフェ",
+      "price": 900,
+      "assetValue": 900,
+      "area": "藤沢"
+    },
+    {
+      "id": "wp_fj_meiten_ent_prop",
+      "name": "藤沢青果店",
+      "category": "青果店",
+      "price": 900,
+      "assetValue": 900,
+      "area": "藤沢名店街入口"
+    },
+    {
+      "id": "r_fj_kg_2_prop",
+      "name": "藤沢雑貨店",
+      "category": "雑貨店",
+      "price": 700,
+      "assetValue": 700,
+      "area": "藤沢"
+    },
+    {
+      "id": "wp_fj_higashiguchi_prop",
+      "name": "藤沢本屋",
+      "category": "本屋",
+      "price": 1000,
+      "assetValue": 1000,
+      "area": "藤沢東口"
+    },
+    {
+      "id": "r_fjrt_ring4_1_prop",
+      "name": "藤沢居酒屋",
+      "category": "居酒屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "藤沢ロータリー"
+    },
+    {
+      "id": "cgklp_nw_prop",
+      "name": "茅ヶ崎パン屋",
+      "category": "パン屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "茅ヶ崎海岸通り(北西)"
+    },
+    {
+      "id": "cgcyu_e_prop",
+      "name": "茅ヶ崎本屋",
+      "category": "本屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "茅ヶ崎中央(東)"
+    },
+    {
+      "id": "cgcyu_ne_prop",
+      "name": "茅ヶ崎青果店",
+      "category": "青果店",
+      "price": 900,
+      "assetValue": 900,
+      "area": "茅ヶ崎中央(北東)"
+    },
+    {
+      "id": "r_cg_ne_mesh2_1_prop",
+      "name": "茅ヶ崎デパート",
+      "category": "デパート",
+      "price": 700,
+      "assetValue": 700,
+      "area": "茅ヶ崎住宅街"
+    },
+    {
+      "id": "cgklp_sw_prop",
+      "name": "茅ヶ崎定食屋",
+      "category": "定食屋",
+      "price": 800,
+      "assetValue": 800,
+      "area": "茅ヶ崎海岸通り(南西)"
+    },
+    {
+      "id": "wp_hr_sakura_prop",
+      "name": "平塚居酒屋",
+      "category": "居酒屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "平塚桜ヶ丘入口"
+    },
+    {
+      "id": "wp_hr_shop_prop",
+      "name": "平塚ラーメン店",
+      "category": "ラーメン店",
+      "price": 900,
+      "assetValue": 900,
+      "area": "平塚銀座入口"
+    },
+    {
+      "id": "wp_hr_shop_bend_prop",
+      "name": "平塚青果店",
+      "category": "青果店",
+      "price": 900,
+      "assetValue": 900,
+      "area": "平塚銀座入口(角)"
+    },
+    {
+      "id": "r_hrlp_ring0_1_prop",
+      "name": "平塚定食屋",
+      "category": "定食屋",
+      "price": 500,
+      "assetValue": 500,
+      "area": "平塚小路"
+    },
+    {
+      "id": "wp_sc_res_bend2_prop",
+      "name": "湘南台デパート",
+      "category": "デパート",
+      "price": 500,
+      "assetValue": 500,
+      "area": "湘南台住宅街裏道(南)"
+    },
+    {
+      "id": "r_sc_rk_4_prop",
+      "name": "湘南台ショッピングビル",
+      "category": "ショッピングビル",
+      "price": 900,
+      "assetValue": 900,
+      "area": "湘南台"
+    },
+    {
+      "id": "wp_sc_res_spur_prop",
+      "name": "湘南台パン屋",
+      "category": "パン屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "湘南台住宅街裏の外れ"
+    },
+    {
+      "id": "r_sc_of_h_4_prop",
+      "name": "湘南台居酒屋",
+      "category": "居酒屋",
+      "price": 900,
+      "assetValue": 900,
+      "area": "湘南台"
+    },
+    {
+      "id": "wp_samukawa_kita_prop",
+      "name": "寒川青果店",
+      "category": "青果店",
+      "price": 500,
+      "assetValue": 500,
+      "area": "寒川ロータリー入口"
+    },
+    {
+      "id": "r_sm_tm_4_prop",
+      "name": "寒川薬局",
+      "category": "薬局",
+      "price": 500,
+      "assetValue": 500,
+      "area": "寒川"
+    },
+    {
+      "id": "r_sm_sc_h1_1_prop",
+      "name": "寒川ショッピングビル",
+      "category": "ショッピングビル",
+      "price": 500,
+      "assetValue": 500,
+      "area": "寒川"
+    },
+    {
+      "id": "r_sm_sc_h1_4_prop",
+      "name": "寒川カフェ",
+      "category": "カフェ",
+      "price": 600,
+      "assetValue": 600,
+      "area": "寒川"
+    },
+    {
+      "id": "tssp_se_prop",
+      "name": "辻堂パン屋",
+      "category": "パン屋",
+      "price": 700,
+      "assetValue": 700,
+      "area": "辻堂海浜商店街(南東)"
+    },
+    {
+      "id": "wp_tsujido_kaigan_prop",
+      "name": "辻堂薬局",
+      "category": "薬局",
+      "price": 700,
+      "assetValue": 700,
+      "area": "辻堂海岸"
+    },
+    {
+      "id": "tssp_sw_prop",
+      "name": "辻堂カフェ",
+      "category": "カフェ",
+      "price": 700,
+      "assetValue": 700,
+      "area": "辻堂海浜商店街(南西)"
+    },
+    {
+      "id": "tsmd_nw_prop",
+      "name": "辻堂居酒屋",
+      "category": "居酒屋",
+      "price": 900,
+      "assetValue": 900,
+      "area": "辻堂緑ヶ浜(北西)"
+    },
+    {
+      "id": "r_kmlp_ring6_1_prop",
+      "name": "鎌倉ショッピングビル",
+      "category": "ショッピングビル",
+      "price": 700,
+      "assetValue": 700,
+      "area": "鎌倉小路"
+    },
+    {
+      "id": "r_kmlp_gate_kmlp_n_1_prop",
+      "name": "鎌倉薬局",
+      "category": "薬局",
+      "price": 600,
+      "assetValue": 600,
+      "area": "鎌倉小路"
+    },
+    {
+      "id": "kmmesh_sw_prop",
+      "name": "鎌倉ゲストハウス",
+      "category": "ゲストハウス",
+      "price": 800,
+      "assetValue": 800,
+      "area": "鎌倉住宅街(南西)"
+    },
+    {
+      "id": "enlp_se_prop",
+      "name": "江の島定食屋",
+      "category": "定食屋",
+      "price": 500,
+      "assetValue": 500,
+      "area": "江の島参道(南東)"
+    },
+    {
+      "id": "r_kg_en_bridge_1_prop",
+      "name": "江の島ショッピングビル",
+      "category": "ショッピングビル",
+      "price": 800,
+      "assetValue": 800,
+      "area": "江の島大橋"
+    },
+    {
+      "id": "enlp_sw_prop",
+      "name": "江の島土産物店",
+      "category": "土産物店",
+      "price": 500,
+      "assetValue": 500,
+      "area": "江の島参道(南西)"
+    },
+    {
+      "id": "wp_tamura_kado_prop",
+      "name": "田村定食屋",
+      "category": "定食屋",
+      "price": 500,
+      "assetValue": 500,
+      "area": "田村北"
+    },
+    {
+      "id": "tmlp_w_prop",
+      "name": "田村薬局",
+      "category": "薬局",
+      "price": 500,
+      "assetValue": 500,
+      "area": "田村小路(西)"
+    },
+    {
+      "id": "inlp_nw_prop",
+      "name": "稲村ヶ崎ラーメン店",
+      "category": "ラーメン店",
+      "price": 300,
+      "assetValue": 300,
+      "area": "稲村ヶ崎小路(北西)"
+    },
+    {
+      "id": "r_of_kk_1_prop",
+      "name": "大船本屋",
+      "category": "本屋",
+      "price": 600,
+      "assetValue": 600,
+      "area": "大船"
+    },
+    {
+      "id": "r_ks_in_2_prop",
+      "name": "腰越花屋",
+      "category": "花屋",
+      "price": 500,
+      "assetValue": 500,
+      "area": "腰越"
+    },
+    {
+      "id": "r_kg_rk_8_prop",
+      "name": "香川薬局",
+      "category": "薬局",
+      "price": 400,
+      "assetValue": 400,
+      "area": "香川"
+    },
+    {
+      "id": "r_rk_fj_4_prop",
+      "name": "六会本屋",
+      "category": "本屋",
+      "price": 500,
+      "assetValue": 500,
+      "area": "六会"
+    },
+    {
+      "id": "kklp_nw_prop",
+      "name": "北鎌倉ラーメン店",
+      "category": "ラーメン店",
+      "price": 500,
+      "assetValue": 500,
+      "area": "北鎌倉小路(北西)"
+    },
+    {
+      "id": "nklp_nw_prop",
+      "name": "中原青果店",
+      "category": "青果店",
+      "price": 400,
+      "assetValue": 400,
+      "area": "中原小路(北西)"
+    },
+    {
+      "id": "r_sm_sc_shinomiya_gate_1_prop",
+      "name": "四之宮カフェ",
+      "category": "カフェ",
+      "price": 600,
+      "assetValue": 600,
+      "area": "四之宮"
+    }
+  ],
+  "buildingOverrides": []
 }

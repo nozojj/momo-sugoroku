@@ -5,7 +5,9 @@ import type { GameStatus, MapData, MapDecoration, Player, RouteOption } from "@/
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
 import { getPropertyDef } from "@/data/properties";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
+import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
 import { CarToken } from "./CarToken";
+import { BuildingSprite } from "./BuildingSprite";
 
 interface BoardProps {
   map: MapData;
@@ -30,6 +32,10 @@ const DESKTOP_MOVEMENT_ZOOM = 1.4;
 /** パン/ズームのCSSトランジション時間。CarTokenの移動アニメーション(420ms)と揃え、
  *  カメラ追従が駒の移動に自然に同期して見えるようにする。 */
 const CAMERA_TRANSITION_MS = 420;
+/** このズーム未満では建物イラストを間引き、マスの色分け表示だけにする(LOD)。
+ *  PC通常表示(全体フィット)は下回るため間引かれ、移動中ズーム(PC 1.4/スマホ2.0〜2.3)は
+ *  上回るため建物がしっかり見える。 */
+const BUILDING_DETAIL_MIN_ZOOM = 0.9;
 
 type DragState =
   | { kind: "pan"; startX: number; startY: number; startPan: { x: number; y: number } }
@@ -150,14 +156,18 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   // サイコロを振った瞬間(移動フェーズ開始)にプレイヤー中心へズームイン、
   // 着地して移動フェーズが終わった瞬間に通常表示へズームアウトする。
   useEffect(() => {
+    // クリーンアップでrefを実行前の値に戻す: React Strict Modeの開発時二重実行
+    // (mount→cleanup→再mount)でも、2回目の実行が「前回すでに遷移済み」と
+    // 誤認して何もしない(結果としてズームが古いままになる)のを防ぐため。
+    const previousPhase = wasMovingPhaseRef.current;
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect && rect.width > 0 && rect.height > 0) {
-      if (isMovingPhase && !wasMovingPhaseRef.current) {
+      if (isMovingPhase && !previousPhase) {
         const { zoom: z, pan: p } = getMovementCamera(rect);
         setZoom(z);
         setPan(p);
         autoFollowRef.current = true;
-      } else if (!isMovingPhase && wasMovingPhaseRef.current) {
+      } else if (!isMovingPhase && previousPhase) {
         const { zoom: z, pan: p } = getIdleCamera(rect);
         setZoom(z);
         setPan(p);
@@ -165,6 +175,9 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
       }
     }
     wasMovingPhaseRef.current = isMovingPhase;
+    return () => {
+      wasMovingPhaseRef.current = previousPhase;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMovingPhase]);
 
@@ -401,6 +414,24 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                 </g>
               );
             })}
+
+            {/* 建物(マス・道路とは独立した見た目レイヤー。低ズーム時はマスの色分けだけで十分見やすいので間引く) */}
+            {zoom >= BUILDING_DETAIL_MIN_ZOOM &&
+              map.nodes.map((node) => {
+                const propDef = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
+                const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);
+                const building = resolveBuildingForNode(node, propDef, override);
+                if (!building) return null;
+                return (
+                  <BuildingSprite
+                    key={node.id}
+                    cx={node.x - minX + building.offsetX}
+                    cy={node.y - minY + building.offsetY}
+                    buildingType={building.buildingType}
+                    scale={building.scale}
+                  />
+                );
+              })}
 
             {/* 車コマ */}
             {players.map((player, i) => {

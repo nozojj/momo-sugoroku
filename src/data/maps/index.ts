@@ -9,7 +9,9 @@ import overridesData from "./overrides.json";
 // サイト全体が起動できなくなることがないよう、失敗時は無編集の状態にフォールバックする。
 function loadShonanFullMap(): MapData {
   try {
-    return applyMapOverrides(shonanFullMapGenerated, overridesData as MapOverrides);
+    // overrides.jsonがスキーマ追加前(buildingOverrides等)に保存されたものでも読み込めるよう、
+    // 既定値とマージしてから渡す。
+    return applyMapOverrides(shonanFullMapGenerated, { ...EMPTY_OVERRIDES, ...(overridesData as Partial<MapOverrides>) });
   } catch (err) {
     console.error("overrides.jsonの適用に失敗しました。無編集の状態で起動します。", err);
     return applyMapOverrides(shonanFullMapGenerated, EMPTY_OVERRIDES);

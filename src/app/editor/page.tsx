@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { MapData, MapNode, RoadType } from "@/types/game";
 import { shonanFullMap as baseMap } from "@/data/maps/shonan-full";
-import { applyMapOverrides } from "@/data/maps/applyOverrides";
+import { applyMapOverrides, EMPTY_OVERRIDES } from "@/data/maps/applyOverrides";
 import { ROAD_STYLE, NODE_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, straightRoadPath } from "@/lib/game/mapStyle";
+import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
 import { useEditorStore, snapToGrid, type EditorMode } from "@/store/editorStore";
 import { InspectorPanel } from "./InspectorPanel";
+import { BuildingSprite } from "@/components/game/BuildingSprite";
 import { getPropertyDef } from "@/data/properties";
 
 const PADDING = 80;
@@ -111,7 +113,8 @@ export default function EditorPage() {
   useEffect(() => {
     fetch("/api/editor/overrides")
       .then((r) => r.json())
-      .then((data) => load(data))
+      // buildingOverrides追加前に保存されたoverrides.jsonでも読み込めるよう、既定値とマージする。
+      .then((data) => load({ ...EMPTY_OVERRIDES, ...data }))
       .catch(() => load(useEditorStore.getState().overrides));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -160,6 +163,9 @@ export default function EditorPage() {
         })()
       : null;
   const inspectedPropertyDef = inspectedNode?.propertyId ? getPropertyDef(inspectedNode.propertyId) : undefined;
+  const inspectedBuildingOverride = inspectedNode
+    ? overrides.buildingOverrides.find((o) => o.nodeId === inspectedNode.id)
+    : undefined;
 
   function clampZoom(z: number) {
     return Math.min(3, Math.max(0.08, z));
@@ -794,6 +800,27 @@ export default function EditorPage() {
                     </g>
                   );
                 })}
+
+                {/* 建物(見た目レイヤー。エディタでは常にズームに関わらず表示し、位置調整の様子を確認しやすくする) */}
+                {map.nodes.map((node) => {
+                  const preview = dragPreview?.get(node.id);
+                  const px = preview?.x ?? node.x;
+                  const py = preview?.y ?? node.y;
+                  const propDef = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
+                  const override = overrides.buildingOverrides.find((o) => o.nodeId === node.id);
+                  const building = resolveBuildingForNode(node, propDef, override);
+                  if (!building) return null;
+                  return (
+                    <BuildingSprite
+                      key={`bld_${node.id}`}
+                      cx={px - minX + building.offsetX}
+                      cy={py - minY + building.offsetY}
+                      buildingType={building.buildingType}
+                      scale={building.scale}
+                      selected={mode === "select" && selection.size === 1 && selection.has(node.id)}
+                    />
+                  );
+                })}
               </svg>
             </div>
           )}
@@ -831,6 +858,7 @@ export default function EditorPage() {
             isStartNode={inspectedNode?.id === map.startNodeId}
             existingAreas={existingAreas}
             existingPropertyDef={inspectedPropertyDef}
+            existingBuildingOverride={inspectedBuildingOverride}
             onClose={() => {
               setSelection(new Set());
               setSelectedEdge(null);

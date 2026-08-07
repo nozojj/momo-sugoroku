@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
+import type { BuildingOverride, BuildingType, MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
 import { NODE_STYLE } from "@/lib/game/mapStyle";
+import { BUILDING_TYPE_LABEL, BUILDING_TYPE_OPTIONS, inferBuildingType, defaultBuildingOffset } from "@/lib/game/buildingStyle";
 import { useEditorStore } from "@/store/editorStore";
+
+const POSITION_STEP = 4;
 
 const NODE_TYPE_OPTIONS: NodeType[] = [
   "normal",
@@ -38,17 +41,30 @@ interface Props {
   isStartNode: boolean;
   existingAreas: string[];
   existingPropertyDef: PropertyDef | undefined;
+  existingBuildingOverride: BuildingOverride | undefined;
   onClose: () => void;
 }
 
 const inputCls =
   "w-full rounded border border-black/10 bg-white px-2 py-1 text-sm dark:bg-slate-800 dark:border-white/10 dark:text-slate-100";
 const labelCls = "block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1";
+const nudgeBtnCls =
+  "flex h-7 w-7 items-center justify-center rounded border border-sky-300 bg-white text-sm text-sky-700 hover:bg-sky-100 dark:border-sky-700 dark:bg-slate-800 dark:text-sky-300 dark:hover:bg-sky-900";
 
-export function InspectorPanel({ node, edge, isStartNode, existingAreas, existingPropertyDef, onClose }: Props) {
+export function InspectorPanel({
+  node,
+  edge,
+  isStartNode,
+  existingAreas,
+  existingPropertyDef,
+  existingBuildingOverride,
+  onClose,
+}: Props) {
   const updateNode = useEditorStore((s) => s.updateNode);
   const updateEdge = useEditorStore((s) => s.updateEdge);
   const upsertCustomProperty = useEditorStore((s) => s.upsertCustomProperty);
+  const upsertBuildingOverride = useEditorStore((s) => s.upsertBuildingOverride);
+  const removeBuildingOverride = useEditorStore((s) => s.removeBuildingOverride);
   const setStartNode = useEditorStore((s) => s.setStartNode);
   const showToast = useEditorStore((s) => s.showToast);
 
@@ -195,6 +211,131 @@ export function InspectorPanel({ node, edge, isStartNode, existingAreas, existin
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {(node.type === "property" || node.isDestinationCandidate || existingBuildingOverride) && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/30">
+              <p className="mb-2 text-xs font-semibold text-sky-700 dark:text-sky-300">建物の設定(見た目のみ・ゲームロジックには影響しません)</p>
+              {existingBuildingOverride ? (
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={!!existingBuildingOverride.hidden}
+                      onChange={(e) => upsertBuildingOverride(node.id, { hidden: e.target.checked })}
+                    />
+                    建物を非表示にする
+                  </label>
+
+                  <div>
+                    <label className={labelCls}>建物タイプ</label>
+                    <select
+                      className={inputCls}
+                      value={existingBuildingOverride.buildingType ?? inferBuildingType(node, existingPropertyDef)}
+                      onChange={(e) => upsertBuildingOverride(node.id, { buildingType: e.target.value as BuildingType })}
+                    >
+                      {BUILDING_TYPE_OPTIONS.map((t) => (
+                        <option key={t} value={t}>
+                          {BUILDING_TYPE_LABEL[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>位置調整</label>
+                    <div className="grid grid-cols-3 gap-1">
+                      <div />
+                      <button
+                        type="button"
+                        className={`${nudgeBtnCls} mx-auto`}
+                        onClick={() => {
+                          const y = existingBuildingOverride.offsetY ?? defaultBuildingOffset(node).y;
+                          upsertBuildingOverride(node.id, { offsetY: y - POSITION_STEP });
+                        }}
+                        aria-label="上へ"
+                      >
+                        ↑
+                      </button>
+                      <div />
+                      <button
+                        type="button"
+                        className={`${nudgeBtnCls} mx-auto`}
+                        onClick={() => {
+                          const x = existingBuildingOverride.offsetX ?? defaultBuildingOffset(node).x;
+                          upsertBuildingOverride(node.id, { offsetX: x - POSITION_STEP });
+                        }}
+                        aria-label="左へ"
+                      >
+                        ←
+                      </button>
+                      <span className="flex items-center justify-center text-[10px] text-slate-400">
+                        {Math.round(existingBuildingOverride.offsetX ?? defaultBuildingOffset(node).x)},
+                        {Math.round(existingBuildingOverride.offsetY ?? defaultBuildingOffset(node).y)}
+                      </span>
+                      <button
+                        type="button"
+                        className={`${nudgeBtnCls} mx-auto`}
+                        onClick={() => {
+                          const x = existingBuildingOverride.offsetX ?? defaultBuildingOffset(node).x;
+                          upsertBuildingOverride(node.id, { offsetX: x + POSITION_STEP });
+                        }}
+                        aria-label="右へ"
+                      >
+                        →
+                      </button>
+                      <div />
+                      <button
+                        type="button"
+                        className={`${nudgeBtnCls} mx-auto`}
+                        onClick={() => {
+                          const y = existingBuildingOverride.offsetY ?? defaultBuildingOffset(node).y;
+                          upsertBuildingOverride(node.id, { offsetY: y + POSITION_STEP });
+                        }}
+                        aria-label="下へ"
+                      >
+                        ↓
+                      </button>
+                      <div />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>サイズ({(existingBuildingOverride.scale ?? 1).toFixed(2)}倍)</label>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={2}
+                      step={0.1}
+                      value={existingBuildingOverride.scale ?? 1}
+                      onChange={(e) => upsertBuildingOverride(node.id, { scale: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeBuildingOverride(node.id)}
+                    className="w-full rounded-lg border border-rose-300 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950"
+                  >
+                    この上書きを削除(自動推測に戻す)
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    自動推測: {BUILDING_TYPE_LABEL[inferBuildingType(node, existingPropertyDef)]}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => upsertBuildingOverride(node.id, {})}
+                    className="w-full rounded-lg border border-sky-300 px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900"
+                  >
+                    個別設定を追加
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

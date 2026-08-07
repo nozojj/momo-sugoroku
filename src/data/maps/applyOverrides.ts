@@ -1,4 +1,4 @@
-import type { MapData, MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
+import type { BuildingOverride, MapData, MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
 
 /**
  * エディタ(/editor)で行った道路・交差点・マス種別・物件などの編集を、生成済みマップの
@@ -70,6 +70,8 @@ export interface MapOverrides {
   removedEdges: RemovedEdge[];
   /** エディタで作成した物件定義。 */
   customProperties: PropertyDef[];
+  /** 建物の個別設定(ノードごとに最大1件)。マス・物件のゲームロジックには影響しない。 */
+  buildingOverrides: BuildingOverride[];
   /** ゲーム開始地点の上書き。未指定または解決不能な場合はbase.startNodeIdを使う。 */
   startNodeId?: string;
 }
@@ -83,6 +85,7 @@ export const EMPTY_OVERRIDES: MapOverrides = {
   modifiedEdges: [],
   removedEdges: [],
   customProperties: [],
+  buildingOverrides: [],
   startNodeId: undefined,
 };
 
@@ -173,5 +176,11 @@ export function applyMapOverrides(base: MapData, overrides: MapOverrides): MapDa
   const startNodeId =
     overrides.startNodeId && finalById.has(overrides.startNodeId) ? overrides.startNodeId : base.startNodeId;
 
-  return { ...base, nodes, startNodeId };
+  const overriddenBuildingNodeIds = new Set(overrides.buildingOverrides.map((o) => o.nodeId));
+  const buildingOverrides = [
+    ...(base.buildingOverrides ?? []).filter((o) => !overriddenBuildingNodeIds.has(o.nodeId)),
+    ...overrides.buildingOverrides,
+  ];
+
+  return { ...base, nodes, startNodeId, buildingOverrides };
 }
