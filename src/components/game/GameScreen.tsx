@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { getPropertyDef } from "@/data/properties";
-import { getNode } from "@/lib/game/mapGraph";
+import { getNode, shortestDistance } from "@/lib/game/mapGraph";
 import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
 import { Board } from "./Board";
 import { Dice } from "./Dice";
 import { GameHud } from "./GameHud";
 import { GameDrawer } from "./GameDrawer";
+import { RouteChoiceOverlay } from "./RouteChoiceOverlay";
 import { PurchaseModal } from "./PurchaseModal";
 import { ArrivalModal } from "./ArrivalModal";
 import { GameOverModal } from "./GameOverModal";
@@ -67,6 +68,10 @@ export function GameScreen() {
   const pendingProperty = pendingPropertyId ? getPropertyDef(pendingPropertyId) : undefined;
   const calendar = getCalendar(turn);
   const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
+  const distanceToDestination =
+    currentPlayer && (status === "moving" || status === "selectingRoute")
+      ? shortestDistance(map, currentPlayer.currentNodeId, destinationNodeId, currentPlayer.cardIds)
+      : null;
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
@@ -78,6 +83,7 @@ export function GameScreen() {
           destinationNodeId={destinationNodeId}
           routeOptions={routeOptions}
           onSelectRoute={chooseRoute}
+          status={status}
         />
       </div>
 
@@ -87,28 +93,20 @@ export function GameScreen() {
         destinationName={destinationNode.name}
         calendarText={`${calendar.year}年目 ${calendar.month}月`}
         onOpenDrawer={() => setDrawerOpen(true)}
+        movementInfo={
+          status === "moving" ? { remainingMoves, distanceToDestination } : undefined
+        }
       />
 
-      {status === "selectingRoute" && (
-        <div className="pointer-events-none absolute inset-x-3 top-14 z-20 flex justify-center sm:top-16">
-          <div className="pointer-events-auto w-full max-w-md rounded-xl border border-amber-300 bg-amber-50/95 p-3 shadow-lg backdrop-blur-sm dark:bg-amber-950/90">
-            <p className="mb-2 text-sm font-bold text-amber-700 dark:text-amber-300">
-              分岐点です。進む道を選んでください(地図をタップしてもOK)
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {routeOptions.map((opt) => (
-                <button
-                  key={opt.nodeId}
-                  type="button"
-                  onClick={() => chooseRoute(opt.nodeId)}
-                  className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-bold text-white shadow-sm active:scale-95"
-                >
-                  {opt.nodeName} へ
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+      {status === "selectingRoute" && currentPlayer && (
+        <RouteChoiceOverlay
+          map={map}
+          currentNodeId={currentPlayer.currentNodeId}
+          routeOptions={routeOptions}
+          destinationNodeId={destinationNodeId}
+          ownedCardIds={currentPlayer.cardIds}
+          onSelectRoute={chooseRoute}
+        />
       )}
 
       <div className="fixed bottom-5 left-1/2 z-20 -translate-x-1/2 sm:bottom-6">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MapData, MapDecoration, Player, RouteOption } from "@/types/game";
+import type { GameStatus, MapData, MapDecoration, Player, RouteOption } from "@/types/game";
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
 import { getPropertyDef } from "@/data/properties";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
@@ -14,13 +14,19 @@ interface BoardProps {
   destinationNodeId: string;
   routeOptions: RouteOption[];
   onSelectRoute: (nodeId: string) => void;
+  status: GameStatus;
 }
 
 const PADDING = 80;
 
-/** スマホの初期ズーム倍率。全体を見渡すことより、マス/道路/プレイヤーの視認性を優先した値。
- *  実機確認後はこの1箇所だけ変更すればよい。 */
+/** スマホの通常時(移動していないとき)の初期ズーム倍率。全体を見渡すことより、
+ *  マス/道路/プレイヤーの視認性を優先した値。実機確認後はこの1箇所だけ変更すればよい。 */
 const MOBILE_INITIAL_ZOOM = 2.0;
+/** スマホで移動中(サイコロを振った後)に使う、通常時より少し車周辺を大きく見せるズーム倍率。 */
+const MOBILE_MOVEMENT_ZOOM = 2.3;
+/** PCで移動中に使うズーム倍率。通常時は全体フィット(かなり小さい)なので、移動中だけこの倍率に寄せる。
+ *  調整用定数。実機確認後はこの1箇所だけ変更すればよい。 */
+const DESKTOP_MOVEMENT_ZOOM = 1.4;
 /** パン/ズームのCSSトランジション時間。CarTokenの移動アニメーション(420ms)と揃え、
  *  カメラ追従が駒の移動に自然に同期して見えるようにする。 */
 const CAMERA_TRANSITION_MS = 420;
@@ -54,7 +60,7 @@ function smoothPathThroughPoints(points: { x: number; y: number }[]): string {
   return d;
 }
 
-export function Board({ map, players, currentPlayerIndex, destinationNodeId, routeOptions, onSelectRoute }: BoardProps) {
+export function Board({ map, players, currentPlayerIndex, destinationNodeId, routeOptions, onSelectRoute, status }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
   const [zoom, setZoom] = useState(0.55);
@@ -96,35 +102,77 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     return Math.min(2.2, Math.max(0.08, z));
   }
 
-  // 初回表示のズーム/パン。PCはマップ全体が余白なく収まるズームへ、スマホは全体を見渡すことより
-  // マス・道路・プレイヤーの視認性を優先した固定ズームで現在プレイヤー周辺を映す。
+  /** 通常時(移動していないとき)のズーム/パン。PCはマップ全体が余白なく収まるズームへ、
+   *  スマホは全体を見渡すことよりマス・道路・プレイヤーの視認性を優先した固定ズームで
+   *  現在プレイヤー周辺を映す。 */
+  function getIdleCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+    if (isMobile) {
+      const z = clampZoom(MOBILE_INITIAL_ZOOM);
+      const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
+      return {
+        zoom: z,
+        pan: node
+          ? { x: rect.width / 2 - (node.x - minX) * z, y: rect.height / 2 - (node.y - minY) * z }
+          : { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 },
+      };
+    }
+    const z = clampZoom(Math.min(rect.width / width, rect.height / height) * 0.94);
+    return { zoom: z, pan: { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 } };
+  }
+
+  /** 移動中(サイコロを振った後〜着地まで、分岐選択中も含む)のズーム/パン。現在プレイヤーを中心に、
+   *  通常表示より寄ったズームで映す。 */
+  function getMovementCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+    const z = clampZoom(isMobile ? MOBILE_MOVEMENT_ZOOM : DESKTOP_MOVEMENT_ZOOM);
+    const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
+    return {
+      zoom: z,
+      pan: node
+        ? { x: rect.width / 2 - (node.x - minX) * z, y: rect.height / 2 - (node.y - minY) * z }
+        : { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 },
+    };
+  }
+
+  const isMovingPhase = status === "moving" || status === "selectingRoute";
+  const wasMovingPhaseRef = useRef(false);
+
+  // 初回表示、および isMobile が切り替わった瞬間の通常カメラ。
   useEffect(() => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
-
-    if (isMobile) {
-      const mobileZoom = clampZoom(MOBILE_INITIAL_ZOOM);
-      const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
-      setZoom(mobileZoom);
-      setPan(
-        node
-          ? { x: rect.width / 2 - (node.x - minX) * mobileZoom, y: rect.height / 2 - (node.y - minY) * mobileZoom }
-          : { x: (rect.width - width * mobileZoom) / 2, y: (rect.height - height * mobileZoom) / 2 },
-      );
-    } else {
-      const fitZoom = clampZoom(Math.min(rect.width / width, rect.height / height) * 0.94);
-      setZoom(fitZoom);
-      setPan({ x: (rect.width - width * fitZoom) / 2, y: (rect.height - height * fitZoom) / 2 });
-    }
+    const { zoom: z, pan: p } = getIdleCamera(rect);
+    setZoom(z);
+    setPan(p);
     autoFollowRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map.id, isMobile]);
 
-  // スマホ: プレイヤーが移動(または手番交代)したら、追従が有効な間だけカメラを追いかける。
-  // isMobileを依存に含めない: mobile判定が切り替わった瞬間は上の初期表示エフェクトが処理するので、
+  // サイコロを振った瞬間(移動フェーズ開始)にプレイヤー中心へズームイン、
+  // 着地して移動フェーズが終わった瞬間に通常表示へズームアウトする。
+  useEffect(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      if (isMovingPhase && !wasMovingPhaseRef.current) {
+        const { zoom: z, pan: p } = getMovementCamera(rect);
+        setZoom(z);
+        setPan(p);
+        autoFollowRef.current = true;
+      } else if (!isMovingPhase && wasMovingPhaseRef.current) {
+        const { zoom: z, pan: p } = getIdleCamera(rect);
+        setZoom(z);
+        setPan(p);
+        autoFollowRef.current = true;
+      }
+    }
+    wasMovingPhaseRef.current = isMovingPhase;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMovingPhase]);
+
+  // プレイヤーが移動(または手番交代)したら、移動フェーズ中かつ追従が有効な間だけカメラを追いかける。
+  // isMovingPhaseを依存に含めない: フェーズが切り替わった瞬間は上のエフェクトが処理するので、
   // ここで二重に発火すると(そちらのsetZoomがまだ反映されていない)古いzoomを使ってパンを計算してしまう。
   useEffect(() => {
-    if (!isMobile || !autoFollowRef.current) return;
+    if (!isMovingPhase || !autoFollowRef.current) return;
     const node = nodeById.get(currentPlayer?.currentNodeId ?? "");
     const rect = containerRef.current?.getBoundingClientRect();
     if (!node || !rect) return;
@@ -212,14 +260,12 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   }
 
   function recenterOnCurrentPlayer() {
-    const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
-    if (!node || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
     autoFollowRef.current = true;
-    setPan({
-      x: rect.width / 2 - (node.x - minX) * zoom,
-      y: rect.height / 2 - (node.y - minY) * zoom,
-    });
+    const { zoom: z, pan: p } = isMovingPhase ? getMovementCamera(rect) : getIdleCamera(rect);
+    setZoom(z);
+    setPan(p);
   }
 
   return (

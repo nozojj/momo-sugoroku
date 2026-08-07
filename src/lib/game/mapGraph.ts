@@ -41,3 +41,33 @@ export function pickRandomDestination(map: MapData, excludeNodeId?: string): str
 export function rollDice(): number {
   return 1 + Math.floor(Math.random() * 6);
 }
+
+/**
+ * fromId から toId までの最短経路のマス数をBFSで求める。あくまで案内表示用の情報で、
+ * 移動そのものには使わない(自動移動・最短強制はしない)。
+ * 所持カードが無いと通れない近道は除外して計算する(実際に辿れる距離と一致させるため)。
+ * 到達不能な場合はnullを返す。
+ */
+export function shortestDistance(map: MapData, fromId: string, toId: string, ownedCardIds: string[]): number | null {
+  if (fromId === toId) return 0;
+  const visited = new Set<string>([fromId]);
+  let frontier = [fromId];
+  let distance = 0;
+
+  while (frontier.length > 0) {
+    distance += 1;
+    const next: string[] = [];
+    for (const id of frontier) {
+      const node = getNode(map, id);
+      for (const edge of node.connections) {
+        if (edge.requiresCardId && !ownedCardIds.includes(edge.requiresCardId)) continue;
+        if (visited.has(edge.to)) continue;
+        if (edge.to === toId) return distance;
+        visited.add(edge.to);
+        next.push(edge.to);
+      }
+    }
+    frontier = next;
+  }
+  return null;
+}
