@@ -5,7 +5,17 @@ import type { MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
 import { NODE_STYLE } from "@/lib/game/mapStyle";
 import { useEditorStore } from "@/store/editorStore";
 
-const NODE_TYPE_OPTIONS: NodeType[] = ["normal", "money", "card", "property", "gasStation", "warp", "event"];
+const NODE_TYPE_OPTIONS: NodeType[] = [
+  "normal",
+  "money",
+  "moneyGain",
+  "moneyLoss",
+  "card",
+  "property",
+  "gasStation",
+  "warp",
+  "event",
+];
 const ROAD_TYPE_OPTIONS: RoadType[] = ["national", "main", "coastal", "residential", "shortcut"];
 const ROAD_TYPE_LABEL: Record<RoadType, string> = {
   national: "国道",

@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { getPropertyDef } from "@/data/properties";
 import { getNode } from "@/lib/game/mapGraph";
+import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
 import { Board } from "./Board";
 import { Dice } from "./Dice";
-import { PlayerHud } from "./PlayerHud";
+import { GameHud } from "./GameHud";
+import { GameDrawer } from "./GameDrawer";
 import { PurchaseModal } from "./PurchaseModal";
+import { ArrivalModal } from "./ArrivalModal";
 import { GameOverModal } from "./GameOverModal";
-import { EventLog } from "./EventLog";
 import { StartScreen } from "./StartScreen";
-import { formatMoney } from "@/lib/format";
 
 const STEP_ANIMATION_MS = 460;
 
@@ -29,6 +30,7 @@ export function GameScreen() {
   const pendingDoubleMove = useGameStore((s) => s.pendingDoubleMove);
   const routeOptions = useGameStore((s) => s.routeOptions);
   const pendingPropertyId = useGameStore((s) => s.pendingPropertyId);
+  const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
 
@@ -40,6 +42,9 @@ export function GameScreen() {
   const buyProperty = useGameStore((s) => s.buyProperty);
   const skipProperty = useGameStore((s) => s.skipProperty);
   const useCard = useGameStore((s) => s.useCard);
+  const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const currentPlayer = players[currentPlayerIndex];
 
@@ -54,96 +59,102 @@ export function GameScreen() {
   }, [status, remainingMoves, currentPlayer?.currentNodeId]);
 
   if (status === "waiting") {
-    return <StartScreen onStart={(names) => startGame(names)} />;
+    return <StartScreen onStart={(names, totalYears) => startGame(names, totalYears)} />;
   }
 
   const map = getMap(mapId);
   const destinationNode = getNode(map, destinationNodeId);
   const pendingProperty = pendingPropertyId ? getPropertyDef(pendingPropertyId) : undefined;
+  const calendar = getCalendar(turn);
+  const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-3 p-3 sm:p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-lg font-black text-slate-800 dark:text-white">湘南すごろく</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {turn}/{totalTurns}ターン ・ 目的地: 🎯 {destinationNode.name}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm("ゲームを終了して最初からやり直しますか?")) resetGame();
-          }}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-600 dark:text-slate-300"
-        >
-          リセット
-        </button>
-      </header>
+    <div className="relative h-dvh w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
+      <div className="absolute inset-0">
+        <Board
+          map={map}
+          players={players}
+          currentPlayerIndex={currentPlayerIndex}
+          destinationNodeId={destinationNodeId}
+          routeOptions={routeOptions}
+          onSelectRoute={chooseRoute}
+        />
+      </div>
 
-      <Board
-        map={map}
-        players={players}
-        currentPlayerIndex={currentPlayerIndex}
-        destinationNodeId={destinationNodeId}
-        routeOptions={routeOptions}
-        onSelectRoute={chooseRoute}
+      <GameHud
+        currentPlayerName={currentPlayer?.name ?? ""}
+        currentPlayerColor={currentPlayer?.color ?? "#94a3b8"}
+        destinationName={destinationNode.name}
+        calendarText={`${calendar.year}年目 ${calendar.month}月`}
+        onOpenDrawer={() => setDrawerOpen(true)}
       />
 
       {status === "selectingRoute" && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:bg-amber-400/10">
-          <p className="mb-2 text-sm font-bold text-amber-700 dark:text-amber-300">
-            分岐点です。進む道を選んでください(地図をタップしてもOK)
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {routeOptions.map((opt) => (
-              <button
-                key={opt.nodeId}
-                type="button"
-                onClick={() => chooseRoute(opt.nodeId)}
-                className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-bold text-white shadow-sm active:scale-95"
-              >
-                {opt.nodeName} へ
-              </button>
-            ))}
+        <div className="pointer-events-none absolute inset-x-3 top-14 z-20 flex justify-center sm:top-16">
+          <div className="pointer-events-auto w-full max-w-md rounded-xl border border-amber-300 bg-amber-50/95 p-3 shadow-lg backdrop-blur-sm dark:bg-amber-950/90">
+            <p className="mb-2 text-sm font-bold text-amber-700 dark:text-amber-300">
+              分岐点です。進む道を選んでください(地図をタップしてもOK)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {routeOptions.map((opt) => (
+                <button
+                  key={opt.nodeId}
+                  type="button"
+                  onClick={() => chooseRoute(opt.nodeId)}
+                  className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-bold text-white shadow-sm active:scale-95"
+                >
+                  {opt.nodeName} へ
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-        {players.map((player, i) => (
-          <PlayerHud
-            key={player.id}
-            player={player}
-            isActive={i === currentPlayerIndex}
-            canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null}
-            onUseCard={useCard}
-          />
-        ))}
-      </div>
-
-      <div className="flex items-center justify-center gap-4 rounded-xl border border-black/10 bg-white/60 p-3 dark:bg-slate-800/50">
+      <div className="fixed bottom-5 left-1/2 z-20 -translate-x-1/2 sm:bottom-6">
         <Dice
           diceResult={status === "moving" ? diceResult : null}
           canRoll={status === "rolling" && diceResult === null}
           doubleArmed={pendingDoubleMove}
           onRoll={rollDice}
         />
-        <div className="text-sm text-slate-600 dark:text-slate-300">
-          <p className="font-bold">{currentPlayer?.name}さんの番</p>
-          {status === "moving" && remainingMoves > 0 && <p>残り {remainingMoves} マス</p>}
-          <p className="mt-1 text-xs text-slate-400">目的地ボーナス +{formatMoney(300)}</p>
-        </div>
+        {status === "moving" && remainingMoves > 0 && (
+          <p className="mt-1 text-center text-xs font-bold text-slate-600 drop-shadow-sm dark:text-slate-300">
+            残り {remainingMoves} マス
+          </p>
+        )}
       </div>
 
-      <EventLog log={log} />
+      <GameDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        players={players}
+        currentPlayerIndex={currentPlayerIndex}
+        status={status}
+        diceResult={diceResult}
+        onUseCard={useCard}
+        destinationName={destinationNode.name}
+        year={calendar.year}
+        month={calendar.month}
+        totalYears={totalYears}
+        turn={turn}
+        totalTurns={totalTurns}
+        log={log}
+        onReset={() => {
+          if (window.confirm("ゲームを終了して最初からやり直しますか?")) resetGame();
+        }}
+      />
 
       {status === "purchaseOffer" && pendingProperty && currentPlayer && (
         <PurchaseModal property={pendingProperty} player={currentPlayer} onBuy={buyProperty} onSkip={skipProperty} />
       )}
 
+      {status === "destinationArrived" && arrivalInfo && (
+        <ArrivalModal arrivalInfo={arrivalInfo} onContinue={continueAfterArrival} />
+      )}
+
       {status === "finished" && winnerIds && (
-        <GameOverModal players={players} winnerIds={winnerIds} onRestart={resetGame} />
+        <GameOverModal players={players} winnerIds={winnerIds} totalYears={totalYears} onRestart={resetGame} />
       )}
     </div>
   );

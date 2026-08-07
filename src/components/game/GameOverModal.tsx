@@ -7,10 +7,11 @@ import { netWorth } from "@/lib/game/engine";
 interface GameOverModalProps {
   players: Player[];
   winnerIds: string[];
+  totalYears: number;
   onRestart: () => void;
 }
 
-export function GameOverModal({ players, winnerIds, onRestart }: GameOverModalProps) {
+export function GameOverModal({ players, winnerIds, totalYears, onRestart }: GameOverModalProps) {
   const ranked = [...players].sort((a, b) => netWorth(b) - netWorth(a));
   const isTie = winnerIds.length > 1;
   return (
@@ -20,7 +21,7 @@ export function GameOverModal({ players, winnerIds, onRestart }: GameOverModalPr
         <h2 className="mt-2 text-xl font-bold">
           {isTie ? "引き分け!" : `${players.find((p) => p.id === winnerIds[0])?.name}さんの勝ち!`}
         </h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">規定ターンが終了しました</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{totalYears}年間のプレイが終了しました</p>
 
         <ul className="mt-4 space-y-2 text-left">
           {ranked.map((p, i) => (

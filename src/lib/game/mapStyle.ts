@@ -3,6 +3,8 @@ import type { NodeType, RoadType } from "@/types/game";
 export const NODE_STYLE: Record<NodeType, { fill: string; stroke: string; icon: string; label: string }> = {
   normal: { fill: "#f5f1e6", stroke: "#9c9284", icon: "", label: "通常" },
   money: { fill: "#ffd166", stroke: "#e0a400", icon: "¥", label: "お金" },
+  moneyGain: { fill: "#7ab8f5", stroke: "#2f6fc9", icon: "+", label: "青(お金+)" },
+  moneyLoss: { fill: "#f28b82", stroke: "#c9392f", icon: "−", label: "赤(お金−)" },
   card: { fill: "#c9a4ff", stroke: "#8b5cf6", icon: "🎴", label: "カード" },
   property: { fill: "#ffadc6", stroke: "#e0447a", icon: "🏠", label: "物件" },
   gasStation: { fill: "#8fd3c7", stroke: "#2ea896", icon: "⛽", label: "GS" },

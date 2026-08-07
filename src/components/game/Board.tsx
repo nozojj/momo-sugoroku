@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapData, MapDecoration, Player, RouteOption } from "@/types/game";
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
 import { getPropertyDef } from "@/data/properties";
+import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { CarToken } from "./CarToken";
 
 interface BoardProps {
@@ -16,6 +17,26 @@ interface BoardProps {
 }
 
 const PADDING = 80;
+
+/** スマホの初期ズーム倍率。全体を見渡すことより、マス/道路/プレイヤーの視認性を優先した値。
+ *  実機確認後はこの1箇所だけ変更すればよい。 */
+const MOBILE_INITIAL_ZOOM = 2.0;
+/** パン/ズームのCSSトランジション時間。CarTokenの移動アニメーション(420ms)と揃え、
+ *  カメラ追従が駒の移動に自然に同期して見えるようにする。 */
+const CAMERA_TRANSITION_MS = 420;
+
+type DragState =
+  | { kind: "pan"; startX: number; startY: number; startPan: { x: number; y: number } }
+  | {
+      kind: "pinch";
+      idA: number;
+      idB: number;
+      startDist: number;
+      startMidX: number;
+      startMidY: number;
+      startZoom: number;
+      startPan: { x: number; y: number };
+    };
 
 function smoothPathThroughPoints(points: { x: number; y: number }[]): string {
   if (points.length === 0) return "";
@@ -37,9 +58,13 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
   const [zoom, setZoom] = useState(0.55);
-  const dragState = useRef<{ startX: number; startY: number; startPan: { x: number; y: number } } | null>(null);
+  const dragState = useRef<DragState | null>(null);
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const [dragging, setDragging] = useState(false);
   const [debugClickPos, setDebugClickPos] = useState<{ x: number; y: number } | null>(null);
+  const isMobile = useIsMobileViewport();
+  /** falseの間はプレイヤー移動によるカメラ追従を止める(ユーザーが手動でマップを動かした場合)。 */
+  const autoFollowRef = useRef(true);
 
   const { width, height, edges } = useMemo(() => {
     const xs = map.nodes.map((n) => n.x);
@@ -71,33 +96,109 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     return Math.min(2.2, Math.max(0.08, z));
   }
 
-  // マップ全体(縦・横どちらの余白も余らせない側)が初回表示で画面内に収まるズームへ合わせる
+  // 初回表示のズーム/パン。PCはマップ全体が余白なく収まるズームへ、スマホは全体を見渡すことより
+  // マス・道路・プレイヤーの視認性を優先した固定ズームで現在プレイヤー周辺を映す。
   useEffect(() => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
-    const fitZoom = clampZoom(Math.min(rect.width / width, rect.height / height) * 0.94);
-    setZoom(fitZoom);
-    setPan({ x: (rect.width - width * fitZoom) / 2, y: (rect.height - height * fitZoom) / 2 });
+
+    if (isMobile) {
+      const mobileZoom = clampZoom(MOBILE_INITIAL_ZOOM);
+      const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
+      setZoom(mobileZoom);
+      setPan(
+        node
+          ? { x: rect.width / 2 - (node.x - minX) * mobileZoom, y: rect.height / 2 - (node.y - minY) * mobileZoom }
+          : { x: (rect.width - width * mobileZoom) / 2, y: (rect.height - height * mobileZoom) / 2 },
+      );
+    } else {
+      const fitZoom = clampZoom(Math.min(rect.width / width, rect.height / height) * 0.94);
+      setZoom(fitZoom);
+      setPan({ x: (rect.width - width * fitZoom) / 2, y: (rect.height - height * fitZoom) / 2 });
+    }
+    autoFollowRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map.id]);
+  }, [map.id, isMobile]);
+
+  // スマホ: プレイヤーが移動(または手番交代)したら、追従が有効な間だけカメラを追いかける。
+  // isMobileを依存に含めない: mobile判定が切り替わった瞬間は上の初期表示エフェクトが処理するので、
+  // ここで二重に発火すると(そちらのsetZoomがまだ反映されていない)古いzoomを使ってパンを計算してしまう。
+  useEffect(() => {
+    if (!isMobile || !autoFollowRef.current) return;
+    const node = nodeById.get(currentPlayer?.currentNodeId ?? "");
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!node || !rect) return;
+    setPan({ x: rect.width / 2 - (node.x - minX) * zoom, y: rect.height / 2 - (node.y - minY) * zoom });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPlayerIndex, currentPlayer?.currentNodeId]);
 
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragState.current = { startX: e.clientX, startY: e.clientY, startPan: pan };
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointersRef.current.size === 2) {
+      // 2本目の指が触れた: パン中でもピンチ操作へ切り替える
+      const ids = [...pointersRef.current.keys()];
+      const p1 = pointersRef.current.get(ids[0])!;
+      const p2 = pointersRef.current.get(ids[1])!;
+      dragState.current = {
+        kind: "pinch",
+        idA: ids[0],
+        idB: ids[1],
+        startDist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+        startMidX: (p1.x + p2.x) / 2,
+        startMidY: (p1.y + p2.y) / 2,
+        startZoom: zoom,
+        startPan: pan,
+      };
+      autoFollowRef.current = false;
+    } else if (pointersRef.current.size === 1) {
+      dragState.current = { kind: "pan", startX: e.clientX, startY: e.clientY, startPan: pan };
+    }
     setDragging(true);
   }
+
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragState.current) return;
-    const dx = e.clientX - dragState.current.startX;
-    const dy = e.clientY - dragState.current.startY;
-    setPan({ x: dragState.current.startPan.x + dx, y: dragState.current.startPan.y + dy });
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    const drag = dragState.current;
+    if (!drag) return;
+
+    if (drag.kind === "pan") {
+      autoFollowRef.current = false;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      setPan({ x: drag.startPan.x + dx, y: drag.startPan.y + dy });
+      return;
+    }
+
+    // ピンチ: 開始時の中点が指すゲーム座標を求め、今の中点の下に来るようズーム/パンを同時に更新する
+    // (開始時のスナップショットだけから毎回計算するので、フレームごとの誤差が蓄積しない)
+    const rect = containerRef.current?.getBoundingClientRect();
+    const p1 = pointersRef.current.get(drag.idA);
+    const p2 = pointersRef.current.get(drag.idB);
+    if (!rect || !p1 || !p2 || drag.startDist === 0) return;
+    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+    const targetZoom = clampZoom(drag.startZoom * (dist / drag.startDist));
+    const gameX = (drag.startMidX - rect.left - drag.startPan.x) / drag.startZoom;
+    const gameY = (drag.startMidY - rect.top - drag.startPan.y) / drag.startZoom;
+    setZoom(targetZoom);
+    setPan({ x: midX - rect.left - gameX * targetZoom, y: midY - rect.top - gameY * targetZoom });
   }
-  function onPointerUp() {
+
+  function onPointerUp(e: React.PointerEvent) {
+    pointersRef.current.delete(e.pointerId);
+    // 簡略化: ピンチ中に指が1本減ったら単指パンへ引き継がず、いったん操作をリセットする
     dragState.current = null;
-    setDragging(false);
+    setDragging(pointersRef.current.size > 0);
   }
+
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
+    autoFollowRef.current = false;
     setZoom((z) => clampZoom(z - e.deltaY * 0.0012));
   }
 
@@ -114,6 +215,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
     if (!node || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    autoFollowRef.current = true;
     setPan({
       x: rect.width / 2 - (node.x - minX) * zoom,
       y: rect.height / 2 - (node.y - minY) * zoom,
@@ -121,10 +223,10 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative h-full w-full">
       <div
         ref={containerRef}
-        className="relative h-[58vh] sm:h-[68vh] w-full overflow-hidden rounded-2xl border border-black/10 bg-linear-to-b from-sky-100 to-emerald-50 dark:from-slate-800 dark:to-slate-900 touch-none select-none"
+        className="relative h-full w-full overflow-hidden bg-linear-to-b from-sky-100 to-emerald-50 dark:from-slate-800 dark:to-slate-900 touch-none select-none"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -137,7 +239,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",
-            transition: dragging ? "none" : "transform 120ms ease-out",
+            transition: dragging ? "none" : `transform ${CAMERA_TRANSITION_MS}ms ease-out`,
           }}
         >
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -286,7 +388,10 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
       <div className="absolute right-3 bottom-3 flex flex-col gap-1.5">
         <button
           type="button"
-          onClick={() => setZoom((z) => clampZoom(z + 0.15))}
+          onClick={() => {
+            autoFollowRef.current = false;
+            setZoom((z) => clampZoom(z + 0.15));
+          }}
           className="h-9 w-9 rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white"
           aria-label="拡大"
         >
@@ -294,7 +399,10 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
         </button>
         <button
           type="button"
-          onClick={() => setZoom((z) => clampZoom(z - 0.15))}
+          onClick={() => {
+            autoFollowRef.current = false;
+            setZoom((z) => clampZoom(z - 0.15));
+          }}
           className="h-9 w-9 rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white"
           aria-label="縮小"
         >

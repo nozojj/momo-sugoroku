@@ -1,0 +1,35 @@
+"use client";
+
+interface GameHudProps {
+  currentPlayerName: string;
+  currentPlayerColor: string;
+  destinationName: string;
+  calendarText: string;
+  onOpenDrawer: () => void;
+}
+
+/** マップ上部に常時表示する最小限のHUD。手番・目的地・年月だけを見せる。 */
+export function GameHud({ currentPlayerName, currentPlayerColor, destinationName, calendarText, onOpenDrawer }: GameHudProps) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-white/75 px-3 py-2 backdrop-blur-sm dark:bg-slate-900/70 sm:px-4 sm:py-2.5">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs sm:text-sm">
+        <span className="flex min-w-0 items-center gap-1.5 font-bold text-slate-800 dark:text-white">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: currentPlayerColor }} />
+          <span className="truncate">{currentPlayerName}さんの番</span>
+        </span>
+        <span className="text-slate-300 dark:text-slate-600">・</span>
+        <span className="truncate text-slate-600 dark:text-slate-300">🎯 {destinationName}</span>
+        <span className="text-slate-300 dark:text-slate-600">・</span>
+        <span className="shrink-0 font-mono text-slate-500 dark:text-slate-400">{calendarText}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onOpenDrawer}
+        aria-label="メニューを開く"
+        className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white text-lg shadow-sm dark:border-white/10 dark:bg-slate-800 dark:text-white"
+      >
+        ☰
+      </button>
+    </div>
+  );
+}

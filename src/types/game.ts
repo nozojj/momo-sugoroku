@@ -8,12 +8,14 @@
 /** マスの種別 */
 export type NodeType =
   | "normal" // 通常マス
-  | "money" // お金増減マス
+  | "money" // お金増減マス(±混在の抽選。既存マスの互換のため残す)
+  | "moneyGain" // 青マス: 止まると所持金が増える(常にプラス)
+  | "moneyLoss" // 赤マス: 止まると所持金が減る(常にマイナス)
   | "card" // カード獲得マス
   | "property" // 物件購入スポット
   | "gasStation" // ガソリンスタンド(将来のガソリン制のための予約枠。MVPでは効果なし)
   | "warp" // ワープ地点(MVPでは未使用)
-  | "event"; // 渋滞・工事などの特殊マス
+  | "event"; // 渋滞・工事などの特殊マス(将来、季節・地域限定イベントに拡張する土台)
 
 /** 道路の種類。ルート選択の見た目・演出に使う。 */
 export type RoadType =
@@ -139,6 +141,7 @@ export type GameStatus =
   | "moving" // マスからマスへ移動アニメーション中
   | "resolvingEvent" // マスの効果を解決中(お金/カード/物件購入確認など)
   | "purchaseOffer" // 物件購入の確認待ち
+  | "destinationArrived" // 目的地到着演出中(ボーナス表示・次の目的地提示の確認待ち)
   | "finished"; // ゲーム終了
 
 /** 分岐地点で選べる進行先候補。 */
@@ -154,6 +157,16 @@ export interface LogEntry {
   id: string;
   turn: number;
   message: string;
+}
+
+/** status: "destinationArrived" のときに表示する到着演出の内容。 */
+export interface ArrivalInfo {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  destinationName: string;
+  bonus: number;
+  nextDestinationName: string;
 }
 
 export interface GameState {
@@ -175,6 +188,8 @@ export interface GameState {
   routeOptions: RouteOption[];
   /** purchaseOffer状態のときに提示している物件ID */
   pendingPropertyId: string | null;
+  /** destinationArrived状態のときに表示する到着演出の内容 */
+  arrivalInfo: ArrivalInfo | null;
   log: LogEntry[];
   winnerIds: string[] | null;
 }

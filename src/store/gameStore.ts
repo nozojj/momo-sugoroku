@@ -4,8 +4,8 @@ import type { GameState, Player, RouteOption } from "@/types/game";
 import { getMap, defaultMapId, maps } from "@/data/maps";
 import { getNode, getTraversableOptions, pickRandomDestination, rollDice as rollDiceValue } from "@/lib/game/mapGraph";
 import { getPropertyDef } from "@/data/properties";
-import { drawableCardIds, getCardDef } from "@/data/cards";
-import { moneyEventPool, localEventPool, drawFromPool } from "@/data/events";
+import { getCardDef } from "@/data/cards";
+import { resolveLandingOutcome } from "@/lib/game/landingEffects";
 import { createInitialState, makeLogId, computeWinnerIds, DESTINATION_BONUS, DEFAULT_TOTAL_TURNS } from "@/lib/game/engine";
 
 const IDLE_STATE: GameState = {
@@ -22,6 +22,7 @@ const IDLE_STATE: GameState = {
   status: "waiting",
   routeOptions: [],
   pendingPropertyId: null,
+  arrivalInfo: null,
   log: [],
   winnerIds: null,
 };
@@ -29,7 +30,7 @@ const IDLE_STATE: GameState = {
 interface GameStore extends GameState {
   /** ゲーム未開始 or 終了後の初期状態かどうか */
   hasActiveGame: () => boolean;
-  startGame: (playerNames: string[]) => void;
+  startGame: (playerNames: string[], totalYears: number) => void;
   resetGame: () => void;
   useCard: (cardId: string) => void;
   rollDice: () => void;
@@ -38,6 +39,8 @@ interface GameStore extends GameState {
   chooseRoute: (nodeId: string) => void;
   buyProperty: () => void;
   skipProperty: () => void;
+  /** 到着演出モーダルを閉じて次のプレイヤーへ手番を送る */
+  continueAfterArrival: () => void;
 }
 
 function currentPlayer(state: GameState): Player {
@@ -57,11 +60,12 @@ export const useGameStore = create<GameStore>()(
     (set, get) => {
       // --- 着地処理・ターン終了(クロージャでset/getを直接使う) ---
 
-      function checkDestinationArrival() {
+      /** 目的地に到着していたら、ボーナス付与・次の目的地抽選・到着演出への遷移まで行う。到着していたらtrueを返す。 */
+      function checkDestinationArrival(): boolean {
         const state = get();
         const map = getMap(state.mapId);
         const player = currentPlayer(state);
-        if (player.currentNodeId !== state.destinationNodeId) return;
+        if (player.currentNodeId !== state.destinationNodeId) return false;
 
         const arrivedNode = getNode(map, state.destinationNodeId);
         const playersAfterBonus = updatePlayer(state.players, player.id, (p) => ({
@@ -75,11 +79,21 @@ export const useGameStore = create<GameStore>()(
         set({
           players: playersAfterBonus,
           destinationNodeId: nextDestinationId,
+          status: "destinationArrived",
+          arrivalInfo: {
+            playerId: player.id,
+            playerName: player.name,
+            playerColor: player.color,
+            destinationName: arrivedNode.name,
+            bonus: DESTINATION_BONUS,
+            nextDestinationName: nextDestination.name,
+          },
           log: pushLog(
             state,
             `${player.name}さんが目的地「${arrivedNode.name}」に到着! ボーナス+${DESTINATION_BONUS}万円。次の目的地は「${nextDestination.name}」`,
           ),
         });
+        return true;
       }
 
       function endTurn() {
@@ -97,6 +111,9 @@ export const useGameStore = create<GameStore>()(
         }
 
         const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
+        // nextIndex === 0 は「全員が1回ずつ行動した」= turn(月)が進む瞬間。
+        // 将来ここに季節イベント抽選を、getCalendar(nextTurn).isYearStart が true の場合に
+        // 決算(年次の物件収益計算など)を差し込める。
         const nextTurn = nextIndex === 0 ? state.turn + 1 : state.turn;
 
         if (nextTurn > state.totalTurns) {
@@ -120,7 +137,8 @@ export const useGameStore = create<GameStore>()(
       }
 
       function finishLandingAndEndTurn() {
-        checkDestinationArrival();
+        // 到着していれば演出モーダルを表示して停止する。手番送りは continueAfterArrival() が行う。
+        if (checkDestinationArrival()) return;
         endTurn();
       }
 
@@ -129,67 +147,30 @@ export const useGameStore = create<GameStore>()(
         const map = getMap(state.mapId);
         const player = currentPlayer(state);
         const node = getNode(map, player.currentNodeId);
+        const outcome = resolveLandingOutcome({ state, map, node, player });
 
-        switch (node.type) {
+        switch (outcome.kind) {
           case "money": {
-            const ev = drawFromPool(moneyEventPool);
-            const players = updatePlayer(state.players, player.id, (p) => ({ ...p, money: p.money + ev.amount }));
-            set({
-              players,
-              status: "resolvingEvent",
-              log: pushLog(state, `${player.name}さん「${node.name}」: ${ev.message}(${ev.amount >= 0 ? "+" : ""}${ev.amount}万円)`),
-            });
-            finishLandingAndEndTurn();
-            return;
-          }
-          case "event": {
-            const ev = drawFromPool(localEventPool);
-            const players = updatePlayer(state.players, player.id, (p) => ({ ...p, money: p.money + ev.amount }));
-            set({
-              players,
-              status: "resolvingEvent",
-              log: pushLog(state, `${player.name}さん「${node.name}」: ${ev.message}(${ev.amount >= 0 ? "+" : ""}${ev.amount}万円)`),
-            });
+            const players = updatePlayer(state.players, player.id, (p) => ({ ...p, money: p.money + outcome.amount }));
+            set({ players, status: "resolvingEvent", log: pushLog(state, outcome.message) });
             finishLandingAndEndTurn();
             return;
           }
           case "card": {
-            const cardId = drawableCardIds[Math.floor(Math.random() * drawableCardIds.length)];
-            const def = getCardDef(cardId);
-            const players = updatePlayer(state.players, player.id, (p) => ({ ...p, cardIds: [...p.cardIds, cardId] }));
-            set({
-              players,
-              status: "resolvingEvent",
-              log: pushLog(state, `${player.name}さんがカード「${def?.name}」を手に入れた!`),
-            });
+            const players = updatePlayer(state.players, player.id, (p) => ({
+              ...p,
+              cardIds: [...p.cardIds, outcome.cardId],
+            }));
+            set({ players, status: "resolvingEvent", log: pushLog(state, outcome.message) });
             finishLandingAndEndTurn();
             return;
           }
-          case "property": {
-            const def = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
-            if (!def) {
-              set({ status: "resolvingEvent" });
-              finishLandingAndEndTurn();
-              return;
-            }
-            const owner = state.players.find((p) => p.ownedPropertyIds.includes(def.id));
-            if (!owner) {
-              set({ status: "purchaseOffer", pendingPropertyId: def.id });
-              return; // buyProperty/skipPropertyの操作待ち
-            }
-            const message =
-              owner.id === player.id
-                ? `${player.name}さん「${def.name}」: 自分の物件だ`
-                : `${player.name}さん「${def.name}」: ${owner.name}さんの物件だった`;
-            set({ status: "resolvingEvent", log: pushLog(state, message) });
-            finishLandingAndEndTurn();
-            return;
+          case "purchaseOffer": {
+            set({ status: "purchaseOffer", pendingPropertyId: outcome.propertyId });
+            return; // buyProperty/skipPropertyの操作待ち
           }
-          default: {
-            set({
-              status: "resolvingEvent",
-              log: pushLog(state, `${player.name}さんが「${node.name}」に到着`),
-            });
+          case "info": {
+            set({ status: "resolvingEvent", log: pushLog(state, outcome.message) });
             finishLandingAndEndTurn();
             return;
           }
@@ -204,8 +185,8 @@ export const useGameStore = create<GameStore>()(
           return s.status !== "waiting" && s.players.length > 0;
         },
 
-        startGame: (playerNames: string[]) => {
-          const initial = createInitialState(defaultMapId, playerNames);
+        startGame: (playerNames: string[], totalYears: number) => {
+          const initial = createInitialState(defaultMapId, playerNames, totalYears);
           set(initial);
         },
 
@@ -345,6 +326,13 @@ export const useGameStore = create<GameStore>()(
             log: pushLog(state, `${player.name}さんは購入を見送った`),
           });
           finishLandingAndEndTurn();
+        },
+
+        continueAfterArrival: () => {
+          const state = get();
+          if (state.status !== "destinationArrived") return;
+          set({ arrivalInfo: null });
+          endTurn();
         },
       };
     },

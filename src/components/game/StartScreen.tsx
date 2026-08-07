@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { MAX_PLAYERS, MIN_PLAYERS, PLAYER_COLORS, CAR_ICONS } from "@/lib/game/engine";
+import { MAX_PLAYERS, MIN_PLAYERS, PLAYER_COLORS, CAR_ICONS, YEAR_OPTIONS, DEFAULT_TOTAL_YEARS } from "@/lib/game/engine";
 
 interface StartScreenProps {
-  onStart: (names: string[]) => void;
+  onStart: (names: string[], totalYears: number) => void;
 }
 
 const DEFAULT_NAMES = ["プレイヤー1", "プレイヤー2", "プレイヤー3", "プレイヤー4"];
@@ -16,6 +16,7 @@ const PLAYER_COUNT_OPTIONS = Array.from(
 export function StartScreen({ onStart }: StartScreenProps) {
   const [playerCount, setPlayerCount] = useState<number>(MIN_PLAYERS);
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  const [totalYears, setTotalYears] = useState<number>(DEFAULT_TOTAL_YEARS);
 
   function setName(index: number, value: string) {
     setNames((prev) => prev.map((n, i) => (i === index ? value : n)));
@@ -25,7 +26,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
     const chosen = names
       .slice(0, playerCount)
       .map((n, i) => n.trim() || DEFAULT_NAMES[i]);
-    onStart(chosen);
+    onStart(chosen, totalYears);
   }
 
   return (
@@ -50,6 +51,24 @@ export function StartScreen({ onStart }: StartScreenProps) {
               }`}
             >
               {count}人
+            </button>
+          ))}
+        </div>
+
+        <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">プレイ年数を選択</h2>
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          {YEAR_OPTIONS.map((years) => (
+            <button
+              key={years}
+              type="button"
+              onClick={() => setTotalYears(years)}
+              className={`rounded-lg border py-2 text-sm font-bold transition ${
+                totalYears === years
+                  ? "border-slate-800 bg-slate-800 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                  : "border-slate-300 text-slate-500 dark:border-slate-500 dark:text-slate-300"
+              }`}
+            >
+              {years}年
             </button>
           ))}
         </div>

@@ -10,6 +10,22 @@ export const moneyEventPool: MoneyEventDef[] = [
   { id: "money_tire", message: "パンク修理でお金がかかった", amount: -60 },
 ];
 
+/** type: "moneyGain" (青マス) に止まったときの、常にプラスの収支イベント。 */
+export const moneyGainPool: MoneyEventDef[] = [
+  { id: "gain_coin", message: "道端で小銭を拾った!", amount: 30 },
+  { id: "gain_sale", message: "商店街のセールでお得に買い物できた", amount: 50 },
+  { id: "gain_bonus", message: "アルバイト代が入った", amount: 100 },
+  { id: "gain_gift", message: "地元の人からお土産をもらった", amount: 40 },
+];
+
+/** type: "moneyLoss" (赤マス) に止まったときの、常にマイナスの収支イベント。 */
+export const moneyLossPool: MoneyEventDef[] = [
+  { id: "loss_parking", message: "駐車違反の反則金を払った…", amount: -80 },
+  { id: "loss_lunch", message: "評判のランチにお金を使いすぎた", amount: -40 },
+  { id: "loss_tire", message: "パンク修理でお金がかかった", amount: -60 },
+  { id: "loss_toll", message: "うっかり有料道路に入ってしまった", amount: -30 },
+];
+
 /** type: "event" のマス(河畔ルートなど)に止まったときの、湘南らしいご当地イベント。 */
 export const localEventPool: MoneyEventDef[] = [
   {
