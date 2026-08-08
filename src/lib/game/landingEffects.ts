@@ -1,9 +1,10 @@
 import type { GameState, MapData, MapNode, MoneyEventDef, MoneyRouletteInfo, NodeType, Player } from "@/types/game";
 import { getPropertyDef } from "@/data/properties";
-import { drawableCardIds, getCardDef } from "@/data/cards";
+import { getDrawableCards } from "@/data/cards";
 import { moneyEventPool, localEventPool, drawFromPool } from "@/data/events";
 import { getCalendar } from "@/lib/game/engine";
 import { seasonalBaseAmount, generateRouletteCandidates, drawRouletteResult } from "@/lib/game/moneyRoulette";
+import { drawWeightedCard } from "@/lib/game/cardDraw";
 
 /**
  * マスに止まったときの効果を種別ごとに解決するレジストリ。
@@ -76,9 +77,8 @@ export const LANDING_HANDLERS: Partial<Record<NodeType, LandingHandler>> = {
   event: (ctx) => moneyOutcome(localEventPool, ctx),
 
   card: (ctx) => {
-    const cardId = drawableCardIds[Math.floor(Math.random() * drawableCardIds.length)];
-    const def = getCardDef(cardId);
-    return { kind: "card", cardId, message: `${ctx.player.name}さんがカード「${def?.name}」を手に入れた!` };
+    const def = drawWeightedCard(getDrawableCards());
+    return { kind: "card", cardId: def.id, message: `${ctx.player.name}さんがカード「${def.name}」を引いた!` };
   },
 
   property: (ctx) => {

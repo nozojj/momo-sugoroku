@@ -6,7 +6,15 @@ import { getNode, getTraversableOptions, pickRandomDestination, rollDice as roll
 import { getPropertyDef } from "@/data/properties";
 import { getCardDef } from "@/data/cards";
 import { resolveLandingOutcome } from "@/lib/game/landingEffects";
-import { createInitialState, makeLogId, computeWinnerIds, DESTINATION_BONUS, DEFAULT_TOTAL_TURNS } from "@/lib/game/engine";
+import { CARD_EFFECT_HANDLERS } from "@/lib/game/cardEffects";
+import {
+  createInitialState,
+  makeLogId,
+  computeWinnerIds,
+  DESTINATION_BONUS,
+  DEFAULT_TOTAL_TURNS,
+  MAX_CARDS_PER_PLAYER,
+} from "@/lib/game/engine";
 
 const IDLE_STATE: GameState = {
   mapId: defaultMapId,
@@ -24,6 +32,8 @@ const IDLE_STATE: GameState = {
   pendingPropertyId: null,
   arrivalInfo: null,
   moneyRouletteInfo: null,
+  cardDrawInfo: null,
+  cardOverflowInfo: null,
   log: [],
   winnerIds: null,
 };
@@ -46,6 +56,11 @@ interface GameStore extends GameState {
   continueAfterArrival: () => void;
   /** ルーレット演出モーダルを閉じて先の着地処理(到着判定・ターン送り)を続行する */
   continueAfterMoneyRoulette: () => void;
+  /** カード抽選演出モーダルを閉じ、所持枠に空きがあれば手札に加えて先の着地処理を続行する。
+   *  上限に達している場合はcardOverflow状態(整理画面)へ遷移し、ここでは停止する。 */
+  continueAfterCardDraw: () => void;
+  /** cardOverflow状態で、既存カードを1枚捨てて新カードを受け取るか、新カードを見送るかを確定する */
+  resolveCardOverflow: (decision: { discard: "newCard" } | { discard: "existing"; index: number }) => void;
 }
 
 function currentPlayer(state: GameState): Player {
@@ -174,13 +189,14 @@ export const useGameStore = create<GameStore>()(
             return; // continueAfterMoneyRoulette()待ち
           }
           case "card": {
-            const players = updatePlayer(state.players, player.id, (p) => ({
-              ...p,
-              cardIds: [...p.cardIds, outcome.cardId],
-            }));
-            set({ players, status: "resolvingEvent", log: pushLog(state, outcome.message) });
-            finishLandingAndEndTurn();
-            return;
+            // ここではまだcardIdsへ反映しない。所持上限を超えているかどうかで分岐する必要があるため、
+            // 確定処理はcontinueAfterCardDraw()(演出モーダルを閉じた後)にまとめて行う。
+            set({
+              status: "cardDraw",
+              cardDrawInfo: { playerId: player.id, playerName: player.name, cardId: outcome.cardId },
+              log: pushLog(state, outcome.message),
+            });
+            return; // continueAfterCardDraw()待ち
           }
           case "purchaseOffer": {
             set({ status: "purchaseOffer", pendingPropertyId: outcome.propertyId });
@@ -215,26 +231,16 @@ export const useGameStore = create<GameStore>()(
           const player = currentPlayer(state);
           if (!player.cardIds.includes(cardId)) return;
           const def = getCardDef(cardId);
-          if (!def || def.kind !== "usable") return;
+          if (!def || def.kind !== "usable" || !def.effect) return;
+          const handler = CARD_EFFECT_HANDLERS[def.effect];
+          if (!handler) return;
 
           const playersAfterUse = updatePlayer(state.players, player.id, (p) => ({
             ...p,
             cardIds: p.cardIds.filter((id) => id !== cardId),
           }));
-
-          if (def.effect === "doubleMove") {
-            set({
-              players: playersAfterUse,
-              pendingDoubleMove: true,
-              log: pushLog(state, `${player.name}さんが「${def.name}」を使った! 次の出目が2倍になる。`),
-            });
-          } else if (def.effect === "diceAgain") {
-            set({
-              players: playersAfterUse,
-              extraRollGranted: true,
-              log: pushLog(state, `${player.name}さんが「${def.name}」を使った! この手番の後、もう一度サイコロを振れる。`),
-            });
-          }
+          const result = handler({ state, player, def });
+          set({ players: playersAfterUse, ...result.statePatch, log: pushLog(state, result.logMessage) });
         },
 
         rollDice: () => {
@@ -399,6 +405,65 @@ export const useGameStore = create<GameStore>()(
           const state = get();
           if (state.status !== "moneyRoulette") return;
           set({ moneyRouletteInfo: null });
+          finishLandingAndEndTurn();
+        },
+
+        continueAfterCardDraw: () => {
+          const state = get();
+          if (state.status !== "cardDraw" || !state.cardDrawInfo) return;
+          const { playerId, playerName, cardId } = state.cardDrawInfo;
+          const player = state.players.find((p) => p.id === playerId);
+          if (!player) return;
+          const def = getCardDef(cardId);
+
+          if (player.cardIds.length < MAX_CARDS_PER_PLAYER) {
+            const players = updatePlayer(state.players, playerId, (p) => ({
+              ...p,
+              cardIds: [...p.cardIds, cardId],
+            }));
+            set({
+              players,
+              cardDrawInfo: null,
+              status: "resolvingEvent",
+              log: pushLog(state, `${playerName}さんがカード「${def?.name}」を手に入れた!`),
+            });
+            finishLandingAndEndTurn();
+            return;
+          }
+
+          // 所持上限に達している: 自動で捨てず、整理画面(cardOverflow)で選んでもらう。
+          set({
+            cardDrawInfo: null,
+            status: "cardOverflow",
+            cardOverflowInfo: { playerId, playerName, currentCardIds: player.cardIds, newCardId: cardId },
+          });
+        },
+
+        resolveCardOverflow: (decision) => {
+          const state = get();
+          if (state.status !== "cardOverflow" || !state.cardOverflowInfo) return;
+          const { playerId, playerName, currentCardIds, newCardId } = state.cardOverflowInfo;
+
+          let finalCardIds: string[];
+          let logMessage: string;
+
+          if (decision.discard === "newCard") {
+            finalCardIds = currentCardIds;
+            logMessage = `${playerName}さんは「${getCardDef(newCardId)?.name}」を見送り、手札を維持した`;
+          } else {
+            const discardedId = currentCardIds[decision.index];
+            if (discardedId === undefined) return;
+            finalCardIds = currentCardIds.map((id, i) => (i === decision.index ? newCardId : id));
+            logMessage = `${playerName}さんは「${getCardDef(discardedId)?.name}」を手放し、「${getCardDef(newCardId)?.name}」を手に入れた`;
+          }
+
+          const players = updatePlayer(state.players, playerId, (p) => ({ ...p, cardIds: finalCardIds }));
+          set({
+            players,
+            cardOverflowInfo: null,
+            status: "resolvingEvent",
+            log: pushLog(state, logMessage),
+          });
           finishLandingAndEndTurn();
         },
       };

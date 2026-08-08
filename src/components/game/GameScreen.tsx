@@ -14,6 +14,8 @@ import { RouteChoiceOverlay } from "./RouteChoiceOverlay";
 import { PurchaseModal } from "./PurchaseModal";
 import { ArrivalModal } from "./ArrivalModal";
 import { MoneyRouletteModal } from "./MoneyRouletteModal";
+import { CardDrawModal } from "./CardDrawModal";
+import { CardOverflowModal } from "./CardOverflowModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
@@ -34,6 +36,8 @@ export function GameScreen() {
   const pendingPropertyId = useGameStore((s) => s.pendingPropertyId);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const moneyRouletteInfo = useGameStore((s) => s.moneyRouletteInfo);
+  const cardDrawInfo = useGameStore((s) => s.cardDrawInfo);
+  const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
 
@@ -48,6 +52,8 @@ export function GameScreen() {
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
   const continueAfterMoneyRoulette = useGameStore((s) => s.continueAfterMoneyRoulette);
+  const continueAfterCardDraw = useGameStore((s) => s.continueAfterCardDraw);
+  const resolveCardOverflow = useGameStore((s) => s.resolveCardOverflow);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -175,6 +181,18 @@ export function GameScreen() {
 
       {status === "moneyRoulette" && moneyRouletteInfo && (
         <MoneyRouletteModal info={moneyRouletteInfo} onContinue={continueAfterMoneyRoulette} />
+      )}
+
+      {status === "cardDraw" && cardDrawInfo && (
+        <CardDrawModal info={cardDrawInfo} onContinue={continueAfterCardDraw} />
+      )}
+
+      {status === "cardOverflow" && cardOverflowInfo && (
+        <CardOverflowModal
+          info={cardOverflowInfo}
+          onDiscardExisting={(index) => resolveCardOverflow({ discard: "existing", index })}
+          onKeepCurrentHand={() => resolveCardOverflow({ discard: "newCard" })}
+        />
       )}
 
       {status === "finished" && winnerIds && (

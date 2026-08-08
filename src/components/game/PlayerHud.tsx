@@ -4,6 +4,7 @@ import type { CardDef, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { netWorth } from "@/lib/game/engine";
 import { cardDefs } from "@/data/cards";
+import { RARITY_BADGE_CLASS } from "@/lib/game/cardDisplay";
 
 interface PlayerHudProps {
   player: Player;
@@ -58,13 +59,11 @@ export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHud
                 disabled={!usable}
                 onClick={() => usable && onUseCard(cardId)}
                 title={def.description}
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  usable
-                    ? "border-fuchsia-400 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-400/10 dark:text-fuchsia-200"
-                    : "border-slate-300 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${RARITY_BADGE_CLASS[def.rarity]} ${
+                  usable ? "ring-2 ring-fuchsia-400" : "opacity-70"
                 }`}
               >
-                {def.name}
+                {def.icon} {def.name}
               </button>
             );
           })}

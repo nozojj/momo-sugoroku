@@ -137,6 +137,9 @@ export interface PropertyDef {
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
 
+/** カードのレア度。抽選重みは data/cards.ts の RARITY_WEIGHT で定義する。 */
+export type CardRarity = "common" | "rare" | "superRare";
+
 export interface CardDef {
   id: string;
   name: string;
@@ -145,6 +148,11 @@ export interface CardDef {
   kind: "usable" | "key";
   /** kind: "usable" のときのみ使用 */
   effect?: CardEffectType;
+  rarity: CardRarity;
+  /** カード獲得演出・所持カード表示で使う絵文字アイコン。 */
+  icon: string;
+  /** カードマスの抽選対象にするか。省略時はtrue(裏道パスなど特別枠のカードのみfalseにする)。 */
+  drawable?: boolean;
 }
 
 /** お金増減マスで発生しうる事象。 */
@@ -183,6 +191,8 @@ export type GameStatus =
   | "purchaseOffer" // 物件購入の確認待ち
   | "destinationArrived" // 目的地到着演出中(ボーナス表示・次の目的地提示の確認待ち)
   | "moneyRoulette" // プラス/マイナスマスのルーレット演出中(確定額表示・次へ待ち)
+  | "cardDraw" // カードマスの抽選演出中(結果表示・自動で次へ)
+  | "cardOverflow" // 所持上限到達につき、捨てるカードの選択待ち(自動進行しない)
   | "finished"; // ゲーム終了
 
 /** 分岐地点で選べる進行先候補。 */
@@ -223,6 +233,25 @@ export interface MoneyRouletteInfo {
   candidates: number[];
 }
 
+/** status: "cardDraw" のときに表示する抽選演出の内容。確定済みのcardIdを持つ(まだplayer.cardIdsには未反映)。 */
+export interface CardDrawInfo {
+  playerId: string;
+  playerName: string;
+  cardId: string;
+}
+
+/** status: "cardOverflow" のときに表示する、カード整理画面の内容。
+ *  currentCardIdsのindexで「どの1枚を捨てるか」を指定できるようにし、同名カードの重複所持でも
+ *  1枚単位で選べるようにする。 */
+export interface CardOverflowInfo {
+  playerId: string;
+  playerName: string;
+  /** 抽選前から所持していたカード(上限に達している状態のもの) */
+  currentCardIds: string[];
+  /** 今回引いた新カード */
+  newCardId: string;
+}
+
 export interface GameState {
   mapId: string;
   players: Player[];
@@ -246,6 +275,10 @@ export interface GameState {
   arrivalInfo: ArrivalInfo | null;
   /** moneyRoulette状態のときに表示するルーレット演出の内容 */
   moneyRouletteInfo: MoneyRouletteInfo | null;
+  /** cardDraw状態のときに表示する抽選演出の内容 */
+  cardDrawInfo: CardDrawInfo | null;
+  /** cardOverflow状態のときに表示するカード整理画面の内容 */
+  cardOverflowInfo: CardOverflowInfo | null;
   log: LogEntry[];
   winnerIds: string[] | null;
 }

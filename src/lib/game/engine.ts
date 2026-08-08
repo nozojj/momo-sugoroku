@@ -10,6 +10,8 @@ export const PLAYER_COLOR_NAMES = ["赤", "青", "緑", "紫"];
 export const CAR_ICONS = ["🚗", "🚙", "🚕", "🚓"];
 export const STARTING_MONEY = 1500; // 万円
 export const DESTINATION_BONUS = 300; // 万円
+/** プレイヤー1人あたりのカード所持上限。超過分は整理画面(cardOverflow)で入れ替えを選ぶ。 */
+export const MAX_CARDS_PER_PLAYER = 8;
 
 /** ゲームカレンダー: 1ターン(全員が1回ずつ行動する1ラウンド)=1か月、4月始まり。 */
 export const MONTHS_PER_YEAR = 12;
@@ -95,6 +97,8 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     pendingPropertyId: null,
     arrivalInfo: null,
     moneyRouletteInfo: null,
+    cardDrawInfo: null,
+    cardOverflowInfo: null,
     log: [
       {
         id: makeLogId(),
