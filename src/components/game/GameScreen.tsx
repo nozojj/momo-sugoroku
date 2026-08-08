@@ -42,6 +42,7 @@ export function GameScreen() {
   const rollDice = useGameStore((s) => s.rollDice);
   const advanceStep = useGameStore((s) => s.advanceStep);
   const chooseRoute = useGameStore((s) => s.chooseRoute);
+  const stepBack = useGameStore((s) => s.stepBack);
   const buyProperty = useGameStore((s) => s.buyProperty);
   const skipProperty = useGameStore((s) => s.skipProperty);
   const useCard = useGameStore((s) => s.useCard);
@@ -75,6 +76,10 @@ export function GameScreen() {
     currentPlayer && (status === "moving" || status === "selectingRoute")
       ? shortestDistance(map, currentPlayer.currentNodeId, destinationNodeId, currentPlayer.cardIds)
       : null;
+  const backNodeId =
+    currentPlayer && currentPlayer.moveHistory.length >= 2
+      ? currentPlayer.moveHistory[currentPlayer.moveHistory.length - 2]
+      : null;
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
@@ -97,7 +102,9 @@ export function GameScreen() {
         calendarText={`${calendar.year}年目 ${calendar.month}月`}
         onOpenDrawer={() => setDrawerOpen(true)}
         movementInfo={
-          status === "moving" ? { remainingMoves, distanceToDestination } : undefined
+          status === "moving" || status === "selectingRoute"
+            ? { remainingMoves, distanceToDestination }
+            : undefined
         }
       />
 
@@ -109,6 +116,9 @@ export function GameScreen() {
           destinationNodeId={destinationNodeId}
           ownedCardIds={currentPlayer.cardIds}
           onSelectRoute={chooseRoute}
+          backNodeId={backNodeId}
+          remainingMovesAfterBack={remainingMoves + 1}
+          onStepBack={stepBack}
         />
       )}
 
@@ -123,6 +133,15 @@ export function GameScreen() {
           <p className="mt-1 text-center text-xs font-bold text-slate-600 drop-shadow-sm dark:text-slate-300">
             残り {remainingMoves} マス
           </p>
+        )}
+        {status === "moving" && backNodeId && (
+          <button
+            type="button"
+            onClick={stepBack}
+            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-full border border-slate-400 bg-white/90 px-3 py-1 text-xs font-bold text-slate-700 shadow-sm active:scale-95 dark:border-slate-500 dark:bg-slate-800/90 dark:text-slate-200"
+          >
+            ← 戻る(残り{remainingMoves + 1}マスに戻る)
+          </button>
         )}
       </div>
 

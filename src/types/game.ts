@@ -161,7 +161,11 @@ export interface Player {
   /** プレイヤーパネル表示用の車アイコン(絵文字)。MVPでは見た目の差別化程度の意味。 */
   carIcon: string;
   currentNodeId: string;
-  previousNodeId: string | null;
+  /**
+   * 今回のサイコロ移動で実際に通ったノードの履歴(移動開始地点を含む)。
+   * rollDice() のたびにリセットされる。stepBack() はこの末尾をpopして1マス戻す。
+   */
+  moveHistory: string[];
   money: number;
   ownedPropertyIds: string[];
   cardIds: string[];

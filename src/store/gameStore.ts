@@ -38,6 +38,8 @@ interface GameStore extends GameState {
   /** 1マス分の移動判定を進める(分岐なら停止してroute選択待ちにする)。アニメーション後にUI側から呼ぶ。 */
   advanceStep: () => void;
   chooseRoute: (nodeId: string) => void;
+  /** 今回のサイコロ移動で直前に通ったマスへ1マス戻る(remainingMovesを1増やす)。移動開始地点より前へは戻れない。 */
+  stepBack: () => void;
   buyProperty: () => void;
   skipProperty: () => void;
   /** 到着演出モーダルを閉じて次のプレイヤーへ手番を送る */
@@ -242,7 +244,12 @@ export const useGameStore = create<GameStore>()(
           const result = state.pendingDoubleMove ? raw * 2 : raw;
           const player = currentPlayer(state);
           const wasDoubled = state.pendingDoubleMove;
+          const players = updatePlayer(state.players, player.id, (p) => ({
+            ...p,
+            moveHistory: [p.currentNodeId],
+          }));
           set({
+            players,
             diceResult: raw,
             remainingMoves: result,
             pendingDoubleMove: false,
@@ -263,7 +270,9 @@ export const useGameStore = create<GameStore>()(
           }
 
           const node = getNode(map, player.currentNodeId);
-          const options = getTraversableOptions(node, player.previousNodeId, player.cardIds);
+          const prevId =
+            player.moveHistory.length >= 2 ? player.moveHistory[player.moveHistory.length - 2] : null;
+          const options = getTraversableOptions(node, prevId, player.cardIds);
 
           if (options.length === 0) {
             // 理論上発生しない(孤立ノードは無い)が、保険として着地処理へ。
@@ -275,7 +284,7 @@ export const useGameStore = create<GameStore>()(
             const to = options[0].to;
             const players = updatePlayer(state.players, player.id, (p) => ({
               ...p,
-              previousNodeId: p.currentNodeId,
+              moveHistory: [...p.moveHistory, to],
               currentNodeId: to,
             }));
             set({ players, remainingMoves: state.remainingMoves - 1 });
@@ -299,7 +308,7 @@ export const useGameStore = create<GameStore>()(
           const player = currentPlayer(state);
           const players = updatePlayer(state.players, player.id, (p) => ({
             ...p,
-            previousNodeId: p.currentNodeId,
+            moveHistory: [...p.moveHistory, nodeId],
             currentNodeId: nodeId,
           }));
           set({
@@ -307,6 +316,42 @@ export const useGameStore = create<GameStore>()(
             remainingMoves: state.remainingMoves - 1,
             status: "moving",
             routeOptions: [],
+          });
+        },
+
+        stepBack: () => {
+          const state = get();
+          if (state.status !== "moving" && state.status !== "selectingRoute") return;
+          const player = currentPlayer(state);
+          if (player.moveHistory.length < 2) return;
+
+          const newHistory = player.moveHistory.slice(0, -1);
+          const backTo = newHistory[newHistory.length - 1];
+          const players = updatePlayer(state.players, player.id, (p) => ({
+            ...p,
+            moveHistory: newHistory,
+            currentNodeId: backTo,
+          }));
+
+          // 戻った先で改めて前進候補を計算し、必ず選択待ち状態で停止する。
+          // ここでstatusを"moving"のままにすると、次の自動移動タイマーが即座に発火して
+          // 今しがた戻ったばかりの道をまた自動で進んでしまい、戻る操作が無意味になる。
+          const map = getMap(state.mapId);
+          const node = getNode(map, backTo);
+          const prevId = newHistory.length >= 2 ? newHistory[newHistory.length - 2] : null;
+          const options = getTraversableOptions(node, prevId, player.cardIds);
+          const routeOptions: RouteOption[] = options.map((edge) => ({
+            nodeId: edge.to,
+            nodeName: getNode(map, edge.to).name,
+            roadType: edge.roadType,
+            available: true,
+          }));
+
+          set({
+            players,
+            remainingMoves: state.remainingMoves + 1,
+            status: "selectingRoute",
+            routeOptions,
           });
         },
 
@@ -375,12 +420,18 @@ export const useGameStore = create<GameStore>()(
         const playersOk =
           !state.players ||
           state.players.every(
-            (p) => validNodeIds.has(p.currentNodeId) && (p.previousNodeId == null || validNodeIds.has(p.previousNodeId)),
+            (p) =>
+              validNodeIds.has(p.currentNodeId) &&
+              (p.moveHistory ?? []).every((id) => validNodeIds.has(id)),
           );
         if (!destOk || !playersOk) {
           return currentState;
         }
-        return { ...currentState, ...state };
+        // 旧セーブ(previousNodeIdのみ持ち、moveHistoryが無い)を読み込んだ場合のフォールバック。
+        const players = state.players?.map((p) =>
+          p.moveHistory && p.moveHistory.length > 0 ? p : { ...p, moveHistory: [p.currentNodeId] },
+        );
+        return { ...currentState, ...state, ...(players ? { players } : {}) };
       },
     },
   ),

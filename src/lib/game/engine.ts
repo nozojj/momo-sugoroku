@@ -66,7 +66,7 @@ export function createPlayer(id: string, name: string, colorIndex: number, start
     color: PLAYER_COLORS[colorIndex % PLAYER_COLORS.length],
     carIcon: CAR_ICONS[colorIndex % CAR_ICONS.length],
     currentNodeId: startNodeId,
-    previousNodeId: null,
+    moveHistory: [startNodeId],
     money: STARTING_MONEY,
     ownedPropertyIds: [],
     cardIds: [],

@@ -31,6 +31,11 @@ interface RouteChoiceOverlayProps {
   destinationNodeId: string;
   ownedCardIds: string[];
   onSelectRoute: (nodeId: string) => void;
+  /** 今回のサイコロ移動でここより前に戻れるノードID。移動開始地点まで戻り切っていればnull。 */
+  backNodeId: string | null;
+  /** 戻った場合の残りマス数(現在のremainingMoves + 1)。ボタンのラベル表示用。 */
+  remainingMovesAfterBack: number;
+  onStepBack: () => void;
 }
 
 export function RouteChoiceOverlay({
@@ -40,6 +45,9 @@ export function RouteChoiceOverlay({
   destinationNodeId,
   ownedCardIds,
   onSelectRoute,
+  backNodeId,
+  remainingMovesAfterBack,
+  onStepBack,
 }: RouteChoiceOverlayProps) {
   const decorated = useMemo<DecoratedOption[]>(() => {
     const current = getNode(map, currentNodeId);
@@ -60,6 +68,8 @@ export function RouteChoiceOverlay({
 
   const byDirection: Record<Direction, DecoratedOption[]> = { up: [], down: [], left: [], right: [] };
   for (const opt of decorated) byDirection[opt.direction].push(opt);
+
+  const backNodeName = backNodeId ? getNode(map, backNodeId).name : null;
 
   function renderButton(opt: DecoratedOption) {
     const isShortest = minDistance !== null && opt.distance === minDistance;
@@ -94,6 +104,17 @@ export function RouteChoiceOverlay({
         <p className="mb-2 text-center text-sm font-bold text-amber-700 dark:text-amber-300">
           分岐点です。進む道を選んでください(地図をタップしてもOK)
         </p>
+        {backNodeId && backNodeName && (
+          <button
+            type="button"
+            onClick={onStepBack}
+            className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm active:scale-95 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-200"
+          >
+            <span className="text-base font-black leading-none">← 戻る</span>
+            <span className="text-[10px] font-medium opacity-80">({backNodeName}へ)</span>
+            <span className="text-[10px] font-bold">残り{remainingMovesAfterBack}マスに戻る</span>
+          </button>
+        )}
         <div className="grid grid-cols-3 grid-rows-3 place-items-center gap-2">
           <div />
           <div className="flex flex-col gap-1.5">{byDirection.up.map(renderButton)}</div>
