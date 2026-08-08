@@ -4,6 +4,7 @@ import type { CardDef, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { netWorth } from "@/lib/game/engine";
 import { cardDefs } from "@/data/cards";
+import { getPropertyDef } from "@/data/properties";
 import { RARITY_BADGE_CLASS } from "@/lib/game/cardDisplay";
 
 interface PlayerHudProps {
@@ -45,6 +46,25 @@ export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHud
         <span>🏠 {player.ownedPropertyIds.length}件</span>
         <span>🎯 {player.destinationsReached}回到着</span>
       </div>
+
+      {player.ownedPropertyIds.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {player.ownedPropertyIds.map((propertyId) => {
+            const def = getPropertyDef(propertyId);
+            if (!def) return null;
+            return (
+              <span
+                key={propertyId}
+                title={`${def.category} / ${formatMoney(def.price)}`}
+                className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-500/50 dark:bg-emerald-400/10 dark:text-emerald-300"
+              >
+                {def.icon ? `${def.icon} ` : "🏠 "}
+                {def.name}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {player.cardIds.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">

@@ -94,11 +94,12 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     extraRollGranted: false,
     status: "rolling",
     routeOptions: [],
-    pendingPropertyId: null,
+    pendingPropertyGroupId: null,
     arrivalInfo: null,
     moneyRouletteInfo: null,
     cardDrawInfo: null,
     cardOverflowInfo: null,
+    settlementInfo: null,
     log: [
       {
         id: makeLogId(),

@@ -1,4 +1,4 @@
-import type { NodeType, PropertyDef, RoadType } from "@/types/game";
+import type { NodeType, PropertyDef, PropertyGroup, RoadType } from "@/types/game";
 
 export interface GeneratedNodeSpec {
   id: string;
@@ -7,7 +7,7 @@ export interface GeneratedNodeSpec {
   area: string;
   x: number;
   y: number;
-  propertyId?: string;
+  propertyGroupId?: string;
 }
 
 export interface GeneratedEdgeSpec {
@@ -15,6 +15,12 @@ export interface GeneratedEdgeSpec {
   to: string;
   roadType: RoadType;
   requiresCardId?: string;
+}
+
+/** 自動生成される物件・物件グループの受け皿。1件の生成物件につき1グループ(1:1)を作る。 */
+export interface GeneratedPropertyPool {
+  properties: PropertyDef[];
+  groups: PropertyGroup[];
 }
 
 function hashSeed(seed: string): number {
@@ -109,6 +115,28 @@ function generatedPropertyPrice(seed: number): number {
   return 300 + (seed % 8) * 50;
 }
 
+function generatedPropertyRevenueRate(seed: number): number {
+  // 8%〜15%のあいだで、種のばらつきで収益率をつける
+  return Math.round((0.08 + (seed % 8) * 0.01) * 100) / 100;
+}
+
+/** 自動生成の物件1件+それを1件だけ持つ物件グループ1件を作り、poolに積む。ノードのpropertyGroupIdを返す。 */
+function pushGeneratedProperty(pool: GeneratedPropertyPool, nodeId: string, name: string, area: string, seed: number): string {
+  const groupId = `${nodeId}_grp`;
+  const propertyId = `${nodeId}_prop`;
+  pool.groups.push({ id: groupId, name, region: area });
+  pool.properties.push({
+    id: propertyId,
+    name,
+    category: SHOP_CATEGORIES[seed % SHOP_CATEGORIES.length],
+    price: generatedPropertyPrice(seed),
+    assetValue: generatedPropertyPrice(seed),
+    groupId,
+    revenueRate: generatedPropertyRevenueRate(seed),
+  });
+  return groupId;
+}
+
 interface WindingFillerOptions {
   /** 生成するマスの数(始点・終点は含まない) */
   count: number;
@@ -134,7 +162,7 @@ export function windingFiller(
   from: { id: string; x: number; y: number },
   to: { id: string; x: number; y: number },
   opts: WindingFillerOptions,
-  generatedProperties: PropertyDef[],
+  propertyPool: GeneratedPropertyPool,
 ): { nodes: GeneratedNodeSpec[]; edges: GeneratedEdgeSpec[] } {
   const nodes: GeneratedNodeSpec[] = [];
   const edges: GeneratedEdgeSpec[] = [];
@@ -160,20 +188,9 @@ export function windingFiller(
     const type = opts.plain ? "normal" : pickFillerType(seed);
     const id = `${opts.idPrefix}_${i}`;
     const name = fillerName(type, opts.area, seed);
-    let propertyId: string | undefined;
-    if (type === "property") {
-      propertyId = `${id}_prop`;
-      generatedProperties.push({
-        id: propertyId,
-        name,
-        category: SHOP_CATEGORIES[seed % SHOP_CATEGORIES.length],
-        price: generatedPropertyPrice(seed),
-        assetValue: generatedPropertyPrice(seed),
-        area: opts.area,
-      });
-    }
+    const propertyGroupId = type === "property" ? pushGeneratedProperty(propertyPool, id, name, opts.area, seed) : undefined;
 
-    nodes.push({ id, name, type, area: opts.area, x, y, propertyId });
+    nodes.push({ id, name, type, area: opts.area, x, y, propertyGroupId });
     edges.push({ from: prevId, to: id, roadType: opts.roadType, requiresCardId: opts.requiresCardId });
     prevId = id;
   }
@@ -208,7 +225,7 @@ export function chainWithBranches(
   from: { id: string; x: number; y: number },
   to: { id: string; x: number; y: number },
   opts: ChainWithBranchesOptions,
-  generatedProperties: PropertyDef[],
+  propertyPool: GeneratedPropertyPool,
 ): { nodes: GeneratedNodeSpec[]; edges: GeneratedEdgeSpec[] } {
   const nodes: GeneratedNodeSpec[] = [];
   const edges: GeneratedEdgeSpec[] = [];
@@ -242,13 +259,13 @@ export function chainWithBranches(
       prev,
       junction,
       { count: armA, roadType: opts.roadTypeA ?? "coastal", area: opts.area, idPrefix: `${opts.idPrefix}_a${k}`, bias: forkBias },
-      generatedProperties,
+      propertyPool,
     );
     const resB = windingFiller(
       prev,
       junction,
       { count: armB, roadType: opts.roadTypeB ?? "main", area: opts.area, idPrefix: `${opts.idPrefix}_b${k}`, bias: -forkBias },
-      generatedProperties,
+      propertyPool,
     );
 
     nodes.push(...resA.nodes, ...resB.nodes);
@@ -259,7 +276,7 @@ export function chainWithBranches(
   }
 
   const tailCount = Math.max(2, Math.round(spacing / 2));
-  const tail = windingFiller(prev, to, { count: tailCount, roadType: opts.roadTypeB ?? "main", area: opts.area, idPrefix: `${opts.idPrefix}_tail` }, generatedProperties);
+  const tail = windingFiller(prev, to, { count: tailCount, roadType: opts.roadTypeB ?? "main", area: opts.area, idPrefix: `${opts.idPrefix}_tail` }, propertyPool);
   nodes.push(...tail.nodes);
   edges.push(...tail.edges);
 
@@ -280,7 +297,7 @@ export interface RotarySpurSpec {
   length: number;
   roadType: RoadType;
   /** 行き止まりの終点マス(実在ランドマークなど)。省略時は生成される通常の枝道マスで終わる。 */
-  end?: { name: string; propertyId: string; icon?: string };
+  end?: { name: string; propertyGroupId: string; icon?: string };
 }
 
 /** 外周ロータリーの内側にもう1周作る、小さな内周ロータリー(裏通り)の指定。 */
@@ -321,7 +338,7 @@ export interface RotaryTownOptions {
 export function buildRotaryTown(
   center: { x: number; y: number },
   opts: RotaryTownOptions,
-  generatedProperties: PropertyDef[],
+  propertyPool: GeneratedPropertyPool,
 ): {
   nodes: GeneratedNodeSpec[];
   edges: GeneratedEdgeSpec[];
@@ -390,19 +407,8 @@ export function buildRotaryTown(
     const seed = hashSeed(`${opts.idPrefix}-ring-${i}`);
     const type = pickFillerType(seed);
     const name = fillerName(type, opts.area, seed);
-    let propertyId: string | undefined;
-    if (type === "property") {
-      propertyId = `${id}_prop`;
-      generatedProperties.push({
-        id: propertyId,
-        name,
-        category: SHOP_CATEGORIES[seed % SHOP_CATEGORIES.length],
-        price: generatedPropertyPrice(seed),
-        assetValue: generatedPropertyPrice(seed),
-        area: opts.area,
-      });
-    }
-    nodes.push({ id, name, type, area: opts.area, x, y, propertyId });
+    const propertyGroupId = type === "property" ? pushGeneratedProperty(propertyPool, id, name, opts.area, seed) : undefined;
+    nodes.push({ id, name, type, area: opts.area, x, y, propertyGroupId });
   }
 
   // 環状路を一周つなぐ
@@ -426,14 +432,14 @@ export function buildRotaryTown(
       { id: originId, x: Math.round(originX), y: Math.round(originY) },
       { id: `${opts.idPrefix}_spurEnd_${idx}`, x: Math.round(outX), y: Math.round(outY) },
       { count: Math.max(0, spur.length - 1), roadType: spur.roadType, area: opts.area, idPrefix: `${opts.idPrefix}_spur${idx}` },
-      generatedProperties,
+      propertyPool,
     );
     nodes.push(...res.nodes);
     edges.push(...res.edges);
 
     const endId = `${opts.idPrefix}_spurEnd_${idx}`;
     if (spur.end) {
-      nodes.push({ id: endId, name: spur.end.name, type: "property", area: opts.area, x: Math.round(outX), y: Math.round(outY), propertyId: spur.end.propertyId });
+      nodes.push({ id: endId, name: spur.end.name, type: "property", area: opts.area, x: Math.round(outX), y: Math.round(outY), propertyGroupId: spur.end.propertyGroupId });
     } else {
       const seed = hashSeed(`${opts.idPrefix}-spurend-${idx}`);
       nodes.push({ id: endId, name: fillerName("normal", opts.area, seed), type: "normal", area: opts.area, x: Math.round(outX), y: Math.round(outY) });
@@ -457,19 +463,8 @@ export function buildRotaryTown(
       const seed = hashSeed(`${opts.idPrefix}-inner-${i}`);
       const type = pickFillerType(seed);
       const name = fillerName(type, opts.area, seed);
-      let propertyId: string | undefined;
-      if (type === "property") {
-        propertyId = `${id}_prop`;
-        generatedProperties.push({
-          id: propertyId,
-          name,
-          category: SHOP_CATEGORIES[seed % SHOP_CATEGORIES.length],
-          price: generatedPropertyPrice(seed),
-          assetValue: generatedPropertyPrice(seed),
-          area: opts.area,
-        });
-      }
-      nodes.push({ id, name, type, area: opts.area, x, y, propertyId });
+      const propertyGroupId = type === "property" ? pushGeneratedProperty(propertyPool, id, name, opts.area, seed) : undefined;
+      nodes.push({ id, name, type, area: opts.area, x, y, propertyGroupId });
     }
 
     // 内周を一周つなぐ(裏通りらしくresidential扱い)
@@ -504,7 +499,7 @@ export interface JunctionSpokeSpec {
   /** 他の街・道路とつなぐための出入口にする場合の名前。省略すると行き止まりになる。 */
   label?: string;
   /** 行き止まりを実在ランドマークなどの特別な場所にする場合。labelと同時指定はしない想定。 */
-  end?: { name: string; propertyId: string };
+  end?: { name: string; propertyGroupId: string };
 }
 
 export interface JunctionTownOptions {
@@ -525,7 +520,7 @@ export interface JunctionTownOptions {
 export function buildJunctionTown(
   center: { x: number; y: number },
   opts: JunctionTownOptions,
-  generatedProperties: PropertyDef[],
+  propertyPool: GeneratedPropertyPool,
 ): {
   nodes: GeneratedNodeSpec[];
   edges: GeneratedEdgeSpec[];
@@ -574,13 +569,13 @@ export function buildJunctionTown(
         requiresCardId: spoke.requiresCardId,
         wobble: Math.min(22, spoke.distance / (spoke.length + 1) * 0.35) * wobbleScale,
       },
-      generatedProperties,
+      propertyPool,
     );
     nodes.push(...res.nodes);
     edges.push(...res.edges);
 
     if (spoke.end) {
-      nodes.push({ id: endId, name: spoke.end.name, type: "property", area: opts.area, x: endX, y: endY, propertyId: spoke.end.propertyId });
+      nodes.push({ id: endId, name: spoke.end.name, type: "property", area: opts.area, x: endX, y: endY, propertyGroupId: spoke.end.propertyGroupId });
       spurEndNodeIds.push(endId);
     } else {
       const seed = hashSeed(`${opts.idPrefix}-sp${i}-end`);

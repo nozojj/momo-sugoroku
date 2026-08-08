@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
-import { getPropertyDef } from "@/data/properties";
 import { getNode, shortestDistance } from "@/lib/game/mapGraph";
 import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
 import { Board } from "./Board";
@@ -16,6 +15,7 @@ import { ArrivalModal } from "./ArrivalModal";
 import { MoneyRouletteModal } from "./MoneyRouletteModal";
 import { CardDrawModal } from "./CardDrawModal";
 import { CardOverflowModal } from "./CardOverflowModal";
+import { SettlementModal } from "./SettlementModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
@@ -33,11 +33,12 @@ export function GameScreen() {
   const remainingMoves = useGameStore((s) => s.remainingMoves);
   const pendingDoubleMove = useGameStore((s) => s.pendingDoubleMove);
   const routeOptions = useGameStore((s) => s.routeOptions);
-  const pendingPropertyId = useGameStore((s) => s.pendingPropertyId);
+  const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const moneyRouletteInfo = useGameStore((s) => s.moneyRouletteInfo);
   const cardDrawInfo = useGameStore((s) => s.cardDrawInfo);
   const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
+  const settlementInfo = useGameStore((s) => s.settlementInfo);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
 
@@ -48,12 +49,13 @@ export function GameScreen() {
   const chooseRoute = useGameStore((s) => s.chooseRoute);
   const stepBack = useGameStore((s) => s.stepBack);
   const buyProperty = useGameStore((s) => s.buyProperty);
-  const skipProperty = useGameStore((s) => s.skipProperty);
+  const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
   const continueAfterMoneyRoulette = useGameStore((s) => s.continueAfterMoneyRoulette);
   const continueAfterCardDraw = useGameStore((s) => s.continueAfterCardDraw);
   const resolveCardOverflow = useGameStore((s) => s.resolveCardOverflow);
+  const continueAfterSettlement = useGameStore((s) => s.continueAfterSettlement);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -75,7 +77,6 @@ export function GameScreen() {
 
   const map = getMap(mapId);
   const destinationNode = getNode(map, destinationNodeId);
-  const pendingProperty = pendingPropertyId ? getPropertyDef(pendingPropertyId) : undefined;
   const calendar = getCalendar(turn);
   const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
   const distanceToDestination =
@@ -171,8 +172,14 @@ export function GameScreen() {
         }}
       />
 
-      {status === "purchaseOffer" && pendingProperty && currentPlayer && (
-        <PurchaseModal property={pendingProperty} player={currentPlayer} onBuy={buyProperty} onSkip={skipProperty} />
+      {status === "purchaseOffer" && pendingPropertyGroupId && currentPlayer && (
+        <PurchaseModal
+          groupId={pendingPropertyGroupId}
+          player={currentPlayer}
+          players={players}
+          onBuy={buyProperty}
+          onFinish={finishPropertyShopping}
+        />
       )}
 
       {status === "destinationArrived" && arrivalInfo && (
@@ -193,6 +200,10 @@ export function GameScreen() {
           onDiscardExisting={(index) => resolveCardOverflow({ discard: "existing", index })}
           onKeepCurrentHand={() => resolveCardOverflow({ discard: "newCard" })}
         />
+      )}
+
+      {status === "settlement" && settlementInfo && (
+        <SettlementModal info={settlementInfo} onContinue={continueAfterSettlement} />
       )}
 
       {status === "finished" && winnerIds && (

@@ -1,5 +1,6 @@
 import type { GameState, MapData, MapNode, MoneyEventDef, MoneyRouletteInfo, NodeType, Player } from "@/types/game";
-import { getPropertyDef } from "@/data/properties";
+import { getPropertiesInGroup } from "@/data/properties";
+import { getPropertyGroupDef } from "@/data/propertyGroups";
 import { getDrawableCards } from "@/data/cards";
 import { moneyEventPool, localEventPool, drawFromPool } from "@/data/events";
 import { getCalendar } from "@/lib/game/engine";
@@ -29,7 +30,7 @@ export type LandingOutcome =
   | { kind: "money"; amount: number; message: string }
   | { kind: "moneyRoulette"; amount: number; message: string; rouletteInfo: Omit<MoneyRouletteInfo, "playerId" | "playerName"> }
   | { kind: "card"; cardId: string; message: string }
-  | { kind: "purchaseOffer"; propertyId: string }
+  | { kind: "propertyOffer"; groupId: string }
   | { kind: "info"; message: string };
 
 export type LandingHandler = (ctx: LandingContext) => LandingOutcome;
@@ -82,17 +83,13 @@ export const LANDING_HANDLERS: Partial<Record<NodeType, LandingHandler>> = {
   },
 
   property: (ctx) => {
-    const def = ctx.node.propertyId ? getPropertyDef(ctx.node.propertyId) : undefined;
-    if (!def) return { kind: "info", message: `${ctx.player.name}さんが「${ctx.node.name}」に到着` };
+    const group = ctx.node.propertyGroupId ? getPropertyGroupDef(ctx.node.propertyGroupId) : undefined;
+    if (!group) return { kind: "info", message: `${ctx.player.name}さんが「${ctx.node.name}」に到着` };
 
-    const owner = ctx.state.players.find((p) => p.ownedPropertyIds.includes(def.id));
-    if (!owner) return { kind: "purchaseOffer", propertyId: def.id };
+    const properties = getPropertiesInGroup(group.id);
+    if (properties.length === 0) return { kind: "info", message: `${ctx.player.name}さんが「${group.name}」に到着(物件未整備)` };
 
-    const message =
-      owner.id === ctx.player.id
-        ? `${ctx.player.name}さん「${def.name}」: 自分の物件だ`
-        : `${ctx.player.name}さん「${def.name}」: ${owner.name}さんの物件だった`;
-    return { kind: "info", message };
+    return { kind: "propertyOffer", groupId: group.id };
   },
 };
 

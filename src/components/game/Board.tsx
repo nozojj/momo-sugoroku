@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GameStatus, MapData, MapDecoration, Player, RouteOption } from "@/types/game";
+import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RouteOption } from "@/types/game";
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
-import { getPropertyDef } from "@/data/properties";
+import { getPropertiesInGroup } from "@/data/properties";
+import { getPropertyGroupDef } from "@/data/propertyGroups";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
 import { CarToken } from "./CarToken";
@@ -387,11 +388,12 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
             {/* マス */}
             {map.nodes.map((node) => {
               const style = NODE_STYLE[node.type];
-              const propDef = node.type === "property" && node.propertyId ? getPropertyDef(node.propertyId) : undefined;
-              const isLandmark = !!propDef?.isRealLandmark;
-              const fillColor = isLandmark ? LANDMARK_STYLE.fill : (ownerColor(node.propertyId, players) ?? style.fill);
+              const group = node.type === "property" && node.propertyGroupId ? getPropertyGroupDef(node.propertyGroupId) : undefined;
+              const groupProperties = group ? getPropertiesInGroup(group.id) : [];
+              const isLandmark = groupProperties.some((p) => p.isRealLandmark);
+              const fillColor = isLandmark ? LANDMARK_STYLE.fill : (groupOwnerColor(groupProperties, players) ?? style.fill);
               const strokeColor = isLandmark ? LANDMARK_STYLE.stroke : style.stroke;
-              const icon = propDef?.icon ?? style.icon;
+              const icon = group?.icon ?? style.icon;
               const isDestination = node.id === destinationNodeId;
               const isSelectable = selectableIds.has(node.id);
               const radius = node.isMajorHub ? lodRadius.hub : lodRadius.node;
@@ -447,9 +449,9 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
             {/* 建物(マス・道路とは独立した見た目レイヤー。低ズーム時はマスの色分けだけで十分見やすいので間引く) */}
             {zoom >= ZOOM_DETAIL_THRESHOLD &&
               map.nodes.map((node) => {
-                const propDef = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
+                const group = node.propertyGroupId ? getPropertyGroupDef(node.propertyGroupId) : undefined;
                 const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);
-                const building = resolveBuildingForNode(node, propDef, override);
+                const building = resolveBuildingForNode(node, group, override);
                 if (!building) return null;
                 return (
                   <BuildingSprite
@@ -622,8 +624,12 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
   return null;
 }
 
-function ownerColor(propertyId: string | undefined, players: Player[]): string | undefined {
-  if (!propertyId) return undefined;
-  const owner = players.find((p) => p.ownedPropertyIds.includes(propertyId));
-  return owner?.color;
+/** そのグループの全物件を1人のプレイヤーが買い切っているときだけ、そのプレイヤーの色を返す
+ *  (グループ独占の視覚的な先取り)。部分所有・未所有では通常色のまま。 */
+function groupOwnerColor(groupProperties: PropertyDef[], players: Player[]): string | undefined {
+  if (groupProperties.length === 0) return undefined;
+  for (const player of players) {
+    if (groupProperties.every((p) => player.ownedPropertyIds.includes(p.id))) return player.color;
+  }
+  return undefined;
 }

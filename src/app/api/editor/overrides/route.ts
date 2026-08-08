@@ -33,7 +33,7 @@ function isValidAddedNode(v: unknown): boolean {
     isFiniteNumber(n.y) &&
     isOptionalString(n.area) &&
     (n.type === undefined || (typeof n.type === "string" && NODE_TYPES.has(n.type))) &&
-    isOptionalString(n.propertyId) &&
+    isOptionalString(n.propertyGroupId) &&
     isOptionalBoolean(n.isDestinationCandidate) &&
     isOptionalBoolean(n.isMajorHub)
   );
@@ -52,7 +52,7 @@ function isValidModifiedNode(v: unknown): boolean {
     (p.type === undefined || (typeof p.type === "string" && NODE_TYPES.has(p.type))) &&
     isOptionalString(p.name) &&
     isOptionalString(p.area) &&
-    isOptionalString(p.propertyId) &&
+    isOptionalString(p.propertyGroupId) &&
     isOptionalBoolean(p.isDestinationCandidate) &&
     isOptionalBoolean(p.isMajorHub)
   );
@@ -92,9 +92,11 @@ function isValidCustomProperty(v: unknown): boolean {
     isNonEmptyString(p.category) &&
     isFiniteNumber(p.price) &&
     isFiniteNumber(p.assetValue) &&
-    isNonEmptyString(p.area) &&
+    isNonEmptyString(p.groupId) &&
+    isFiniteNumber(p.revenueRate) &&
     isOptionalString(p.icon) &&
-    isOptionalBoolean(p.isRealLandmark)
+    isOptionalBoolean(p.isRealLandmark) &&
+    (p.buildingType === undefined || (typeof p.buildingType === "string" && BUILDING_TYPES.has(p.buildingType)))
   );
 }
 

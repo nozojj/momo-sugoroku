@@ -10,7 +10,7 @@ import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
 import { useEditorStore, snapToGrid, type EditorMode } from "@/store/editorStore";
 import { InspectorPanel } from "./InspectorPanel";
 import { BuildingSprite } from "@/components/game/BuildingSprite";
-import { getPropertyDef } from "@/data/properties";
+import { getPropertyGroupDef } from "@/data/propertyGroups";
 
 const PADDING = 80;
 
@@ -162,7 +162,7 @@ export default function EditorPage() {
           return { from, to, roadType: conn.roadType, requiresCardId: conn.requiresCardId };
         })()
       : null;
-  const inspectedPropertyDef = inspectedNode?.propertyId ? getPropertyDef(inspectedNode.propertyId) : undefined;
+  const inspectedPropertyGroup = inspectedNode?.propertyGroupId ? getPropertyGroupDef(inspectedNode.propertyGroupId) : undefined;
   const inspectedBuildingOverride = inspectedNode
     ? overrides.buildingOverrides.find((o) => o.nodeId === inspectedNode.id)
     : undefined;
@@ -806,9 +806,9 @@ export default function EditorPage() {
                   const preview = dragPreview?.get(node.id);
                   const px = preview?.x ?? node.x;
                   const py = preview?.y ?? node.y;
-                  const propDef = node.propertyId ? getPropertyDef(node.propertyId) : undefined;
+                  const group = node.propertyGroupId ? getPropertyGroupDef(node.propertyGroupId) : undefined;
                   const override = overrides.buildingOverrides.find((o) => o.nodeId === node.id);
-                  const building = resolveBuildingForNode(node, propDef, override);
+                  const building = resolveBuildingForNode(node, group, override);
                   if (!building) return null;
                   return (
                     <BuildingSprite
@@ -857,7 +857,7 @@ export default function EditorPage() {
             edge={inspectedEdge}
             isStartNode={inspectedNode?.id === map.startNodeId}
             existingAreas={existingAreas}
-            existingPropertyDef={inspectedPropertyDef}
+            existingPropertyGroup={inspectedPropertyGroup}
             existingBuildingOverride={inspectedBuildingOverride}
             onClose={() => {
               setSelection(new Set());

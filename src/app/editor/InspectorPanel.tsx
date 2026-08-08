@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { BuildingOverride, BuildingType, MapNode, NodeType, PropertyDef, RoadType } from "@/types/game";
+import type { BuildingOverride, BuildingType, MapNode, NodeType, PropertyGroup, RoadType } from "@/types/game";
 import { NODE_STYLE } from "@/lib/game/mapStyle";
 import { BUILDING_TYPE_LABEL, BUILDING_TYPE_OPTIONS, inferBuildingType, defaultBuildingOffset } from "@/lib/game/buildingStyle";
+import { propertyGroupDefs } from "@/data/propertyGroups";
 import { useEditorStore } from "@/store/editorStore";
 
 const POSITION_STEP = 4;
@@ -40,7 +41,7 @@ interface Props {
   edge: SelectedEdgeInfo | null;
   isStartNode: boolean;
   existingAreas: string[];
-  existingPropertyDef: PropertyDef | undefined;
+  existingPropertyGroup: PropertyGroup | undefined;
   existingBuildingOverride: BuildingOverride | undefined;
   onClose: () => void;
 }
@@ -56,13 +57,12 @@ export function InspectorPanel({
   edge,
   isStartNode,
   existingAreas,
-  existingPropertyDef,
+  existingPropertyGroup,
   existingBuildingOverride,
   onClose,
 }: Props) {
   const updateNode = useEditorStore((s) => s.updateNode);
   const updateEdge = useEditorStore((s) => s.updateEdge);
-  const upsertCustomProperty = useEditorStore((s) => s.upsertCustomProperty);
   const upsertBuildingOverride = useEditorStore((s) => s.upsertBuildingOverride);
   const removeBuildingOverride = useEditorStore((s) => s.removeBuildingOverride);
   const setStartNode = useEditorStore((s) => s.setStartNode);
@@ -70,34 +70,14 @@ export function InspectorPanel({
 
   const [name, setName] = useState(node?.name ?? "");
   const [area, setArea] = useState(node?.area ?? "");
-  const [propName, setPropName] = useState(existingPropertyDef?.name ?? "");
-  const [propCategory, setPropCategory] = useState(existingPropertyDef?.category ?? "");
-  const [propPrice, setPropPrice] = useState(String(existingPropertyDef?.price ?? 500));
 
   useEffect(() => {
     setName(node?.name ?? "");
     setArea(node?.area ?? "");
-    setPropName(existingPropertyDef?.name ?? "");
-    setPropCategory(existingPropertyDef?.category ?? "");
-    setPropPrice(String(existingPropertyDef?.price ?? 500));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node?.id, edge]);
 
   if (!node && !edge) return null;
-
-  function commitPropertyDef(nodeId: string, patch: Partial<Pick<PropertyDef, "name" | "category" | "price">>) {
-    const price = patch.price ?? existingPropertyDef?.price ?? 500;
-    const def: PropertyDef = {
-      id: `${nodeId}_prop`,
-      name: patch.name ?? existingPropertyDef?.name ?? "新しい物件",
-      category: patch.category ?? existingPropertyDef?.category ?? "その他",
-      price,
-      assetValue: price,
-      area: node?.area || "エディタ物件",
-    };
-    upsertCustomProperty(def);
-    if (node?.propertyId !== def.id) updateNode(nodeId, { propertyId: def.id });
-  }
 
   return (
     <div className="absolute right-3 top-3 bottom-16 w-72 overflow-y-auto rounded-xl border border-black/10 bg-white/95 p-4 shadow-lg backdrop-blur dark:bg-slate-900/95 dark:border-white/10">
@@ -127,7 +107,7 @@ export function InspectorPanel({
               value={node.type}
               onChange={(e) => {
                 const type = e.target.value as NodeType;
-                updateNode(node.id, { type, propertyId: type === "property" ? node.propertyId : undefined });
+                updateNode(node.id, { type, propertyGroupId: type === "property" ? node.propertyGroupId : undefined });
               }}
             >
               {NODE_TYPE_OPTIONS.map((t) => (
@@ -175,41 +155,25 @@ export function InspectorPanel({
 
           {node.type === "property" && (
             <div className="rounded-lg border border-pink-200 bg-pink-50/60 p-3 dark:border-pink-900 dark:bg-pink-950/30">
-              <p className="mb-2 text-xs font-semibold text-pink-700 dark:text-pink-300">物件の設定</p>
-              <div className="flex flex-col gap-2">
-                <div>
-                  <label className={labelCls}>物件名</label>
-                  <input
-                    className={inputCls}
-                    value={propName}
-                    onChange={(e) => setPropName(e.target.value)}
-                    onBlur={() => commitPropertyDef(node.id, { name: propName.trim() || "新しい物件" })}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>カテゴリ</label>
-                  <input
-                    className={inputCls}
-                    value={propCategory}
-                    onChange={(e) => setPropCategory(e.target.value)}
-                    onBlur={() => commitPropertyDef(node.id, { category: propCategory.trim() || "その他" })}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>価格(万円)</label>
-                  <input
-                    className={inputCls}
-                    type="number"
-                    min={0}
-                    step={10}
-                    value={propPrice}
-                    onChange={(e) => setPropPrice(e.target.value)}
-                    onBlur={() => {
-                      const n = Number(propPrice);
-                      commitPropertyDef(node.id, { price: Number.isFinite(n) && n >= 0 ? n : 500 });
-                    }}
-                  />
-                </div>
+              <p className="mb-2 text-xs font-semibold text-pink-700 dark:text-pink-300">物件グループの設定</p>
+              <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+                このマスに止まると、選んだグループに属する全物件が購入対象として一覧表示される。
+                グループの中身(物件の追加・編集)はdata/properties.ts・data/propertyGroups.tsを直接編集する。
+              </p>
+              <div>
+                <label className={labelCls}>物件グループ</label>
+                <select
+                  className={inputCls}
+                  value={node.propertyGroupId ?? ""}
+                  onChange={(e) => updateNode(node.id, { propertyGroupId: e.target.value || undefined })}
+                >
+                  <option value="">(未設定)</option>
+                  {propertyGroupDefs.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.region} / {g.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}
@@ -232,7 +196,7 @@ export function InspectorPanel({
                     <label className={labelCls}>建物タイプ</label>
                     <select
                       className={inputCls}
-                      value={existingBuildingOverride.buildingType ?? inferBuildingType(node, existingPropertyDef)}
+                      value={existingBuildingOverride.buildingType ?? inferBuildingType(node, existingPropertyGroup)}
                       onChange={(e) => upsertBuildingOverride(node.id, { buildingType: e.target.value as BuildingType })}
                     >
                       {BUILDING_TYPE_OPTIONS.map((t) => (
@@ -325,7 +289,7 @@ export function InspectorPanel({
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    自動推測: {BUILDING_TYPE_LABEL[inferBuildingType(node, existingPropertyDef)]}
+                    自動推測: {BUILDING_TYPE_LABEL[inferBuildingType(node, existingPropertyGroup)]}
                   </p>
                   <button
                     type="button"

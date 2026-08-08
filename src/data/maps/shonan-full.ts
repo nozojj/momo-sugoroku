@@ -4,9 +4,10 @@ import type {
   MapDecoration,
   NodeType,
   PropertyDef,
+  PropertyGroup,
   RoadType,
 } from "@/types/game";
-import { windingFiller } from "@/lib/game/mapBuilder";
+import { windingFiller, type GeneratedPropertyPool } from "@/lib/game/mapBuilder";
 
 /**
  * 湘南すごろく 全域マップ(地形反映・自然な広がり版)
@@ -139,9 +140,9 @@ import { windingFiller } from "@/lib/game/mapBuilder";
  * (buildRoad は windingFiller に plain: true を渡し、生成マスはすべて type: "normal")。
  *
  * ── 将来の拡張について ──
- * 駅・物件・イベント・カードマス: MapNode.type / propertyId は既存の型(src/types/game.ts)に
+ * 駅・物件・イベント・カードマス: MapNode.type / propertyGroupId は既存の型(src/types/game.ts)に
  *   すでにある(normal/money/card/property/event/gasStation/warp)。今は全マスをnormalで
- *   生成しているだけなので、後から特定ノードのtype・propertyIdを差し替えるだけで追加できる。
+ *   生成しているだけなので、後から特定ノードのtype・propertyGroupIdを差し替えるだけで追加できる。
  * フェリールート: RoadType(現状 national/main/coastal/residential/shortcut)に"ferry"を
  *   追加し、海沿いの2拠点間(例: 江の島⇄鎌倉)を直接結ぶ専用エッジとして生やせる。
  * ワープイベント: NodeType.warp がすでに定義済み(現状未使用)。対象ノードのtypeを
@@ -159,7 +160,7 @@ interface NodeSpec {
   area: string;
   x: number;
   y: number;
-  propertyId?: string;
+  propertyGroupId?: string;
   dest?: true;
   majorHub?: true;
 }
@@ -171,7 +172,7 @@ interface EdgeSpec {
   requiresCardId?: string;
 }
 
-const generatedProperties: PropertyDef[] = [];
+const generatedPropertyPool: GeneratedPropertyPool = { properties: [], groups: [] };
 const nodeSpecs: NodeSpec[] = [];
 const edgeSpecs: EdgeSpec[] = [];
 
@@ -242,7 +243,7 @@ function buildRoad(
     { id: a.id, x: a.x, y: a.y },
     { id: b.id, x: b.x, y: b.y },
     { count: spineCount, roadType, area, idPrefix, wobble, plain: true },
-    generatedProperties,
+    generatedPropertyPool,
   );
   for (const n of spine.nodes)
     nodeSpecs.push({
@@ -252,7 +253,7 @@ function buildRoad(
       area: n.area,
       x: n.x,
       y: n.y,
-      propertyId: n.propertyId,
+      propertyGroupId: n.propertyGroupId,
     });
   for (const e of spine.edges) edgeSpecs.push(e);
 
@@ -2994,6 +2995,7 @@ nudgeNode("bend40_bend", -1, 4);
 export function buildShonanFullMap(): {
   map: MapData;
   properties: PropertyDef[];
+  propertyGroups: PropertyGroup[];
 } {
   const nodeMap = new Map<string, MapNode>();
   for (const spec of nodeSpecs) {
@@ -3007,7 +3009,7 @@ export function buildShonanFullMap(): {
       x: spec.x,
       y: spec.y,
       connections: [],
-      propertyId: spec.propertyId,
+      propertyGroupId: spec.propertyGroupId,
       isDestinationCandidate: spec.dest,
       area: spec.area,
       isMajorHub: spec.majorHub,
@@ -3037,9 +3039,9 @@ export function buildShonanFullMap(): {
   const nodes = Array.from(nodeMap.values());
 
   for (const node of nodes) {
-    if (node.type === "property" && !node.propertyId) {
+    if (node.type === "property" && !node.propertyGroupId) {
       throw new Error(
-        `shonan-full map: property node "${node.id}" is missing propertyId`,
+        `shonan-full map: property node "${node.id}" is missing propertyGroupId`,
       );
     }
     if (node.connections.length === 0) {
@@ -3078,9 +3080,10 @@ export function buildShonanFullMap(): {
     decorations,
   };
 
-  return { map, properties: generatedProperties };
+  return { map, properties: generatedPropertyPool.properties, propertyGroups: generatedPropertyPool.groups };
 }
 
 const built = buildShonanFullMap();
 export const shonanFullMap: MapData = built.map;
 export const generatedPropertyDefs: PropertyDef[] = built.properties;
+export const generatedPropertyGroupDefs: PropertyGroup[] = built.propertyGroups;

@@ -17,13 +17,13 @@ export interface AddedNode {
   area?: string;
   /** 省略時は "normal" */
   type?: NodeType;
-  propertyId?: string;
+  propertyGroupId?: string;
   isDestinationCandidate?: boolean;
   isMajorHub?: boolean;
 }
 
 export type NodePatch = Partial<
-  Pick<MapNode, "type" | "name" | "area" | "propertyId" | "isDestinationCandidate" | "isMajorHub">
+  Pick<MapNode, "type" | "name" | "area" | "propertyGroupId" | "isDestinationCandidate" | "isMajorHub">
 >;
 
 export interface ModifiedNode {
@@ -154,7 +154,7 @@ export function applyMapOverrides(base: MapData, overrides: MapOverrides): MapDa
       y: an.y,
       connections: [],
       area: an.area,
-      propertyId: an.propertyId,
+      propertyGroupId: an.propertyGroupId,
       isDestinationCandidate: an.isDestinationCandidate,
       isMajorHub: an.isMajorHub,
     });

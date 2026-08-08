@@ -7,10 +7,12 @@ import { getPropertyDef } from "@/data/properties";
 import { getCardDef } from "@/data/cards";
 import { resolveLandingOutcome } from "@/lib/game/landingEffects";
 import { CARD_EFFECT_HANDLERS } from "@/lib/game/cardEffects";
+import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 import {
   createInitialState,
   makeLogId,
   computeWinnerIds,
+  getCalendar,
   DESTINATION_BONUS,
   DEFAULT_TOTAL_TURNS,
   MAX_CARDS_PER_PLAYER,
@@ -29,11 +31,12 @@ const IDLE_STATE: GameState = {
   extraRollGranted: false,
   status: "waiting",
   routeOptions: [],
-  pendingPropertyId: null,
+  pendingPropertyGroupId: null,
   arrivalInfo: null,
   moneyRouletteInfo: null,
   cardDrawInfo: null,
   cardOverflowInfo: null,
+  settlementInfo: null,
   log: [],
   winnerIds: null,
 };
@@ -50,8 +53,11 @@ interface GameStore extends GameState {
   chooseRoute: (nodeId: string) => void;
   /** 今回のサイコロ移動で直前に通ったマスへ1マス戻る(remainingMovesを1増やす)。移動開始地点より前へは戻れない。 */
   stepBack: () => void;
-  buyProperty: () => void;
-  skipProperty: () => void;
+  /** 指定した物件を購入する。購入後もstatusはpurchaseOfferのままにし、同じグループの
+   *  別の物件を続けて購入できるようにする(ターンは終えない)。 */
+  buyProperty: (propertyId: string) => void;
+  /** 物件購入画面を閉じ、着地処理を続行してターンを終える */
+  finishPropertyShopping: () => void;
   /** 到着演出モーダルを閉じて次のプレイヤーへ手番を送る */
   continueAfterArrival: () => void;
   /** ルーレット演出モーダルを閉じて先の着地処理(到着判定・ターン送り)を続行する */
@@ -61,6 +67,8 @@ interface GameStore extends GameState {
   continueAfterCardDraw: () => void;
   /** cardOverflow状態で、既存カードを1枚捨てて新カードを受け取るか、新カードを見送るかを確定する */
   resolveCardOverflow: (decision: { discard: "newCard" } | { discard: "existing"; index: number }) => void;
+  /** 決算演出モーダルを閉じて次のプレイヤーへ手番を送る(必要なら年またぎ) */
+  continueAfterSettlement: () => void;
 }
 
 function currentPlayer(state: GameState): Player {
@@ -116,24 +124,49 @@ export const useGameStore = create<GameStore>()(
         return true;
       }
 
-      function endTurn() {
+      /**
+       * 全員が1回ずつ行動して年度が変わる瞬間(3月終了→4月開始)なら決算を行い、
+       * status: "settlement" へ遷移してtrueを返す(この場合、手番送りはcontinueAfterSettlement()が行う)。
+       * 年度が変わらない、またはゲーム終了判定に入る場合はfalseを返し、呼び出し側の通常進行に任せる。
+       */
+      function applySettlementIfNeeded(): boolean {
         const state = get();
-
-        if (state.extraRollGranted) {
-          set({
-            extraRollGranted: false,
-            status: "rolling",
-            diceResult: null,
-            remainingMoves: 0,
-            pendingPropertyId: null,
-          });
-          return;
-        }
-
         const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-        // nextIndex === 0 は「全員が1回ずつ行動した」= turn(月)が進む瞬間。
-        // 将来ここに季節イベント抽選を、getCalendar(nextTurn).isYearStart が true の場合に
-        // 決算(年次の物件収益計算など)を差し込める。
+        const nextTurn = nextIndex === 0 ? state.turn + 1 : state.turn;
+        if (nextIndex !== 0 || !getCalendar(nextTurn).isYearStart) return false;
+
+        const settledYear = getCalendar(state.turn).year;
+        const entries = state.players.map((player) => {
+          const propertyBreakdown = player.ownedPropertyIds.map((propertyId) => {
+            const def = getPropertyDef(propertyId);
+            const amount = def ? calculateAnnualRevenue(def) : 0;
+            return { propertyId, propertyName: def?.name ?? propertyId, amount };
+          });
+          const total = propertyBreakdown.reduce((sum, e) => sum + e.amount, 0);
+          return { playerId: player.id, playerName: player.name, propertyBreakdown, total };
+        });
+
+        const players = state.players.map((player) => {
+          const entry = entries.find((e) => e.playerId === player.id);
+          return entry && entry.total !== 0 ? { ...player, money: player.money + entry.total } : player;
+        });
+
+        set({
+          players,
+          status: "settlement",
+          settlementInfo: { year: settledYear, entries },
+          log: pushLog(
+            state,
+            `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.total}万円`).join("、")}`,
+          ),
+        });
+        return true;
+      }
+
+      /** 手番を次のプレイヤーへ送る(決算判定は済んでいる前提)。規定ターン終了ならゲーム終了へ。 */
+      function advanceToNextTurn() {
+        const state = get();
+        const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
         const nextTurn = nextIndex === 0 ? state.turn + 1 : state.turn;
 
         if (nextTurn > state.totalTurns) {
@@ -152,8 +185,26 @@ export const useGameStore = create<GameStore>()(
           status: "rolling",
           diceResult: null,
           remainingMoves: 0,
-          pendingPropertyId: null,
+          pendingPropertyGroupId: null,
         });
+      }
+
+      function endTurn() {
+        const state = get();
+
+        if (state.extraRollGranted) {
+          set({
+            extraRollGranted: false,
+            status: "rolling",
+            diceResult: null,
+            remainingMoves: 0,
+            pendingPropertyGroupId: null,
+          });
+          return;
+        }
+
+        if (applySettlementIfNeeded()) return; // continueAfterSettlement()待ち
+        advanceToNextTurn();
       }
 
       function finishLandingAndEndTurn() {
@@ -198,9 +249,9 @@ export const useGameStore = create<GameStore>()(
             });
             return; // continueAfterCardDraw()待ち
           }
-          case "purchaseOffer": {
-            set({ status: "purchaseOffer", pendingPropertyId: outcome.propertyId });
-            return; // buyProperty/skipPropertyの操作待ち
+          case "propertyOffer": {
+            set({ status: "purchaseOffer", pendingPropertyGroupId: outcome.groupId });
+            return; // buyProperty/finishPropertyShoppingの操作待ち
           }
           case "info": {
             set({ status: "resolvingEvent", log: pushLog(state, outcome.message) });
@@ -361,35 +412,36 @@ export const useGameStore = create<GameStore>()(
           });
         },
 
-        buyProperty: () => {
+        buyProperty: (propertyId: string) => {
           const state = get();
-          if (state.status !== "purchaseOffer" || !state.pendingPropertyId) return;
-          const def = getPropertyDef(state.pendingPropertyId);
+          if (state.status !== "purchaseOffer" || !state.pendingPropertyGroupId) return;
+          const def = getPropertyDef(propertyId);
+          if (!def || def.groupId !== state.pendingPropertyGroupId) return;
           const player = currentPlayer(state);
-          if (!def || player.money < def.price) return;
+          if (player.money < def.price) return;
+          const alreadyOwned = state.players.some((p) => p.ownedPropertyIds.includes(def.id));
+          if (alreadyOwned) return;
 
           const players = updatePlayer(state.players, player.id, (p) => ({
             ...p,
             money: p.money - def.price,
             ownedPropertyIds: [...p.ownedPropertyIds, def.id],
           }));
+          // statusはpurchaseOfferのまま維持する: 同じグループの別の物件を続けて購入できるようにするため。
           set({
             players,
-            pendingPropertyId: null,
-            status: "resolvingEvent",
             log: pushLog(state, `${player.name}さんが「${def.name}」を購入した(${def.price}万円)`),
           });
-          finishLandingAndEndTurn();
         },
 
-        skipProperty: () => {
+        finishPropertyShopping: () => {
           const state = get();
           if (state.status !== "purchaseOffer") return;
           const player = currentPlayer(state);
           set({
-            pendingPropertyId: null,
+            pendingPropertyGroupId: null,
             status: "resolvingEvent",
-            log: pushLog(state, `${player.name}さんは購入を見送った`),
+            log: pushLog(state, `${player.name}さんは物件購入を終えた`),
           });
           finishLandingAndEndTurn();
         },
@@ -465,6 +517,13 @@ export const useGameStore = create<GameStore>()(
             log: pushLog(state, logMessage),
           });
           finishLandingAndEndTurn();
+        },
+
+        continueAfterSettlement: () => {
+          const state = get();
+          if (state.status !== "settlement") return;
+          set({ settlementInfo: null });
+          advanceToNextTurn(); // 決算判定は済んでいるので、再判定せず手番だけ送る
         },
       };
     },

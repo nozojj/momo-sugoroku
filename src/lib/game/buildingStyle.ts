@@ -1,4 +1,4 @@
-import type { BuildingOverride, BuildingType, MapNode, PropertyDef } from "@/types/game";
+import type { BuildingOverride, BuildingType, MapNode, PropertyGroup } from "@/types/game";
 import { NODE_RADIUS, MAJOR_HUB_RADIUS } from "@/lib/game/mapStyle";
 
 /** プレースホルダーの見た目定義(仮の2.5D建物)。本番アセットに差し替えるときは
@@ -52,13 +52,14 @@ const KEYWORD_RULES: [BuildingType, string[]][] = [
   ["shop", ["スーパー", "カラオケ", "ショップ", "マーケット", "雑貨", "店"]],
 ];
 
-/** 物件のcategoryやノードの状態から建物タイプを推測する(あくまで既定値。エディタで個別上書き可能)。 */
-export function inferBuildingType(node: MapNode, propertyDef: PropertyDef | undefined): BuildingType {
-  if (propertyDef) {
+/** 物件グループの名前やノードの状態から建物タイプを推測する(あくまで既定値。エディタ・グループ側で個別上書き可能)。 */
+export function inferBuildingType(node: MapNode, group: PropertyGroup | undefined): BuildingType {
+  if (group) {
+    if (group.buildingType) return group.buildingType;
     for (const [type, keywords] of KEYWORD_RULES) {
-      if (keywords.some((k) => propertyDef.category.includes(k) || propertyDef.name.includes(k))) return type;
+      if (keywords.some((k) => group.name.includes(k))) return type;
     }
-    return "generic";
+    return "commercial";
   }
   if (node.isDestinationCandidate) return "station";
   return "generic";
@@ -81,13 +82,13 @@ export interface ResolvedBuilding {
 }
 
 /**
- * ノード・物件定義・エディタでの個別上書きから、実際に描画すべき建物を1件解決する。
- * マス(MapNode)・物件(PropertyDef)は読み取るだけで一切変更しない。
+ * ノード・物件グループ・エディタでの個別上書きから、実際に描画すべき建物を1件解決する。
+ * マス(MapNode)・物件グループ(PropertyGroup)は読み取るだけで一切変更しない。
  * 対象外(物件でも駅でもなく、上書きも無い)ならnullを返す。
  */
 export function resolveBuildingForNode(
   node: MapNode,
-  propertyDef: PropertyDef | undefined,
+  group: PropertyGroup | undefined,
   override: BuildingOverride | undefined,
 ): ResolvedBuilding | null {
   if (override?.hidden) return null;
@@ -97,7 +98,7 @@ export function resolveBuildingForNode(
   const defaultOffset = defaultBuildingOffset(node);
   return {
     nodeId: node.id,
-    buildingType: override?.buildingType ?? inferBuildingType(node, propertyDef),
+    buildingType: override?.buildingType ?? inferBuildingType(node, group),
     offsetX: override?.offsetX ?? defaultOffset.x,
     offsetY: override?.offsetY ?? defaultOffset.y,
     scale: override?.scale ?? 1,

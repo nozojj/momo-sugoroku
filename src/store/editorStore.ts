@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { BuildingOverride, PropertyDef, RoadType } from "@/types/game";
+import type { BuildingOverride, RoadType } from "@/types/game";
 import { applyMapOverrides, EMPTY_OVERRIDES, type MapOverrides, type ModifiedEdge, type NodePatch } from "@/data/maps/applyOverrides";
 import { shonanFullMap as baseMap } from "@/data/maps/shonan-full";
 
@@ -110,7 +110,6 @@ interface EditorStore {
   moveNodes: (moves: { id: string; x: number; y: number }[]) => void;
   updateNode: (id: string, patch: NodePatch) => void;
   updateEdge: (a: string, b: string, patch: { roadType?: RoadType; requiresCardId?: string | null }) => void;
-  upsertCustomProperty: (propDef: PropertyDef) => void;
   /** ノードの建物設定を追加/変更する。上書きが既に存在すればマージし、無ければ新規作成する。 */
   upsertBuildingOverride: (nodeId: string, patch: Partial<Omit<BuildingOverride, "nodeId">>) => void;
   /** ノードの建物の個別上書きを削除する(自動推測の見た目に戻る)。 */
@@ -311,15 +310,6 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     get().commit({ ...prev, modifiedEdges });
   },
 
-  upsertCustomProperty: (propDef) => {
-    const prev = get().overrides;
-    const idx = prev.customProperties.findIndex((p) => p.id === propDef.id);
-    const customProperties = [...prev.customProperties];
-    if (idx !== -1) customProperties[idx] = propDef;
-    else customProperties.push(propDef);
-    get().commit({ ...prev, customProperties });
-  },
-
   upsertBuildingOverride: (nodeId, patch) => {
     const prev = get().overrides;
     const idx = prev.buildingOverrides.findIndex((o) => o.nodeId === nodeId);
@@ -343,15 +333,15 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     set({ saveStatus: "saving" });
     try {
       const current = get().overrides;
-      // 物件タイプのノードから参照されなくなったcustomProperties、
-      // 削除されたノードを指したままのbuildingOverridesを保存時に整理する
+      // 物件タイプのノードから参照されなくなったcustomProperties(そのgroupIdをどのノードも
+      // 指していないもの)、削除されたノードを指したままのbuildingOverridesを保存時に整理する
       // (削除・種別変更・Undo/Redoの繰り返しでゴミが溜まらないようにするため)。
       const merged = applyMapOverrides(baseMap, current);
-      const referencedPropIds = new Set(
-        merged.nodes.filter((n) => n.propertyId).map((n) => n.propertyId as string),
+      const referencedGroupIds = new Set(
+        merged.nodes.filter((n) => n.propertyGroupId).map((n) => n.propertyGroupId as string),
       );
       const validNodeIds = new Set(merged.nodes.map((n) => n.id));
-      const customProperties = current.customProperties.filter((p) => referencedPropIds.has(p.id));
+      const customProperties = current.customProperties.filter((p) => referencedGroupIds.has(p.groupId));
       const buildingOverrides = current.buildingOverrides.filter((o) => validNodeIds.has(o.nodeId));
       const overrides = { ...current, customProperties, buildingOverrides };
 

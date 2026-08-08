@@ -45,8 +45,9 @@ export interface MapNode {
   y: number;
   /** このマスから進める道路一覧。双方向路は両端のノードにそれぞれ定義する。 */
   connections: RoadEdge[];
-  /** type: "property" のときの物件定義ID */
-  propertyId?: string;
+  /** type: "property" のときに紐づく物件グループのid。同じグループidを複数のノードが共有してよく、
+   *  そのグループに属する全PropertyDefがまとめて購入対象として一覧表示される。 */
+  propertyGroupId?: string;
   /** 目的地の抽選対象になり得るか */
   isDestinationCandidate?: boolean;
   /** マップ上の地区名(表示・演出用) */
@@ -119,6 +120,24 @@ export interface MapData {
   buildingOverrides?: BuildingOverride[];
 }
 
+/**
+ * 物件グループ(「物件エリア/物件駅」に相当)。1つの物件マス(MapNode.propertyGroupId)は
+ * このグループを1つ指し、グループに属する全PropertyDefが購入対象として一覧表示される。
+ * 複数の物件マスが同じグループを指してもよい(例: 藤沢駅前の複数マスすべてが同じ
+ * 「藤沢駅前」グループを指し、どこに止まっても同じラインナップが出る)。
+ */
+export interface PropertyGroup {
+  id: string;
+  /** 購入画面の見出し・盤面表示に使う名前(例: "藤沢駅前") */
+  name: string;
+  /** 地域独占判定・季節連動などで使う都市単位のくくり(例: "藤沢") */
+  region: string;
+  /** 盤面タイルに表示するアイコン(絵文字)。省略時は種別ごとの既定アイコン。 */
+  icon?: string;
+  /** 盤面の建物見た目。省略時はグループ名からのキーワード自動推測。 */
+  buildingType?: BuildingType;
+}
+
 /** 物件の定義(静的データ)。 */
 export interface PropertyDef {
   id: string;
@@ -127,12 +146,20 @@ export interface PropertyDef {
   price: number;
   /** 所有していると勝敗判定時に加算される資産価値(基本は price と同額)。 */
   assetValue: number;
-  area: string;
+  /** 所属する物件グループのid。物件の地域・立地はここを経由して決まる(PropertyDef自体はarea/regionを持たない)。 */
+  groupId: string;
+  /** 年間収益率(0.1 = 10%)。決算(3月)で price * revenueRate を基準額として使う。 */
+  revenueRate: number;
   /** マス上に表示するアイコン(絵文字)。省略時は物件の標準アイコンを使う。 */
   icon?: string;
-  /** 実在店舗をモデルにしたランドマークか(架空物件と見た目を区別する)。 */
+  /** 実在店舗・実在施設をモデルにしたランドマークか(架空物件と見た目を区別する)。 */
   isRealLandmark?: boolean;
+  /** 明示的な建物タイプ上書き。省略時はcategory/nameからの自動推測。 */
+  buildingType?: BuildingType;
 }
+
+/** 物件所有の3段階。通常所有 → グループ独占 → region独占の順に強い。 */
+export type OwnershipTier = "normal" | "groupMonopoly" | "regionMonopoly";
 
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
@@ -193,6 +220,7 @@ export type GameStatus =
   | "moneyRoulette" // プラス/マイナスマスのルーレット演出中(確定額表示・次へ待ち)
   | "cardDraw" // カードマスの抽選演出中(結果表示・自動で次へ)
   | "cardOverflow" // 所持上限到達につき、捨てるカードの選択待ち(自動進行しない)
+  | "settlement" // 3月決算の演出中(内訳確認・次へ待ち)
   | "finished"; // ゲーム終了
 
 /** 分岐地点で選べる進行先候補。 */
@@ -252,6 +280,18 @@ export interface CardOverflowInfo {
   newCardId: string;
 }
 
+/** status: "settlement" のときに表示する決算演出の内容。プレイヤーごと・物件ごとの内訳を持つ。 */
+export interface SettlementInfo {
+  /** 決算が発生した年度(決算前の年) */
+  year: number;
+  entries: {
+    playerId: string;
+    playerName: string;
+    propertyBreakdown: { propertyId: string; propertyName: string; amount: number }[];
+    total: number;
+  }[];
+}
+
 export interface GameState {
   mapId: string;
   players: Player[];
@@ -269,8 +309,8 @@ export interface GameState {
   extraRollGranted: boolean;
   status: GameStatus;
   routeOptions: RouteOption[];
-  /** purchaseOffer状態のときに提示している物件ID */
-  pendingPropertyId: string | null;
+  /** purchaseOffer状態のときに提示している物件グループID(所属する全PropertyDefが購入対象) */
+  pendingPropertyGroupId: string | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
   /** moneyRoulette状態のときに表示するルーレット演出の内容 */
@@ -279,6 +319,8 @@ export interface GameState {
   cardDrawInfo: CardDrawInfo | null;
   /** cardOverflow状態のときに表示するカード整理画面の内容 */
   cardOverflowInfo: CardOverflowInfo | null;
+  /** settlement状態のときに表示する決算演出の内容 */
+  settlementInfo: SettlementInfo | null;
   log: LogEntry[];
   winnerIds: string[] | null;
 }
