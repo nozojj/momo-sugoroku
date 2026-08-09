@@ -15,12 +15,14 @@ interface CharacterSpriteProps {
  * プレースホルダー絵文字の代わりに自動的に<img>へ差し替わる。
  */
 export function CharacterSprite({ characterId, expression, className }: CharacterSpriteProps) {
-  const assetUrl = CHARACTER_ASSET_URLS[characterId]?.[expression];
+  const entry = CHARACTER_ASSET_URLS[characterId];
+  // 解決順序: ①指定expressionの画像 → ②そのcharacterIdのdefault画像 → ③絵文字プレースホルダー(下のif文)。
+  const assetUrl = entry?.[expression] ?? entry?.default;
   const placeholder = CHARACTER_PLACEHOLDER_STYLE[expression];
 
   if (assetUrl) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={assetUrl} alt="" className={className} />;
+    return <img src={assetUrl} alt="" className={`object-contain ${className ?? ""}`} />;
   }
 
   return (

@@ -14,6 +14,17 @@ export const CHARACTER_PLACEHOLDER_STYLE: Record<CharacterExpression, { emoji: s
   troubled: { emoji: "😟", bg: "#e5e7eb" },
 };
 
+/** characterIdごとのアセット登録。expression別画像に加え、そのキャラの表情差分が
+ *  まだ揃っていない間に使う`default`(フォールバック)画像を持てる。
+ *  CharacterSpriteの解決順序: ①指定expressionの画像 → ②そのcharacterIdのdefault画像
+ *  → ③絵文字プレースホルダー。 */
+type CharacterAssetEntry = Partial<Record<CharacterExpression, string>> & { default?: string };
+
 /** 本番アセット(PNG/WebP等)への差し替え用。characterId→expression→画像URLで登録すると、
- *  CharacterSpriteはプレースホルダー絵文字の代わりにその画像を描画する。今は未登録(空)。 */
-export const CHARACTER_ASSET_URLS: Partial<Record<string, Partial<Record<CharacterExpression, string>>>> = {};
+ *  CharacterSpriteはプレースホルダー絵文字の代わりにその画像を描画する。
+ *  navi(湘南すごろく案内キャラ、momotetu-main-kyara.png基準)は現状happyのみ用意済みなので、
+ *  defaultにも同じ画像を登録し、未実装のnormal/surprised/troubledはhappyで代用する。
+ *  各表情の画像を追加したら、そのexpressionキーを登録するだけで自動的にそちらが優先される。 */
+export const CHARACTER_ASSET_URLS: Partial<Record<string, CharacterAssetEntry>> = {
+  navi: { default: "/characters/navi/happy.webp", happy: "/characters/navi/happy.webp" },
+};
