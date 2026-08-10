@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
+import { useHasHydrated } from "@/store/useHasHydrated";
 import { getMap } from "@/data/maps";
 import { getNode, shortestDistance } from "@/lib/game/mapGraph";
 import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
@@ -15,13 +16,16 @@ import { ArrivalModal } from "./ArrivalModal";
 import { MoneyRouletteModal } from "./MoneyRouletteModal";
 import { CardDrawModal } from "./CardDrawModal";
 import { CardOverflowModal } from "./CardOverflowModal";
-import { SettlementModal } from "./SettlementModal";
+import { SettlementIntroAnnouncer } from "./SettlementIntroAnnouncer";
+import { SettlementScreen } from "./SettlementScreen";
+import { MonopolyToast } from "./MonopolyToast";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
 const STEP_ANIMATION_MS = 460;
 
 export function GameScreen() {
+  const hasHydrated = useHasHydrated();
   const status = useGameStore((s) => s.status);
   const players = useGameStore((s) => s.players);
   const currentPlayerIndex = useGameStore((s) => s.currentPlayerIndex);
@@ -30,15 +34,20 @@ export function GameScreen() {
   const totalTurns = useGameStore((s) => s.totalTurns);
   const destinationNodeId = useGameStore((s) => s.destinationNodeId);
   const diceResult = useGameStore((s) => s.diceResult);
+  const diceFaces = useGameStore((s) => s.diceFaces);
   const remainingMoves = useGameStore((s) => s.remainingMoves);
   const pendingDoubleMove = useGameStore((s) => s.pendingDoubleMove);
+  const pendingDiceCount = useGameStore((s) => s.pendingDiceCount);
+  const activeVehicleMode = useGameStore((s) => s.activeVehicleMode);
   const routeOptions = useGameStore((s) => s.routeOptions);
   const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
+  const monopolyAchievement = useGameStore((s) => s.monopolyAchievement);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const moneyRouletteInfo = useGameStore((s) => s.moneyRouletteInfo);
   const cardDrawInfo = useGameStore((s) => s.cardDrawInfo);
   const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
   const settlementInfo = useGameStore((s) => s.settlementInfo);
+  const netWorthHistory = useGameStore((s) => s.netWorthHistory);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
 
@@ -50,11 +59,14 @@ export function GameScreen() {
   const stepBack = useGameStore((s) => s.stepBack);
   const buyProperty = useGameStore((s) => s.buyProperty);
   const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
+  const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
+  const continueAfterDestinationFocus = useGameStore((s) => s.continueAfterDestinationFocus);
   const continueAfterMoneyRoulette = useGameStore((s) => s.continueAfterMoneyRoulette);
   const continueAfterCardDraw = useGameStore((s) => s.continueAfterCardDraw);
   const resolveCardOverflow = useGameStore((s) => s.resolveCardOverflow);
+  const continueAfterSettlementIntro = useGameStore((s) => s.continueAfterSettlementIntro);
   const continueAfterSettlement = useGameStore((s) => s.continueAfterSettlement);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -71,8 +83,31 @@ export function GameScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, remainingMoves, currentPlayer?.currentNodeId]);
 
+  // persist(localStorage)のrehydrationが完了するまでは、StartScreenの「ゲーム開始」を
+  // 誤って操作できてしまわないよう、StartScreenも本編も一切マウントしない。
+  if (!hasHydrated) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6">
+        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">読み込み中…</p>
+      </div>
+    );
+  }
+
   if (status === "waiting") {
     return <StartScreen onStart={(names, totalYears) => startGame(names, totalYears)} />;
+  }
+
+  // 決算画面表示中はBoard/HUD/Diceを一切マウントしない(StartScreenと同じ完全差し替え)。
+  // これにより盤面・サイコロ操作は構造的に不可能になる(statusガードに頼らない)。
+  if (status === "settlement" && settlementInfo) {
+    return (
+      <SettlementScreen
+        info={settlementInfo}
+        history={netWorthHistory}
+        players={players}
+        onContinue={continueAfterSettlement}
+      />
+    );
   }
 
   const map = getMap(mapId);
@@ -80,7 +115,7 @@ export function GameScreen() {
   const calendar = getCalendar(turn);
   const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
   const distanceToDestination =
-    currentPlayer && (status === "moving" || status === "selectingRoute")
+    currentPlayer && (status === "rolling" || status === "moving" || status === "selectingRoute")
       ? shortestDistance(map, currentPlayer.currentNodeId, destinationNodeId, currentPlayer.cardIds)
       : null;
   const backNodeId =
@@ -99,6 +134,8 @@ export function GameScreen() {
           routeOptions={routeOptions}
           onSelectRoute={chooseRoute}
           status={status}
+          onDestinationFocusComplete={continueAfterDestinationFocus}
+          activeVehicleMode={activeVehicleMode}
         />
       </div>
 
@@ -109,8 +146,11 @@ export function GameScreen() {
         calendarText={`${calendar.year}年目 ${calendar.month}月`}
         onOpenDrawer={() => setDrawerOpen(true)}
         movementInfo={
-          status === "moving" || status === "selectingRoute"
-            ? { remainingMoves, distanceToDestination }
+          status === "rolling" || status === "moving" || status === "selectingRoute"
+            ? {
+                remainingMoves: status === "moving" || status === "selectingRoute" ? remainingMoves : null,
+                distanceToDestination,
+              }
             : undefined
         }
       />
@@ -132,6 +172,8 @@ export function GameScreen() {
       <div className="fixed bottom-5 left-1/2 z-20 -translate-x-1/2 sm:bottom-6">
         <Dice
           diceResult={status === "moving" ? diceResult : null}
+          diceFaces={status === "moving" ? diceFaces : null}
+          diceCount={status === "moving" ? (diceFaces?.length ?? 1) : pendingDiceCount}
           canRoll={status === "rolling" && diceResult === null}
           doubleArmed={pendingDoubleMove}
           onRoll={rollDice}
@@ -172,6 +214,8 @@ export function GameScreen() {
         }}
       />
 
+      {monopolyAchievement && <MonopolyToast achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />}
+
       {status === "purchaseOffer" && pendingPropertyGroupId && currentPlayer && (
         <PurchaseModal
           groupId={pendingPropertyGroupId}
@@ -202,8 +246,8 @@ export function GameScreen() {
         />
       )}
 
-      {status === "settlement" && settlementInfo && (
-        <SettlementModal info={settlementInfo} onContinue={continueAfterSettlement} />
+      {status === "settlementIntro" && settlementInfo && (
+        <SettlementIntroAnnouncer info={settlementInfo} onContinue={continueAfterSettlementIntro} />
       )}
 
       {status === "finished" && winnerIds && (

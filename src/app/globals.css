@@ -53,6 +53,10 @@ body {
 }
 .animate-ping-slow {
   animation: ping-slow 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  /* transform-box指定が無いと、SVG要素のtransform-origin: centerはSVG全体(viewBox)の中心を
+     基準にしてしまい、マスの位置から離れるほどscaleで大きくズレて見える。要素自身の中心を
+     基準にするにはfill-boxの指定が必要。 */
+  transform-box: fill-box;
   transform-origin: center;
 }
 
@@ -116,4 +120,167 @@ body {
 }
 .animate-arrival-pop {
   animation: arrival-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes character-bounce {
+  0% {
+    transform: scale(1, 1);
+  }
+  35% {
+    transform: scale(1.08, 0.9);
+  }
+  65% {
+    transform: scale(0.95, 1.06);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+.animate-character-bounce {
+  animation: character-bounce 150ms ease-out both;
+}
+
+@keyframes character-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  40% {
+    transform: translateX(4px) rotate(2deg);
+  }
+  60% {
+    transform: translateX(-3px) rotate(-1deg);
+  }
+  80% {
+    transform: translateX(2px) rotate(1deg);
+  }
+}
+.animate-character-shake {
+  animation: character-shake 420ms ease-in-out;
+}
+
+@keyframes highlight-slam {
+  0% {
+    transform: scale(0.3) rotate(-6deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.3) rotate(3deg);
+    opacity: 1;
+  }
+  78% {
+    transform: scale(0.92) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+.animate-highlight-slam {
+  animation: highlight-slam 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes announcer-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+.animate-announcer-sparkle {
+  animation: announcer-sparkle 1100ms ease-in-out both;
+}
+
+@keyframes announcer-warn-ring {
+  0% {
+    transform: translateX(-50%) scale(0.7);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: translateX(-50%) scale(1.7);
+    opacity: 0;
+  }
+}
+.animate-announcer-warn-ring {
+  animation: announcer-warn-ring 1500ms ease-out infinite;
+}
+
+@keyframes spotlight-glow {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  60% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.animate-spotlight-glow {
+  animation: spotlight-glow 1.1s ease-out infinite;
+  /* .animate-ping-slowと同じ理由でfill-boxが必要(SVG要素のtransform-origin: center対策) */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes spotlight-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+}
+.animate-spotlight-pop {
+  animation: spotlight-pop 900ms ease-in-out infinite;
+  /* .animate-ping-slowと同じ理由でfill-boxが必要(SVG要素のtransform-origin: center対策) */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* 急行系カード使用時、車が変身した瞬間に一度だけ広がって消える光の輪(CarToken.tsx)。
+   一度きりの演出なのでinfiniteではなくboth(終了状態を維持)にする。 */
+@keyframes vehicle-transform-flash {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+  60% {
+    transform: scale(1.6);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.animate-vehicle-transform-flash {
+  animation: vehicle-transform-flash 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-arrival-pop,
+  .animate-character-bounce,
+  .animate-character-shake,
+  .animate-highlight-slam,
+  .animate-announcer-sparkle,
+  .animate-announcer-warn-ring,
+  .animate-confetti-fall,
+  .animate-spotlight-glow,
+  .animate-spotlight-pop,
+  .animate-vehicle-transform-flash {
+    animation: none !important;
+  }
 }

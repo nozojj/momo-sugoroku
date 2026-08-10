@@ -161,8 +161,37 @@ export interface PropertyDef {
 /** 物件所有の3段階。通常所有 → グループ独占 → region独占の順に強い。 */
 export type OwnershipTier = "normal" | "groupMonopoly" | "regionMonopoly";
 
+/** 物件購入によって独占(グループ/地域)が今まさに達成された、という1回限りの通知情報。
+ *  MonopolyToastが表示し、一定時間後にdismissMonopolyAchievement()でnullへ戻す。
+ *  ゲームの勝敗・収益計算には一切関与しない、UI通知専用の一時的な状態。 */
+export interface MonopolyAchievement {
+  kind: "group" | "region";
+  /** 表示名(kind:"group"なら物件グループ名、kind:"region"なら地域名) */
+  name: string;
+  /** PROPERTY_REVENUE_CONFIGの該当倍率をそのまま渡す(ここでは再計算しない) */
+  multiplier: number;
+}
+
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
+
+/** 車の見た目モード。急行系カード(複数ダイス移動)使用時に一時的に切り替わる速さの段階。
+ *  normalが通常状態で、それ以外はendTurn()完了時に必ずnormalへ戻る。 */
+export type VehicleMode = "normal" | "expressLv1" | "expressLv2" | "expressLv3" | "expressLv4";
+
+/** 複数のサイコロを振って移動するカードの効果。diceCountとvehicleModeの組み合わせを変えるだけで
+ *  新しい急行系カードを追加できる(cardEffects.tsのmultiDiceハンドラは共通処理1つのみ)。 */
+export interface MultiDiceEffect {
+  type: "multiDice";
+  /** 振るサイコロの個数(2〜) */
+  diceCount: number;
+  /** 使用中に一時的に切り替える車の見た目 */
+  vehicleMode: VehicleMode;
+}
+
+/** カード効果。単純な効果(diceAgain/doubleMove)は文字列そのまま、パラメータを持つ効果は
+ *  {type: "..."}形式のオブジェクトで表す(既存カードのeffectは無変更でこの型に収まる)。 */
+export type CardEffect = CardEffectType | MultiDiceEffect;
 
 /** カードのレア度。抽選重みは data/cards.ts の RARITY_WEIGHT で定義する。 */
 export type CardRarity = "common" | "rare" | "superRare";
@@ -174,7 +203,7 @@ export interface CardDef {
   /** usable: 手札から使って即効果を発動するカード。key: 持っているだけで近道等の通行条件を満たすカード。 */
   kind: "usable" | "key";
   /** kind: "usable" のときのみ使用 */
-  effect?: CardEffectType;
+  effect?: CardEffect;
   rarity: CardRarity;
   /** カード獲得演出・所持カード表示で使う絵文字アイコン。 */
   icon: string;
@@ -217,10 +246,12 @@ export type GameStatus =
   | "resolvingEvent" // マスの効果を解決中(お金/カード/物件購入確認など)
   | "purchaseOffer" // 物件購入の確認待ち
   | "destinationArrived" // 目的地到着演出中(ボーナス表示・次の目的地提示の確認待ち)
+  | "destinationFocus" // 次の目的地マスへカメラが移動し、強調表示している間(自動 or タップでスキップ)
   | "moneyRoulette" // プラス/マイナスマスのルーレット演出中(確定額表示・次へ待ち)
   | "cardDraw" // カードマスの抽選演出中(結果表示・自動で次へ)
   | "cardOverflow" // 所持上限到達につき、捨てるカードの選択待ち(自動進行しない)
-  | "settlement" // 3月決算の演出中(内訳確認・次へ待ち)
+  | "settlementIntro" // 決算導入演出中(CharacterAnnouncerが「○年目の決算です」を表示。盤面はまだ裏に見える)
+  | "settlement" // 決算画面表示中(Board/HUD/Diceを完全にアンマウントしSettlementScreenのみ表示)
   | "finished"; // ゲーム終了
 
 /** 分岐地点で選べる進行先候補。 */
@@ -280,16 +311,55 @@ export interface CardOverflowInfo {
   newCardId: string;
 }
 
-/** status: "settlement" のときに表示する決算演出の内容。プレイヤーごと・物件ごとの内訳を持つ。 */
+/** SettlementScreen/SettlementIntroAnnouncerが表示する、1プレイヤー分の決算結果。
+ *  計算はすべてsrc/lib/game/settlement.tsのcalculateSettlement()で行い、ここには
+ *  計算済みの値だけを積む(画面側はこの値を並べ替え・表示するだけで、お金は一切動かさない)。 */
+export interface SettlementEntry {
+  playerId: string;
+  playerName: string;
+  /** ランキング表示・資産推移グラフの線色に使う */
+  playerColor: string;
+  propertyBreakdown: {
+    propertyId: string;
+    propertyName: string;
+    amount: number;
+    /** 独占倍率の判定結果。旧セーブ(この項目追加前)には無いので必ずoptional。 */
+    tier?: OwnershipTier;
+    /** tierが"groupMonopoly"のとき、注記表示用の物件グループ名。 */
+    groupName?: string;
+    /** tierが"regionMonopoly"のとき、注記表示用の地域名。 */
+    region?: string;
+  }[];
+  /** 今年度の物件収益(合計) */
+  propertyRevenue: number;
+  /** 現金(決算後、今年度の物件収益を反映済み) */
+  cash: number;
+  /** 所有物件総額(assetValueの合計) */
+  propertyValue: number;
+  /** 所有物件数 */
+  propertyCount: number;
+  /** 年度開始時点(前年決算直後、1年目はゲーム開始時)の総資産。
+   *  今はUI表示していないが、netWorthAfterとの差分で「今年度の増減額」を出せるように保持している。 */
+  netWorthBefore: number;
+  /** 決算後の総資産 = cash + propertyValue */
+  netWorthAfter: number;
+  /** 今年度の総資産増減額 = netWorthAfter - netWorthBefore。将来「決算前→決算後」表示を追加する際に使う。 */
+  netWorthDelta: number;
+}
+
+/** status: "settlementIntro"/"settlement" のときに表示する決算結果。プレイヤーごと・物件ごとの内訳を持つ。 */
 export interface SettlementInfo {
   /** 決算が発生した年度(決算前の年) */
   year: number;
-  entries: {
-    playerId: string;
-    playerName: string;
-    propertyBreakdown: { propertyId: string; propertyName: string; amount: number }[];
-    total: number;
-  }[];
+  /** この決算が規定年数の最終年度のものか。SettlementScreenのボタン文言("次の年度へ"/"結果を見る")の出し分けに使う。 */
+  isFinalSettlement: boolean;
+  entries: SettlementEntry[];
+}
+
+/** 年度ごとの総資産スナップショット(資産推移グラフ用)。決算のたびに1件ずつ積み上がる。 */
+export interface NetWorthHistoryEntry {
+  year: number;
+  values: { playerId: string; netWorth: number }[];
 }
 
 export interface GameState {
@@ -301,16 +371,28 @@ export interface GameState {
   totalTurns: number;
   destinationNodeId: string;
   diceResult: number | null;
+  /** 直近のロールの内訳(サイコロ1個ずつの出目)。表示専用で、remainingMoves等の計算には使わない。
+   *  常にdiceResult(合計値)と対になり、diceCountが1のときは要素数1の配列になる。 */
+  diceFaces: number[] | null;
   /** 残り移動マス数(移動処理の途中経過) */
   remainingMoves: number;
   /** 次の移動でカードにより移動数が2倍になるフラグ */
   pendingDoubleMove: boolean;
+  /** 次のrollDice()で振るサイコロの個数。既定1。multiDice系カード使用時のみ一時的に上書きされ、
+   *  rollDice()で消費された時点で1に戻る。 */
+  pendingDiceCount: number;
   /** 「もういちどサイコロ」カードにより、手番を渡さずもう一度振れるフラグ */
   extraRollGranted: boolean;
+  /** 現在表示中の車の見た目モード(通常時null)。currentPlayerIndexの駒にのみ適用され、
+   *  endTurn()完了時に必ずnullへ戻る。 */
+  activeVehicleMode: VehicleMode | null;
   status: GameStatus;
   routeOptions: RouteOption[];
   /** purchaseOffer状態のときに提示している物件グループID(所属する全PropertyDefが購入対象) */
   pendingPropertyGroupId: string | null;
+  /** 直近の購入で独占(グループ/地域)を達成した場合の通知。MonopolyToastが表示し終えたら
+   *  dismissMonopolyAchievement()でnullに戻る。statusの遷移やターン進行には影響しない。 */
+  monopolyAchievement: MonopolyAchievement | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
   /** moneyRoulette状態のときに表示するルーレット演出の内容 */
@@ -319,8 +401,10 @@ export interface GameState {
   cardDrawInfo: CardDrawInfo | null;
   /** cardOverflow状態のときに表示するカード整理画面の内容 */
   cardOverflowInfo: CardOverflowInfo | null;
-  /** settlement状態のときに表示する決算演出の内容 */
+  /** settlementIntro/settlement状態のときに表示する決算結果 */
   settlementInfo: SettlementInfo | null;
+  /** 年度ごとの総資産スナップショットの履歴(資産推移グラフ用)。決算のたびに1件追加される。 */
+  netWorthHistory: NetWorthHistoryEntry[];
   log: LogEntry[];
   winnerIds: string[] | null;
 }

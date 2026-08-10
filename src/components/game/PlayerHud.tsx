@@ -4,7 +4,9 @@ import type { CardDef, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { netWorth } from "@/lib/game/engine";
 import { cardDefs } from "@/data/cards";
-import { getPropertyDef } from "@/data/properties";
+import { getPropertyDef, propertyDefs } from "@/data/properties";
+import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
 import { RARITY_BADGE_CLASS } from "@/lib/game/cardDisplay";
 
 interface PlayerHudProps {
@@ -18,7 +20,34 @@ function cardDef(id: string): CardDef | undefined {
   return cardDefs.find((c) => c.id === id);
 }
 
+/** このプレイヤーが所有する物件から、独占中のグループ/地域だけを抜き出す。
+ *  地域を完全独占している場合は、その地域に属する個別グループのバッジは出さず
+ *  地域バッジ1つにまとめる(バッジが大量に並ぶのを防ぐ)。
+ *
+ *  isGroupMonopolized/isRegionMonopolizedはplayers配列から対象プレイヤーを
+ *  見つけて「そのプレイヤー自身の所有状況」だけを見る実装のため、[player]という
+ *  1要素配列を渡せば十分(全プレイヤー配列をpropsで受け取る必要が無い)。 */
+function monopolyBadges(player: Player): { key: string; label: string; region: boolean }[] {
+  const ownedGroupIds = [...new Set(player.ownedPropertyIds.map((id) => getPropertyDef(id)?.groupId).filter((id): id is string => !!id))];
+  const ownedGroups = ownedGroupIds.map((id) => getPropertyGroupDef(id)).filter((g): g is NonNullable<typeof g> => !!g);
+
+  const monopolizedRegions = [...new Set(ownedGroups.map((g) => g.region))].filter((region) =>
+    isRegionMonopolized(region, player.id, [player], propertyDefs, propertyGroupDefs),
+  );
+
+  const regionBadges = monopolizedRegions.map((region) => ({ key: `region_${region}`, label: `🌐 ${region}エリア 完全独占`, region: true }));
+
+  const groupBadges = ownedGroups
+    .filter((g) => !monopolizedRegions.includes(g.region))
+    .filter((g) => isGroupMonopolized(g.id, player.id, [player], propertyDefs))
+    .map((g) => ({ key: `group_${g.id}`, label: `✨ ${g.name} 独占`, region: false }));
+
+  return [...regionBadges, ...groupBadges];
+}
+
 export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHudProps) {
+  const badges = monopolyBadges(player);
+
   return (
     <div
       className={`rounded-xl border p-3 transition ${
@@ -46,6 +75,19 @@ export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHud
         <span>🏠 {player.ownedPropertyIds.length}件</span>
         <span>🎯 {player.destinationsReached}回到着</span>
       </div>
+
+      {badges.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {badges.map((badge) => (
+            <span
+              key={badge.key}
+              className={`rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${badge.region ? "bg-sky-500" : "bg-amber-500"}`}
+            >
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {player.ownedPropertyIds.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">

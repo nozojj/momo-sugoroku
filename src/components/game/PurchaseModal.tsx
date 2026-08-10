@@ -2,9 +2,9 @@
 
 import type { Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
-import { getPropertiesInGroup } from "@/data/properties";
-import { getPropertyGroupDef } from "@/data/propertyGroups";
-import { getPropertyOwner } from "@/lib/game/propertyOwnership";
+import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
+import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { getPropertyOwner, ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 
 interface PurchaseModalProps {
@@ -19,6 +19,15 @@ export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: Pur
   const group = getPropertyGroupDef(groupId);
   const properties = getPropertiesInGroup(groupId);
 
+  // 「あと○件で独占」判定: グループ内に他プレイヤー所有の物件が1件でもあれば、このプレイヤーは
+  // 二度とそのグループを独占できない(売却は存在しないため)。その場合は「あと○件」を一切出さない。
+  const ownedByOther = properties.filter((p) => {
+    const owner = getPropertyOwner(p.id, players);
+    return !!owner && owner.id !== player.id;
+  });
+  const remainingForMonopoly = properties.filter((p) => !player.ownedPropertyIds.includes(p.id));
+  const monopolyAttainable = ownedByOther.length === 0 && remainingForMonopoly.length > 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-800">
@@ -29,16 +38,26 @@ export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: Pur
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {player.name}さんの所持金: <span className="font-bold">{formatMoney(player.money)}</span>
           </p>
+          {monopolyAttainable && remainingForMonopoly.length >= 2 && (
+            <p className="mt-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+              あと{remainingForMonopoly.length}件で{group?.name ?? "この物件エリア"}を独占
+            </p>
+          )}
         </div>
 
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {properties.map((def) => {
             const owner = getPropertyOwner(def.id, players);
-            const expectedRevenue = calculateAnnualRevenue(def);
+            // 所有済みの物件はその所有者の現在の独占状況を反映した収益、未所有は通常倍率(まだ
+            // 独占が成立していないので"normal"で正しい)。判定はownershipTier()をそのまま使う。
+            const tier = owner ? ownershipTier(def, owner.id, players, propertyDefs, propertyGroupDefs) : "normal";
+            const expectedRevenue = calculateAnnualRevenue(def, tier);
             const canAfford = player.money >= def.price;
             const isOwnedBySelf = owner?.id === player.id;
             const isOwnedByOther = !!owner && !isOwnedBySelf;
             const purchasable = !owner && canAfford;
+            const completesMonopoly =
+              purchasable && monopolyAttainable && remainingForMonopoly.length === 1 && remainingForMonopoly[0].id === def.id;
 
             return (
               <div
@@ -76,6 +95,12 @@ export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: Pur
                   <span>収益率 {Math.round(def.revenueRate * 100)}%</span>
                   <span>予想年間収益 +{formatMoney(expectedRevenue)}</span>
                 </div>
+
+                {completesMonopoly && (
+                  <p className="mt-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                    ✨ この物件を購入すると{group?.name ?? "このエリア"}を独占!
+                  </p>
+                )}
 
                 {!owner && (
                   <button

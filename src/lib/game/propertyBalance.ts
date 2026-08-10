@@ -5,15 +5,10 @@
 export const PROPERTY_REVENUE_CONFIG = {
   /** 通常時の年間収益 = price * revenueRate に対する倍率。基本は1のまま。 */
   baseMultiplier: 1,
-  /**
-   * グループ独占(そのグループの全物件を1人が所有)時の収益倍率。
-   * 現時点ではpropertyRevenue.tsから未参照(判定ロジックのみ用意済み)。
-   * 将来、ownershipTier()の結果と組み合わせて有効化する。
-   */
+  /** グループ独占(そのグループの全物件を1人が所有)時の収益倍率。propertyRevenue.tsの
+   *  calculateAnnualRevenue()がownershipTier()の結果と組み合わせて適用する。 */
   groupMonopolyMultiplier: 1.5,
-  /**
-   * region独占(その地域の全グループの全物件を1人が所有)時の収益倍率。
-   * 現時点では未参照。
-   */
+  /** region独占(その地域の全グループの全物件を1人が所有)時の収益倍率。groupMonopolyとの
+   *  重ね掛けはしない(ownershipTier()がregionMonopolyを優先して1つだけ返すため)。 */
   regionMonopolyMultiplier: 2,
 };

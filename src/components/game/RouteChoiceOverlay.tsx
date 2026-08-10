@@ -91,7 +91,7 @@ export function RouteChoiceOverlay({
         <span className="max-w-20 truncate text-[10px] font-medium opacity-80">{opt.nodeName}</span>
         {opt.distance !== null && (
           <span className="whitespace-nowrap text-[10px] font-bold">
-            目的地まで{opt.distance}マス{isShortest ? "(最短)" : ""}
+            目的地まで{opt.distance}マス{isShortest ? " ✨最短" : ""}
           </span>
         )}
       </button>

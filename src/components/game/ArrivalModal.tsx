@@ -18,6 +18,7 @@ function buildAnnouncement(info: ArrivalInfo): CharacterAnnouncement {
     enterDirection: "right",
     side: "right",
     animationType: "slide",
+    theme: "celebratory",
     lines: [
       { text: "おめでとうございます!", expression: "happy" },
       { text: `${info.playerName}さんが「${info.destinationName}」に一番乗りです!`, expression: "surprised" },

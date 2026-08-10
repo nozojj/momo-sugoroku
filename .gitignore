@@ -32,6 +32,9 @@ yarn-error.log*
 dev-out.log
 dev-err.log
 
+# dev-only scratch output (before/after comparison shots taken while iterating on map blocks)
+/screenshots/
+
 # env files (can opt-in for committing if needed)
 .env*
 

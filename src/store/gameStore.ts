@@ -3,11 +3,14 @@ import { persist } from "zustand/middleware";
 import type { GameState, Player, RouteOption } from "@/types/game";
 import { getMap, defaultMapId, maps } from "@/data/maps";
 import { getNode, getTraversableOptions, pickRandomDestination, rollDice as rollDiceValue } from "@/lib/game/mapGraph";
-import { getPropertyDef } from "@/data/properties";
+import { getPropertyDef, propertyDefs } from "@/data/properties";
+import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
+import { PROPERTY_REVENUE_CONFIG } from "@/lib/game/propertyBalance";
 import { getCardDef } from "@/data/cards";
 import { resolveLandingOutcome } from "@/lib/game/landingEffects";
-import { CARD_EFFECT_HANDLERS } from "@/lib/game/cardEffects";
-import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
+import { CARD_EFFECT_HANDLERS, effectKind, isDiceModifierEffect } from "@/lib/game/cardEffects";
+import { calculateSettlement } from "@/lib/game/settlement";
 import {
   createInitialState,
   makeLogId,
@@ -26,17 +29,22 @@ const IDLE_STATE: GameState = {
   totalTurns: DEFAULT_TOTAL_TURNS,
   destinationNodeId: "",
   diceResult: null,
+  diceFaces: null,
   remainingMoves: 0,
   pendingDoubleMove: false,
+  pendingDiceCount: 1,
   extraRollGranted: false,
+  activeVehicleMode: null,
   status: "waiting",
   routeOptions: [],
   pendingPropertyGroupId: null,
+  monopolyAchievement: null,
   arrivalInfo: null,
   moneyRouletteInfo: null,
   cardDrawInfo: null,
   cardOverflowInfo: null,
   settlementInfo: null,
+  netWorthHistory: [],
   log: [],
   winnerIds: null,
 };
@@ -58,8 +66,12 @@ interface GameStore extends GameState {
   buyProperty: (propertyId: string) => void;
   /** 物件購入画面を閉じ、着地処理を続行してターンを終える */
   finishPropertyShopping: () => void;
-  /** 到着演出モーダルを閉じて次のプレイヤーへ手番を送る */
+  /** MonopolyToastの表示が終わった(自動タイムアウト)ときに呼び、通知状態をクリアする */
+  dismissMonopolyAchievement: () => void;
+  /** 到着演出モーダルを閉じ、次の目的地へのカメラ演出(destinationFocus)へ進む */
   continueAfterArrival: () => void;
+  /** 目的地カメラ演出(自動完了 or タップスキップ)を終え、次のプレイヤーへ手番を送る */
+  continueAfterDestinationFocus: () => void;
   /** ルーレット演出モーダルを閉じて先の着地処理(到着判定・ターン送り)を続行する */
   continueAfterMoneyRoulette: () => void;
   /** カード抽選演出モーダルを閉じ、所持枠に空きがあれば手札に加えて先の着地処理を続行する。
@@ -67,7 +79,9 @@ interface GameStore extends GameState {
   continueAfterCardDraw: () => void;
   /** cardOverflow状態で、既存カードを1枚捨てて新カードを受け取るか、新カードを見送るかを確定する */
   resolveCardOverflow: (decision: { discard: "newCard" } | { discard: "existing"; index: number }) => void;
-  /** 決算演出モーダルを閉じて次のプレイヤーへ手番を送る(必要なら年またぎ) */
+  /** 決算導入演出(CharacterAnnouncer)を終え、SettlementScreen表示(status: "settlement")へ進む */
+  continueAfterSettlementIntro: () => void;
+  /** SettlementScreenを閉じて次のプレイヤーへ手番を送る(必要なら年またぎ。最終決算ならゲーム終了へ) */
   continueAfterSettlement: () => void;
 }
 
@@ -126,8 +140,12 @@ export const useGameStore = create<GameStore>()(
 
       /**
        * 全員が1回ずつ行動して年度が変わる瞬間(3月終了→4月開始)なら決算を行い、
-       * status: "settlement" へ遷移してtrueを返す(この場合、手番送りはcontinueAfterSettlement()が行う)。
+       * status: "settlementIntro" へ遷移してtrueを返す(この場合、手番送りは
+       * continueAfterSettlement()が行う。settlementIntro→settlementの遷移は
+       * continueAfterSettlementIntro()が担当する)。
        * 年度が変わらない、またはゲーム終了判定に入る場合はfalseを返し、呼び出し側の通常進行に任せる。
+       *
+       * 計算そのものはcalculateSettlement()(純関数)に委譲し、ここではその結果をset()するだけ。
        */
       function applySettlementIfNeeded(): boolean {
         const state = get();
@@ -136,28 +154,21 @@ export const useGameStore = create<GameStore>()(
         if (nextIndex !== 0 || !getCalendar(nextTurn).isYearStart) return false;
 
         const settledYear = getCalendar(state.turn).year;
-        const entries = state.players.map((player) => {
-          const propertyBreakdown = player.ownedPropertyIds.map((propertyId) => {
-            const def = getPropertyDef(propertyId);
-            const amount = def ? calculateAnnualRevenue(def) : 0;
-            return { propertyId, propertyName: def?.name ?? propertyId, amount };
-          });
-          const total = propertyBreakdown.reduce((sum, e) => sum + e.amount, 0);
-          return { playerId: player.id, playerName: player.name, propertyBreakdown, total };
-        });
-
-        const players = state.players.map((player) => {
-          const entry = entries.find((e) => e.playerId === player.id);
-          return entry && entry.total !== 0 ? { ...player, money: player.money + entry.total } : player;
-        });
+        const { entries, updatedPlayers, historyEntry } = calculateSettlement(
+          state.players,
+          settledYear,
+          state.netWorthHistory,
+        );
+        const isFinalSettlement = nextTurn > state.totalTurns;
 
         set({
-          players,
-          status: "settlement",
-          settlementInfo: { year: settledYear, entries },
+          players: updatedPlayers,
+          netWorthHistory: [...state.netWorthHistory, historyEntry],
+          status: "settlementIntro",
+          settlementInfo: { year: settledYear, isFinalSettlement, entries },
           log: pushLog(
             state,
-            `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.total}万円`).join("、")}`,
+            `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.propertyRevenue}万円`).join("、")}`,
           ),
         });
         return true;
@@ -191,6 +202,11 @@ export const useGameStore = create<GameStore>()(
 
       function endTurn() {
         const state = get();
+
+        // 変身(activeVehicleMode)は「ロール〜着地処理」の間だけ有効。この関数が呼ばれる時点で
+        // 着地効果・到着演出(destinationArrived/destinationFocus)は必ず完了しているため、
+        // ここで必ず通常車へ戻す。diceFacesも同じタイミングで表示用の内訳をクリアする。
+        set({ activeVehicleMode: null, diceFaces: null });
 
         if (state.extraRollGranted) {
           set({
@@ -283,8 +299,20 @@ export const useGameStore = create<GameStore>()(
           if (!player.cardIds.includes(cardId)) return;
           const def = getCardDef(cardId);
           if (!def || def.kind !== "usable" || !def.effect) return;
-          const handler = CARD_EFFECT_HANDLERS[def.effect];
+          const handler = CARD_EFFECT_HANDLERS[effectKind(def.effect)];
           if (!handler) return;
+
+          // ダイスの出目・移動量そのものを修飾する効果(doubleMove/multiDice)は同時に2つ以上
+          // 予約できない。既に予約済みなら、このカードは消費せず状態も変えずに理由をログへ残す。
+          if (isDiceModifierEffect(def.effect) && (state.pendingDoubleMove || state.pendingDiceCount > 1)) {
+            set({
+              log: pushLog(
+                state,
+                `${player.name}さんは「${def.name}」を使おうとしたが、すでに移動系カードの効果が予約されているため使えなかった。`,
+              ),
+            });
+            return;
+          }
 
           const playersAfterUse = updatePlayer(state.players, player.id, (p) => ({
             ...p,
@@ -297,21 +325,29 @@ export const useGameStore = create<GameStore>()(
         rollDice: () => {
           const state = get();
           if (state.status !== "rolling" || state.diceResult !== null) return;
-          const raw = rollDiceValue();
-          const result = state.pendingDoubleMove ? raw * 2 : raw;
+          const diceCount = state.pendingDiceCount;
+          const faces = Array.from({ length: diceCount }, () => rollDiceValue());
+          const rawSum = faces.reduce((sum, face) => sum + face, 0);
+          const result = state.pendingDoubleMove ? rawSum * 2 : rawSum;
           const player = currentPlayer(state);
           const wasDoubled = state.pendingDoubleMove;
           const players = updatePlayer(state.players, player.id, (p) => ({
             ...p,
             moveHistory: [p.currentNodeId],
           }));
+          const rollDescription = diceCount > 1 ? `${faces.join("+")}=${rawSum}` : `${rawSum}`;
           set({
             players,
-            diceResult: raw,
+            diceFaces: faces,
+            diceResult: rawSum,
             remainingMoves: result,
             pendingDoubleMove: false,
+            pendingDiceCount: 1,
             status: "moving",
-            log: pushLog(state, `${player.name}さんがサイコロを振った: ${raw}${wasDoubled ? " (2倍で" + result + "マス)" : ""}`),
+            log: pushLog(
+              state,
+              `${player.name}さんがサイコロを${diceCount > 1 ? diceCount + "個" : ""}振った: ${rollDescription}${wasDoubled ? " (2倍で" + result + "マス)" : ""}`,
+            ),
           });
         },
 
@@ -427,10 +463,32 @@ export const useGameStore = create<GameStore>()(
             money: p.money - def.price,
             ownedPropertyIds: [...p.ownedPropertyIds, def.id],
           }));
+
+          // 独占達成の検知: 購入「前」の所有状況(state.players)では未達成、購入「後」の所有状況
+          // (players)では達成、という差分だけを見る。そのグループは既に全物件が埋まるため、
+          // 同じ購入で再度この分岐に入ることはない(=通知は達成した瞬間の1回だけ)。
+          // 判定・倍率はどちらもpropertyOwnership.ts/propertyBalance.tsの既存値をそのまま使う。
+          const group = getPropertyGroupDef(def.groupId);
+          const wasGroupMonopoly = isGroupMonopolized(def.groupId, player.id, state.players, propertyDefs);
+          const isGroupMonopolyNow = isGroupMonopolized(def.groupId, player.id, players, propertyDefs);
+          const isRegionMonopolyNow =
+            !!group && isRegionMonopolized(group.region, player.id, players, propertyDefs, propertyGroupDefs);
+
+          let logMessage = `${player.name}さんが「${def.name}」を購入した(${def.price}万円)`;
+          let monopolyAchievement: GameState["monopolyAchievement"] = null;
+          if (!wasGroupMonopoly && isRegionMonopolyNow && group) {
+            logMessage += ` 🎉 ${group.region}エリアを完全独占!物件収益が${PROPERTY_REVENUE_CONFIG.regionMonopolyMultiplier}倍になります!`;
+            monopolyAchievement = { kind: "region", name: group.region, multiplier: PROPERTY_REVENUE_CONFIG.regionMonopolyMultiplier };
+          } else if (!wasGroupMonopoly && isGroupMonopolyNow && group) {
+            logMessage += ` 🎉 ${group.name}を独占!物件収益が${PROPERTY_REVENUE_CONFIG.groupMonopolyMultiplier}倍になります!`;
+            monopolyAchievement = { kind: "group", name: group.name, multiplier: PROPERTY_REVENUE_CONFIG.groupMonopolyMultiplier };
+          }
+
           // statusはpurchaseOfferのまま維持する: 同じグループの別の物件を続けて購入できるようにするため。
           set({
             players,
-            log: pushLog(state, `${player.name}さんが「${def.name}」を購入した(${def.price}万円)`),
+            monopolyAchievement,
+            log: pushLog(state, logMessage),
           });
         },
 
@@ -446,10 +504,17 @@ export const useGameStore = create<GameStore>()(
           finishLandingAndEndTurn();
         },
 
+        dismissMonopolyAchievement: () => set({ monopolyAchievement: null }),
+
         continueAfterArrival: () => {
           const state = get();
           if (state.status !== "destinationArrived") return;
-          set({ arrivalInfo: null });
+          set({ arrivalInfo: null, status: "destinationFocus" });
+        },
+
+        continueAfterDestinationFocus: () => {
+          const state = get();
+          if (state.status !== "destinationFocus") return;
           endTurn();
         },
 
@@ -519,6 +584,12 @@ export const useGameStore = create<GameStore>()(
           finishLandingAndEndTurn();
         },
 
+        continueAfterSettlementIntro: () => {
+          const state = get();
+          if (state.status !== "settlementIntro") return;
+          set({ status: "settlement" });
+        },
+
         continueAfterSettlement: () => {
           const state = get();
           if (state.status !== "settlement") return;
@@ -555,7 +626,30 @@ export const useGameStore = create<GameStore>()(
         const players = state.players?.map((p) =>
           p.moveHistory && p.moveHistory.length > 0 ? p : { ...p, moveHistory: [p.currentNodeId] },
         );
-        return { ...currentState, ...state, ...(players ? { players } : {}) };
+
+        // 旧セーブ(SettlementEntryにnetWorthAfterが無い形式)を決算演出/画面の表示中に
+        // 保存していた場合の防御。お金は書き込み時点で既に反映済みなので実害はなく、
+        // その年の決算表示だけを1回スキップしてrollingへ戻す。
+        const staleEntry = state.settlementInfo?.entries?.[0];
+        const hasStaleSettlementInfo =
+          (state.status === "settlementIntro" || state.status === "settlement") &&
+          !!state.settlementInfo &&
+          (!staleEntry || !("netWorthAfter" in staleEntry));
+        const settlementOverride = hasStaleSettlementInfo
+          ? { status: "rolling" as const, settlementInfo: null }
+          : {};
+
+        return {
+          ...currentState,
+          ...state,
+          ...(players ? { players } : {}),
+          // 旧セーブにキー自体が無ければcurrentState(IDLE_STATE由来)の既定値がそのまま使われる。
+          netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
+          pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
+          activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,
+          diceFaces: state.diceFaces ?? currentState.diceFaces,
+          ...settlementOverride,
+        };
       },
     },
   ),

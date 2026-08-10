@@ -47,12 +47,16 @@ export function makeLogId(): string {
   return `log_${logSeq}_${Date.now()}`;
 }
 
-export function netWorth(player: Player): number {
-  const propertyValue = player.ownedPropertyIds.reduce((sum, id) => {
+/** 所有物件の資産価値(assetValue)合計。netWorth()とcalculateSettlement()の両方から使う。 */
+export function propertyValueOf(player: Player): number {
+  return player.ownedPropertyIds.reduce((sum, id) => {
     const def = getPropertyDef(id);
     return sum + (def?.assetValue ?? 0);
   }, 0);
-  return player.money + propertyValue;
+}
+
+export function netWorth(player: Player): number {
+  return player.money + propertyValueOf(player);
 }
 
 export function computeWinnerIds(players: Player[]): string[] {
@@ -89,17 +93,22 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     totalTurns,
     destinationNodeId,
     diceResult: null,
+    diceFaces: null,
     remainingMoves: 0,
     pendingDoubleMove: false,
+    pendingDiceCount: 1,
     extraRollGranted: false,
+    activeVehicleMode: null,
     status: "rolling",
     routeOptions: [],
     pendingPropertyGroupId: null,
+    monopolyAchievement: null,
     arrivalInfo: null,
     moneyRouletteInfo: null,
     cardDrawInfo: null,
     cardOverflowInfo: null,
     settlementInfo: null,
+    netWorthHistory: [],
     log: [
       {
         id: makeLogId(),

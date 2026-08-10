@@ -43,31 +43,52 @@ export function rollDice(): number {
 }
 
 /**
- * fromId から toId までの最短経路のマス数をBFSで求める。あくまで案内表示用の情報で、
- * 移動そのものには使わない(自動移動・最短強制はしない)。
- * 所持カードが無いと通れない近道は除外して計算する(実際に辿れる距離と一致させるため)。
- * 到達不能な場合はnullを返す。
+ * fromId から toId までの最短経路をBFSで求め、通ったノードIDを fromId から toId まで順に返す
+ * (fromId自身・toId自身を含む)。あくまで案内表示用の情報で、移動そのものには使わない
+ * (自動移動・最短強制はしない)。所持カードが無いと通れない近道(requiresCardId)は除外して
+ * 計算する(実際に辿れる経路と一致させるため)。到達不能な場合はnullを返す。
+ *
+ * 将来「盤面上で最短ルートを光らせる」演出を追加する際は、この関数の戻り値(nodeId配列)を
+ * そのままBoard.tsx側の描画対象として使える設計にしている。
  */
-export function shortestDistance(map: MapData, fromId: string, toId: string, ownedCardIds: string[]): number | null {
-  if (fromId === toId) return 0;
+export function shortestPath(map: MapData, fromId: string, toId: string, ownedCardIds: string[]): string[] | null {
+  if (fromId === toId) return [fromId];
   const visited = new Set<string>([fromId]);
+  const parent = new Map<string, string>();
   let frontier = [fromId];
-  let distance = 0;
 
   while (frontier.length > 0) {
-    distance += 1;
     const next: string[] = [];
     for (const id of frontier) {
       const node = getNode(map, id);
       for (const edge of node.connections) {
         if (edge.requiresCardId && !ownedCardIds.includes(edge.requiresCardId)) continue;
         if (visited.has(edge.to)) continue;
-        if (edge.to === toId) return distance;
         visited.add(edge.to);
+        parent.set(edge.to, id);
+        if (edge.to === toId) {
+          const path = [toId];
+          let cur = toId;
+          while (cur !== fromId) {
+            cur = parent.get(cur)!;
+            path.push(cur);
+          }
+          return path.reverse();
+        }
         next.push(edge.to);
       }
     }
     frontier = next;
   }
   return null;
+}
+
+/**
+ * fromId から toId までの最短経路のマス数。shortestPath()に委譲するだけの薄いラッパーで、
+ * BFSの走査条件(カードゲート・訪問済み判定)を1箇所(shortestPath)にまとめている。
+ * 到達不能な場合はnullを返す。
+ */
+export function shortestDistance(map: MapData, fromId: string, toId: string, ownedCardIds: string[]): number | null {
+  const path = shortestPath(map, fromId, toId, ownedCardIds);
+  return path ? path.length - 1 : null;
 }

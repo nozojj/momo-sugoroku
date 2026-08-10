@@ -9,4 +9,10 @@ export const CHARACTER_ANNOUNCER_TIMING = {
   slideOutMs: 320,
   /** 1セリフあたり、タップされなかった場合に自動で次へ進むまでの表示時間(ms) */
   lineHoldMs: 2200,
+  /** 着地(slideIn終了)後、軽くbounceさせる時間(ms)。この間はまだ"entering"扱いのまま */
+  bounceMs: 150,
+  /** 吹き出しpop後、highlightのslamアニメーションを開始するまでの遅延(ms)。アニメーション自体の長さはCSS(highlight-slam)側で定義する */
+  highlightDelayMs: 300,
+  /** highlightがある行で、lineHoldMsに追加する既定の保持時間(ms)。行ごとにCharacterLine.highlight.holdExtraMsで上書き可能 */
+  highlightHoldExtraMs: 900,
 };

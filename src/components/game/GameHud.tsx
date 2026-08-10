@@ -6,8 +6,10 @@ interface GameHudProps {
   destinationName: string;
   calendarText: string;
   onOpenDrawer: () => void;
-  /** 移動中(status: "moving")のときだけ、残りマス数・目的地までの最短マス数を追加表示する。 */
-  movementInfo?: { remainingMoves: number; distanceToDestination: number | null };
+  /** rolling(サイコロを振る前)〜moving/selectingRoute(移動中)の間、目的地までの最短マス数を
+   *  追加表示する。remainingMovesはmoving/selectingRouteのときだけ値を持ち(rolling中はnull)、
+   *  その場合は残りマス数の行を出さない。 */
+  movementInfo?: { remainingMoves: number | null; distanceToDestination: number | null };
 }
 
 /** マップ上部に常時表示する最小限のHUD。手番・目的地・年月だけを見せる。 */
@@ -44,7 +46,7 @@ export function GameHud({
 
       {movementInfo && (
         <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-          <span>🎲 あと{movementInfo.remainingMoves}マス</span>
+          {movementInfo.remainingMoves !== null && <span>🎲 あと{movementInfo.remainingMoves}マス</span>}
           {movementInfo.distanceToDestination !== null && (
             <span>🎯 目的地まであと{movementInfo.distanceToDestination}マス</span>
           )}

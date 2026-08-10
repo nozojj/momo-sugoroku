@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RouteOption } from "@/types/game";
+import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RouteOption, VehicleMode } from "@/types/game";
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
+import { shortestPath } from "@/lib/game/mapGraph";
 import { getPropertiesInGroup } from "@/data/properties";
 import { getPropertyGroupDef } from "@/data/propertyGroups";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
@@ -18,6 +19,14 @@ interface BoardProps {
   routeOptions: RouteOption[];
   onSelectRoute: (nodeId: string) => void;
   status: GameStatus;
+  /** destinationFocus演出(カメラ移動+目的地強調)が完了した(自動 or タップスキップ)ときに呼ばれる */
+  onDestinationFocusComplete: () => void;
+  /** 急行系カード使用中に一時的に切り替わる車の見た目。currentPlayerIndexの駒にのみ適用する。 */
+  activeVehicleMode: VehicleMode | null;
+  /** 現在地→目的地の最短ルートを道路上に発光表示するか。既定true。
+   *  将来「最短ルート表示 ON/OFF」設定を追加する際は、呼び出し側(GameScreen.tsx)で
+   *  この値をstate/設定から渡すだけでよく、Board.tsx側の変更は不要な設計にしている。 */
+  showShortestRoute?: boolean;
 }
 
 const PADDING = 80;
@@ -34,6 +43,16 @@ const DESKTOP_MOVEMENT_ZOOM = 1.4;
 /** パン/ズームのCSSトランジション時間。CarTokenの移動アニメーション(420ms)と揃え、
  *  カメラ追従が駒の移動に自然に同期して見えるようにする。 */
 const CAMERA_TRANSITION_MS = 420;
+/** 目的地カメラ演出(destinationFocus)で使うズーム倍率。移動中(MOVEMENT_ZOOM)より少し引いた
+ *  見え方にして、目的地マスだけでなく周辺の道も見えるようにする。実機確認後はこの1箇所だけ変更すればよい。 */
+const DESKTOP_DESTINATION_ZOOM = 1.25;
+const MOBILE_DESTINATION_ZOOM = 2.1;
+/** 目的地カメラ演出の所要時間。パン(カメラ移動)にかける時間と、到着後に停止して見せる時間を分離した
+ *  調整用定数。タップでスキップした場合はDESTINATION_FOCUS_SKIP_HOLD_MSの方を使う。 */
+const DESTINATION_FOCUS_PAN_MS = 420;
+const DESTINATION_FOCUS_HOLD_MS = 1200;
+/** タップでスキップした場合、目的地中央の最終位置へ即座にジャンプしてからこの時間だけ表示を保持する。 */
+const DESTINATION_FOCUS_SKIP_HOLD_MS = 450;
 /** このズーム未満は「全体表示」段階(建物イラストを間引き、マスの色分け表示だけにする)。
  *  移動中(isMovingPhase)はズーム値に関わらず常に詳細表示にする。 */
 const ZOOM_DETAIL_THRESHOLD = 0.9;
@@ -92,7 +111,18 @@ function smoothPathThroughPoints(points: { x: number; y: number }[]): string {
   return d;
 }
 
-export function Board({ map, players, currentPlayerIndex, destinationNodeId, routeOptions, onSelectRoute, status }: BoardProps) {
+export function Board({
+  map,
+  players,
+  currentPlayerIndex,
+  destinationNodeId,
+  routeOptions,
+  onSelectRoute,
+  status,
+  onDestinationFocusComplete,
+  activeVehicleMode,
+  showShortestRoute = true,
+}: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
   const [zoom, setZoom] = useState(0.55);
@@ -103,6 +133,14 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   const isMobile = useIsMobileViewport();
   /** falseの間はプレイヤー移動によるカメラ追従を止める(ユーザーが手動でマップを動かした場合)。 */
   const autoFollowRef = useRef(true);
+  /** trueの間はCSSトランジションを無効化し、pan/zoomの変更を即座に反映する(destinationFocusのタップスキップ用)。 */
+  const [instantCameraTransition, setInstantCameraTransition] = useState(false);
+  const wasDestinationFocusRef = useRef(false);
+  const destinationFocusTimerRef = useRef<number | null>(null);
+  /** このdestinationFocusサイクルで既にonDestinationFocusCompleteを呼んだか(二重発火防止) */
+  const destinationFocusResolvedRef = useRef(false);
+  /** このdestinationFocusサイクルで既にタップスキップ済みか(複数タップでの多重スキップ防止) */
+  const destinationFocusSkippedRef = useRef(false);
 
   const { width, height, edges } = useMemo(() => {
     const xs = map.nodes.map((n) => n.x);
@@ -129,6 +167,24 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
   const selectableIds = new Set(routeOptions.map((o) => o.nodeId));
   const currentPlayer = players[currentPlayerIndex];
 
+  /** 現在地→目的地の最短ルート案内(表示専用)。GameStateには保存せず、その場でBFSするだけ。
+   *  到着済み(現在地===目的地)のときはnullにして発光を出さない。 */
+  const shortestPathNodeIds = useMemo(() => {
+    if (!currentPlayer || currentPlayer.currentNodeId === destinationNodeId) return null;
+    return shortestPath(map, currentPlayer.currentNodeId, destinationNodeId, currentPlayer.cardIds);
+  }, [map, currentPlayer?.currentNodeId, destinationNodeId, currentPlayer?.cardIds]);
+
+  /** shortestPathNodeIdsの隣接ノード対を、edges(道路)の重複排除キーと同じ形式("from|to"をsort)で
+   *  Set化したもの。道路描画側はこのSetにキーが含まれるかだけを見ればよい。 */
+  const shortestPathEdgeKeys = useMemo(() => {
+    if (!shortestPathNodeIds || shortestPathNodeIds.length < 2) return null;
+    const keys = new Set<string>();
+    for (let i = 0; i < shortestPathNodeIds.length - 1; i++) {
+      keys.add([shortestPathNodeIds[i], shortestPathNodeIds[i + 1]].sort().join("|"));
+    }
+    return keys;
+  }, [shortestPathNodeIds]);
+
   function clampZoom(z: number) {
     // マップが広がった分、全体を1画面に収めるズームが0.2を下回る場合があるため下限を緩めている
     return Math.min(2.2, Math.max(0.08, z));
@@ -150,6 +206,19 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     }
     const z = clampZoom(Math.min(rect.width / width, rect.height / height) * 0.94);
     return { zoom: z, pan: { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 } };
+  }
+
+  /** 目的地カメラ演出(destinationFocus)中のズーム/パン。次の目的地マスを中心に、
+   *  移動中(getMovementCamera)より少し引いたズームで周辺の道も見えるように映す。 */
+  function getDestinationFocusCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+    const z = clampZoom(isMobile ? MOBILE_DESTINATION_ZOOM : DESKTOP_DESTINATION_ZOOM);
+    const node = nodeById.get(destinationNodeId);
+    return {
+      zoom: z,
+      pan: node
+        ? { x: rect.width / 2 - (node.x - minX) * z, y: rect.height / 2 - (node.y - minY) * z }
+        : { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 },
+    };
   }
 
   /** 移動中(サイコロを振った後〜着地まで、分岐選択中も含む)のズーム/パン。現在プレイヤーを中心に、
@@ -221,6 +290,86 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     setPan({ x: rect.width / 2 - (node.x - minX) * zoom, y: rect.height / 2 - (node.y - minY) * zoom });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPlayerIndex, currentPlayer?.currentNodeId]);
+
+  const isDestinationFocus = status === "destinationFocus";
+
+  /** destinationFocus演出を終了する。通常完了・タップスキップどちらの経路からも呼ばれるため、
+   *  refで二重発火(=onDestinationFocusCompleteの二重呼び出し)を防ぐ。 */
+  function finishDestinationFocus() {
+    if (destinationFocusResolvedRef.current) return;
+    destinationFocusResolvedRef.current = true;
+    if (destinationFocusTimerRef.current !== null) {
+      window.clearTimeout(destinationFocusTimerRef.current);
+      destinationFocusTimerRef.current = null;
+    }
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      const { zoom: z, pan: p } = getIdleCamera(rect);
+      setZoom(z);
+      setPan(p);
+    }
+    autoFollowRef.current = true;
+    onDestinationFocusComplete();
+  }
+
+  // destinationFocusに入った瞬間、次の目的地マスへカメラをパンし、一定時間(パン+停止)後に
+  // 自動でfinishDestinationFocus()を呼ぶ。isMovingPhaseの遷移エフェクトと同じ
+  // 「previousをrefで持ち、クリーンアップで戻す」形でStrict Modeの二重実行に対応する。
+  useEffect(() => {
+    const previous = wasDestinationFocusRef.current;
+    if (isDestinationFocus && !previous) {
+      destinationFocusResolvedRef.current = false;
+      destinationFocusSkippedRef.current = false;
+      setInstantCameraTransition(false);
+      autoFollowRef.current = false;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        const { zoom: z, pan: p } = getDestinationFocusCamera(rect);
+        setZoom(z);
+        setPan(p);
+      }
+
+      if (destinationFocusTimerRef.current !== null) window.clearTimeout(destinationFocusTimerRef.current);
+      destinationFocusTimerRef.current = window.setTimeout(() => {
+        finishDestinationFocus();
+      }, DESTINATION_FOCUS_PAN_MS + DESTINATION_FOCUS_HOLD_MS);
+    }
+    wasDestinationFocusRef.current = isDestinationFocus;
+    return () => {
+      wasDestinationFocusRef.current = previous;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDestinationFocus]);
+
+  /** destinationFocus中のタップスキップ。目的地中央の最終位置へ即座にジャンプしてから
+   *  短い時間(DESTINATION_FOCUS_SKIP_HOLD_MS)だけ見せて終了する。 */
+  function skipDestinationFocus() {
+    if (!isDestinationFocus || destinationFocusResolvedRef.current || destinationFocusSkippedRef.current) return;
+    destinationFocusSkippedRef.current = true;
+
+    if (destinationFocusTimerRef.current !== null) {
+      window.clearTimeout(destinationFocusTimerRef.current);
+      destinationFocusTimerRef.current = null;
+    }
+
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      const { zoom: z, pan: p } = getDestinationFocusCamera(rect);
+      setInstantCameraTransition(true);
+      setZoom(z);
+      setPan(p);
+      // 「トランジション無しの瞬間移動」を1フレーム確実に描画させてから、次のトランジション
+      // (終了時のgetIdleCameraへの遷移)を通常通りアニメーションさせるためにフラグを戻す。
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setInstantCameraTransition(false));
+      });
+    }
+
+    destinationFocusTimerRef.current = window.setTimeout(() => {
+      finishDestinationFocus();
+    }, DESTINATION_FOCUS_SKIP_HOLD_MS);
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -301,6 +450,14 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
     setDebugClickPos({ x: Math.round(gameX), y: Math.round(gameY) });
   }
 
+  function onBoardClick(e: React.MouseEvent) {
+    if (isDestinationFocus) {
+      skipDestinationFocus();
+      return;
+    }
+    onDebugClick(e);
+  }
+
   function recenterOnCurrentPlayer() {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -320,20 +477,29 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         onWheel={onWheel}
-        onClick={onDebugClick}
-        style={{ cursor: dragging ? "grabbing" : "grab" }}
+        onClick={onBoardClick}
+        style={{ cursor: dragging ? "grabbing" : isDestinationFocus ? "pointer" : "grab" }}
       >
         <div
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",
-            transition: dragging ? "none" : `transform ${CAMERA_TRANSITION_MS}ms ease-out`,
+            transition: dragging || instantCameraTransition ? "none" : `transform ${CAMERA_TRANSITION_MS}ms ease-out`,
           }}
         >
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
             <defs>
               <filter id="board-soft" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="16" />
+              </filter>
+              {/* 最短ルート発光用。board-soft(ハブの丸い後光向け)より弱く、細い道路に合わせたぼかし。 */}
+              <filter id="road-glow-soft" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="2.5" />
+              </filter>
+              {/* 目的地マスの通常時ソフトグロー用。road-glow-soft(道路の細い発光向け)より広く、
+                  board-soft(ハブの丸い後光、範囲が広すぎる)より狭い、点(マス)向けの中間のぼかし。 */}
+              <filter id="destination-glow-soft" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="8" />
               </filter>
               <pattern id="board-houses" width="26" height="26" patternUnits="userSpaceOnUse">
                 <rect x="4" y="10" width="8" height="8" rx="1.5" fill="#d8c9a3" opacity="0.55" />
@@ -374,8 +540,21 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                 routeOptions.length > 0 &&
                 ((from.id === currentPlayer?.currentNodeId && selectableIds.has(to.id)) ||
                   (to.id === currentPlayer?.currentNodeId && selectableIds.has(from.id)));
+              const edgeKey = [edge.from, edge.to].sort().join("|");
+              const isShortestRouteEdge = showShortestRoute && (shortestPathEdgeKeys?.has(edgeKey) ?? false);
               return (
                 <g key={`${edge.from}-${edge.to}`} opacity={isSelectableEdge ? 1 : 0.92} className={isSelectableEdge ? "animate-pulse-node" : undefined}>
+                  {isShortestRouteEdge && (
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="#ffcc33"
+                      strokeOpacity={0.7}
+                      strokeWidth={style.width + 14}
+                      strokeLinecap="round"
+                      filter="url(#road-glow-soft)"
+                    />
+                  )}
                   <path d={d} fill="none" stroke={style.base} strokeWidth={style.width} strokeLinecap="round" />
                   <path d={d} fill="none" stroke={style.top} strokeWidth={style.width * 0.72} strokeLinecap="round" strokeDasharray={style.dash} />
                   {!style.dash && (
@@ -403,8 +582,21 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
               return (
                 <g key={node.id} onClick={() => isSelectable && onSelectRoute(node.id)} style={{ cursor: isSelectable ? "pointer" : "default" }}>
                   {node.isMajorHub && <circle cx={cx} cy={cy} r={radius + 20} fill="#fff8e6" opacity={0.5} filter="url(#board-soft)" />}
-                  {isDestination && (
-                    <circle cx={cx} cy={cy} r={radius + 9} fill="none" stroke="#f5a623" strokeWidth={3} className="animate-ping-slow" />
+                  {/* 目的地カメラ演出(destinationFocus)中だけ表示する「今だけ強調」の光彩。
+                      盤面全体は暗くせず、目的地マス周辺だけに効果を留める。 */}
+                  {isDestination && isDestinationFocus && (
+                    <circle cx={cx} cy={cy} r={radius + 30} fill="#ffb703" opacity={0.3} className="animate-spotlight-glow" />
+                  )}
+                  {/* 通常時(destinationFocus中でない)の目的地マス案内。ソフトグロー(面)+静止リング(輪郭)の
+                      2層で構成し、常時ループするアニメーションは使わない(上品な強調に留める)。
+                      色は最短ルート発光(#ffcc33)と揃えて、道路の発光が目的地マスまで自然に
+                      つながって見えるようにしている。destinationFocus中はこちらを消し、
+                      既存の到着演出(上のspotlight-glow等)だけを主役にする。 */}
+                  {isDestination && !isDestinationFocus && (
+                    <>
+                      <circle cx={cx} cy={cy} r={radius + 16} fill="#ffcc33" opacity={0.35} filter="url(#destination-glow-soft)" />
+                      <circle cx={cx} cy={cy} r={radius + 9} fill="none" stroke="#f5a623" strokeWidth={3} />
+                    </>
                   )}
                   {isSelectable && <circle cx={cx} cy={cy} r={radius + 6} fill="#fde68a" opacity={0.55} className="animate-pulse-node" />}
                   {isLandmark && <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#caa23d" strokeWidth={1.5} opacity={0.6} />}
@@ -422,7 +614,14 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                     {icon}
                   </text>
                   {isDestination && (
-                    <text x={cx} y={cy - radius - 14} textAnchor="middle" fontSize={14} pointerEvents="none">
+                    <text
+                      x={cx}
+                      y={cy - radius - 14}
+                      textAnchor="middle"
+                      fontSize={isDestinationFocus ? 20 : 14}
+                      pointerEvents="none"
+                      className={isDestinationFocus ? "animate-spotlight-pop" : undefined}
+                    >
                       🎯
                     </text>
                   )}
@@ -480,6 +679,7 @@ export function Board({ map, players, currentPlayerIndex, destinationNodeId, rou
                   offsetX={dx}
                   offsetY={dy}
                   isCurrentTurn={i === currentPlayerIndex}
+                  vehicleMode={i === currentPlayerIndex ? (activeVehicleMode ?? "normal") : "normal"}
                 />
               );
             })}
