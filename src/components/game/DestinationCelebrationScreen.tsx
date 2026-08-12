@@ -20,14 +20,22 @@ interface DestinationCelebrationScreenProps {
   onContinue: () => void;
 }
 
+/** 演出フェーズ。GameState/statusは増やさず、このコンポーネント内のローカルstateのみで完結させる。
+ *  "lines": お祝い4行(セリフ送り)。
+ *  "spin": 「次の目的地は……」で候補地名が高速→減速して切り替わる(見た目だけのルーレット)。
+ *  "reveal": スピンが確定地名(arrivalInfo.nextDestinationName)で停止し、大きく強調表示する。
+ *  "speak": naviが「次は◯◯を目指しましょう!」と話す。この後onContinue()を呼ぶ。 */
+type Phase = "lines" | "spin" | "reveal" | "speak";
+
 /** ルーレット演出(調整用定数)。候補地の抽選ロジックには一切関与しない、見た目のタイミングのみ。
  *  MoneyRouletteModal.tsxと同じ「後半ほど間隔が長くなる(減速する)」手法を踏襲する。 */
 const SPIN_DURATION_MS = 1200; // 減速しながら地名が確定するまでの時間
 const SPIN_STEP_COUNT = 10; // 確定前に切り替わる回数
-const HOLD_DURATION_MS = 700; // 確定地名を表示してから閉じるまでの時間
+const REVEAL_HOLD_MS = 900; // 確定地名を強調表示してから、naviが話し始めるまでの時間
 // prefers-reduced-motion時は切替回数・時間を大きく縮める(演出自体は消さず、短く見せるだけ)。
 const REDUCED_SPIN_DURATION_MS = 350;
 const REDUCED_SPIN_STEP_COUNT = 3;
+const REDUCED_REVEAL_HOLD_MS = 300;
 
 /** 第1段階: 目的地到着セリフ(おめでとう〜到着援助金〜次の目的地を決めましょう、まで)を
  * 全画面の「お祝いイベント画面」として表示する。ゲーム状態は一切書き換えない表示専用
@@ -84,36 +92,13 @@ export function DestinationCelebrationScreen({
   const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsMobileViewport();
 
-  // フェーズ管理はこのコンポーネント内のローカルstateのみで完結させる(GameState/statusは増やさない)。
-  // "lines": 既存のお祝い4行(セリフ送り)。"roulette": 今回追加する見た目だけの次の目的地ルーレット。
-  const [phase, setPhase] = useState<"lines" | "roulette">("lines");
+  const [phase, setPhase] = useState<Phase>("lines");
   const [lineIndex, setLineIndex] = useState(0);
   const linesCompletedRef = useRef(false);
 
-  function advance() {
-    if (phase !== "lines") return; // ルーレット中はタップしても何も起きない(今回は早送り機能を作らない)
-    if (lineIndex < lines.length - 1) {
-      setLineIndex((i) => i + 1);
-      return;
-    }
-    if (linesCompletedRef.current) return;
-    linesCompletedRef.current = true;
-    setPhase("roulette");
-  }
-
-  // セリフの自動送り(タップされなければ保持時間後に進む)。CharacterAnnouncer.tsxと同じ
-  // タイミング定数(CHARACTER_ANNOUNCER_TIMING)を再利用し、演出のテンポを統一する。
-  useEffect(() => {
-    if (phase !== "lines") return;
-    const current = lines[lineIndex];
-    const holdExtraMs = current?.highlight ? CHARACTER_ANNOUNCER_TIMING.highlightHoldExtraMs : 0;
-    const timer = window.setTimeout(advance, CHARACTER_ANNOUNCER_TIMING.lineHoldMs + holdExtraMs);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, lineIndex, lines]);
-
   const spinStepCount = reduceMotion ? REDUCED_SPIN_STEP_COUNT : SPIN_STEP_COUNT;
   const spinDurationMs = reduceMotion ? REDUCED_SPIN_DURATION_MS : SPIN_DURATION_MS;
+  const revealHoldMs = reduceMotion ? REDUCED_REVEAL_HOLD_MS : REVEAL_HOLD_MS;
 
   // 見せかけの候補列。マウント中は候補・確定地名が変わらない前提(このコンポーネントは
   // arrivalInfoが非nullの間だけGameScreen側でマウントされ続ける)なので、依存が変わっても
@@ -130,37 +115,93 @@ export function DestinationCelebrationScreen({
   );
 
   const [spinStep, setSpinStep] = useState(0);
-  const spinning = phase === "roulette" && spinStep < spinSequence.length - 1;
-  const spinSettled = phase === "roulette" && !spinning;
 
-  // スピン中: 次の目へ切り替える(減速するintervalsに沿って進む)。
+  // onContinue()が二重に呼ばれないようにする唯一のゲート。タップ早送り(handleClick)と
+  // 自動タイマー(useEffect)のどちらから呼ばれても、最初の1回だけを通す。
+  const continuedRef = useRef(false);
+  function finish() {
+    if (continuedRef.current) return;
+    continuedRef.current = true;
+    onContinue();
+  }
+
+  // スピン中: 次の目へ切り替える(減速するintervalsに沿って進む)。最後の1歩に達したら
+  // spinStepの更新とphase遷移を同じコールバック内で行い(Reactが1レンダーにまとめてくれる)、
+  // 「確定名がspin表示のまま一瞬映ってからrevealに切り替わる」ようなチラつきを避ける。
   useEffect(() => {
-    if (phase !== "roulette") return;
+    if (phase !== "spin") return;
     if (spinStep >= spinSequence.length - 1) return;
-    const timer = window.setTimeout(() => setSpinStep((s) => s + 1), spinIntervals[spinStep]);
+    const timer = window.setTimeout(() => {
+      const next = spinStep + 1;
+      setSpinStep(next);
+      if (next >= spinSequence.length - 1) setPhase("reveal");
+    }, spinIntervals[spinStep]);
     return () => window.clearTimeout(timer);
   }, [phase, spinStep, spinSequence.length, spinIntervals]);
 
-  // 確定後: 強調表示をHOLD_DURATION_MSだけ見せてから自動でonContinue()を呼ぶ。
-  // rouletteCompletedRefで二重発火を防ぐ(cleanupでの取り消しに加え、念のための保険。
-  // MoneyRouletteModal.tsxのfiredRefと同じ役割)。
-  const rouletteCompletedRef = useRef(false);
+  // reveal: 確定地名をrevealHoldMsだけ強調表示してから、自動でspeakフェーズへ進む。
   useEffect(() => {
-    if (!spinSettled) return;
-    const timer = window.setTimeout(() => {
-      if (rouletteCompletedRef.current) return;
-      rouletteCompletedRef.current = true;
-      onContinue();
-    }, HOLD_DURATION_MS);
+    if (phase !== "reveal") return;
+    const timer = window.setTimeout(() => setPhase("speak"), revealHoldMs);
     return () => window.clearTimeout(timer);
-  }, [spinSettled, onContinue]);
+  }, [phase, revealHoldMs]);
+
+  // speak: naviのセリフをCHARACTER_ANNOUNCER_TIMING.lineHoldMsだけ保持してから、
+  // 自動でfinish()(=onContinue())を呼ぶ。
+  useEffect(() => {
+    if (phase !== "speak") return;
+    const timer = window.setTimeout(finish, CHARACTER_ANNOUNCER_TIMING.lineHoldMs);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // 全フェーズ共通のタップ/クリックハンドラ。現在のフェーズに応じて、待っている自動タイマーを
+  // 早送りするだけ(何かを再抽選したり、フェーズを飛び越したりはしない)。
+  function handleClick() {
+    if (phase === "lines") {
+      if (lineIndex < lines.length - 1) {
+        setLineIndex((i) => i + 1);
+        return;
+      }
+      if (linesCompletedRef.current) return;
+      linesCompletedRef.current = true;
+      setPhase("spin");
+      return;
+    }
+    if (phase === "spin") {
+      // スピンの残りをスキップして即座に確定させる(spinStep/phaseを同じイベント内で更新)。
+      setSpinStep(spinSequence.length - 1);
+      setPhase("reveal");
+      return;
+    }
+    if (phase === "reveal") {
+      setPhase("speak");
+      return;
+    }
+    if (phase === "speak") {
+      finish();
+      return;
+    }
+  }
+
+  // セリフの自動送り(タップされなければ保持時間後に進む)。CharacterAnnouncer.tsxと同じ
+  // タイミング定数(CHARACTER_ANNOUNCER_TIMING)を再利用し、演出のテンポを統一する。
+  useEffect(() => {
+    if (phase !== "lines") return;
+    const current = lines[lineIndex];
+    const holdExtraMs = current?.highlight ? CHARACTER_ANNOUNCER_TIMING.highlightHoldExtraMs : 0;
+    const timer = window.setTimeout(handleClick, CHARACTER_ANNOUNCER_TIMING.lineHoldMs + holdExtraMs);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, lineIndex, lines]);
 
   const currentLine = lines[lineIndex];
+  const naviLine: CharacterLine = { text: `次は${arrivalInfo.nextDestinationName}を目指しましょう!` };
 
   return (
     <div
       className="fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center gap-3 overflow-y-auto bg-gradient-to-b from-amber-200 via-orange-300 to-rose-300 p-4 dark:from-amber-900 dark:via-orange-950 dark:to-rose-950 sm:gap-5 sm:p-8"
-      onClick={advance}
+      onClick={handleClick}
       role="button"
       tabIndex={0}
       aria-label="次へ"
@@ -177,9 +218,9 @@ export function DestinationCelebrationScreen({
         </>
       )}
 
-      {phase === "roulette" && (
+      {phase === "spin" && (
         <p className="animate-arrival-pop text-center text-sm font-black tracking-widest text-white drop-shadow sm:text-lg">
-          🎯 次の目的地は…? 🎯
+          🎯 次の目的地は…… 🎯
         </p>
       )}
 
@@ -194,22 +235,29 @@ export function DestinationCelebrationScreen({
         </div>
       )}
 
-      {phase === "roulette" && (
+      {phase === "spin" && (
         <div className="w-full max-w-sm rounded-2xl border-2 border-white/50 bg-white/10 px-4 py-6 text-center shadow-xl backdrop-blur-sm sm:max-w-md">
-          <p
-            key={spinStep}
-            className={`animate-arrival-pop text-3xl font-black drop-shadow-lg sm:text-5xl ${
-              spinning ? "text-white/80" : "text-white"
-            }`}
-          >
+          <p key={spinStep} className="animate-arrival-pop text-3xl font-black text-white/80 drop-shadow-lg sm:text-5xl">
             {spinSequence[spinStep]}
           </p>
         </div>
       )}
 
-      {phase === "lines" && (
-        <p className="mt-1 text-xs font-bold text-white/90 drop-shadow sm:text-sm">タップして次へ</p>
+      {phase === "reveal" && (
+        <div className="w-full max-w-sm rounded-2xl border-2 border-white bg-white/20 px-4 py-6 text-center shadow-xl backdrop-blur-sm sm:max-w-md">
+          <p className="animate-highlight-slam text-4xl font-black text-white drop-shadow-lg sm:text-6xl">
+            {arrivalInfo.nextDestinationName}!!
+          </p>
+        </div>
       )}
+
+      {phase === "speak" && (
+        <div className="w-full max-w-sm sm:max-w-md">
+          <SpeechBubble line={naviLine} side="left" theme="celebratory" />
+        </div>
+      )}
+
+      <p className="mt-1 text-xs font-bold text-white/90 drop-shadow sm:text-sm">タップして次へ</p>
     </div>
   );
 }
