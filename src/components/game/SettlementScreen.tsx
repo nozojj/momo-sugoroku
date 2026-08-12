@@ -19,35 +19,55 @@ interface SettlementScreenProps {
  * 決算専用画面。status: "settlement" のときGameScreenがBoard/HUD/Diceを一切マウントせず
  * これに完全差し替える(StartScreenと同じ「早期return」パターン)。
  *
- * 表示専用コンポーネント: 受け取ったinfo/historyを並べ替え・表示するだけで、
+ * 表示専用コンポーネント: 受け取ったinfo/historyを並べ替え・集計して表示するだけで、
  * money・所有物件・netWorthHistoryなどのgameStore状態は一切変更しない
- * (呼べるstoreアクションはonContinueの1つだけ)。
+ * (呼べるstoreアクションはonContinueの1つだけ)。順位変動・決算アワードも、
+ * calculateSettlement()が既に計算済みのentries/historyから画面側で導出するだけで、
+ * GameState・決算計算ロジックには一切手を入れていない。
  *
- * 将来の拡張(順位変動アニメーション・独占地域数・今年一番稼いだプレイヤー・
- * キャラクターコメント等)は、ここにセクションを追加するかSettlementRankingRowに
- * propsを足すだけで対応できる。
+ * レイアウトはlg(1024px)を境に、スマホ幅は1カラムのランキング+下部にチャート、
+ * PC幅はランキング2カラム+右側にスティッキーなチャートパネルに切り替える
+ * (アワード帯だけはsm(640px)で先に3列化する。チップ自体が小さく、ランキング+チャートの
+ * 本格的な再配置より早い段階で横並びにしても窮屈にならないため)。
  */
 export function SettlementScreen({ info, history, players, onContinue }: SettlementScreenProps) {
   const ranked = [...info.entries].sort((a, b) => b.netWorthAfter - a.netWorthAfter);
+  const rankChanges = computeRankChanges(info.entries, history);
+  const awards = computeAwards(info.entries);
 
   return (
     <div className="min-h-dvh w-full overflow-y-auto p-4 pb-8">
-      <div className="mx-auto w-full max-w-sm">
+      <div className="mx-auto w-full max-w-sm lg:max-w-5xl">
         <div className="pt-6 text-center">
           <p className="text-4xl">🧾</p>
           <h1 className="mt-2 text-lg font-bold text-slate-800 dark:text-white">{info.year}年目 決算</h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">総資産の多い順に表示しています</p>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {ranked.map((entry, i) => (
-            <SettlementRankingRow key={entry.playerId} entry={entry} rank={i + 1} />
-          ))}
-        </div>
+        {awards.length > 0 && (
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible">
+            {awards.map((award) => (
+              <AwardChip key={award.key} award={award} />
+            ))}
+          </div>
+        )}
 
-        <div className="mt-5">
-          <h2 className="mb-2 text-center text-xs font-bold text-slate-500 dark:text-slate-400">資産推移</h2>
-          <NetWorthTrendChart history={history} players={players} />
+        <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+          <div className="grid grid-cols-1 gap-3 lg:flex-1 lg:grid-cols-2 lg:items-start">
+            {ranked.map((entry, i) => (
+              <SettlementRankingRow
+                key={entry.playerId}
+                entry={entry}
+                rank={i + 1}
+                rankChange={rankChanges.get(entry.playerId) ?? null}
+              />
+            ))}
+          </div>
+
+          <div className="lg:sticky lg:top-4 lg:w-72 lg:shrink-0">
+            <h2 className="mb-2 text-center text-xs font-bold text-slate-500 dark:text-slate-400">資産推移</h2>
+            <NetWorthTrendChart history={history} players={players} />
+          </div>
         </div>
 
         <div className="mt-6">
@@ -64,10 +84,99 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
   );
 }
 
-/** propertyBreakdown(1物件ごとの明細)から、独占による収益増の注記を組み立てる。
- *  同じグループ/地域で複数物件を所有していても、注記は1グループ/1地域につき1行にまとめる
- *  (「藤沢駅前 独占 ×1.5」を所有物件数ぶん繰り返さない)。tier/groupName/regionは旧セーブに
- *  無い場合があるoptional項目なので、揃っている行だけを対象にする。 */
+/** entries/historyの値をnetWorth降順に並べたplayerIdの配列にする、ランキング算出の共通処理。
+ *  同着の扱いは既存のranked(SettlementScreen本体)と同じ単純な配列順ソートに揃える。 */
+function rankPlayerIds(values: { playerId: string; netWorth: number }[]): string[] {
+  return [...values].sort((a, b) => b.netWorth - a.netWorth).map((v) => v.playerId);
+}
+
+/**
+ * 前年決算からの順位変動(前年の順位 - 今年の順位。正なら順位が上がった)をplayerIdごとに返す。
+ * historyの末尾は今回の決算で既に追加済みのスナップショットなので、「前年」は
+ * 末尾から2番目(history.length - 2)を見る。1年目(比較対象が無い)はnullのまま返し、
+ * 呼び出し側でバッジ自体を出さない。
+ */
+function computeRankChanges(entries: SettlementEntry[], history: NetWorthHistoryEntry[]): Map<string, number | null> {
+  const result = new Map<string, number | null>();
+  const currentRankIds = rankPlayerIds(entries.map((e) => ({ playerId: e.playerId, netWorth: e.netWorthAfter })));
+
+  const previousSnapshot = history.length >= 2 ? history[history.length - 2] : undefined;
+  const previousRankIds = previousSnapshot ? rankPlayerIds(previousSnapshot.values) : null;
+
+  for (const entry of entries) {
+    const currentRank = currentRankIds.indexOf(entry.playerId) + 1;
+    const previousIndex = previousRankIds?.indexOf(entry.playerId) ?? -1;
+    result.set(entry.playerId, previousIndex >= 0 ? previousIndex + 1 - currentRank : null);
+  }
+  return result;
+}
+
+interface Award {
+  key: string;
+  icon: string;
+  label: string;
+  winners: SettlementEntry[];
+}
+
+/**
+ * 決算アワード(今年の物件収益王・資産成長No.1・独占マイスター)をinfo.entriesだけから算出する。
+ * 「今年"新たに"独占を達成したか」は決算時点のデータからは判定できない
+ * (propertyBreakdown.tierは決算時点の現状のみを表し、購入時のmonopolyAchievementは
+ * 一時通知でありここまで残らない)ため、"現在保持している独占の数"で数える。
+ * 同率の場合は該当者全員をwinnersに含める。
+ */
+function computeAwards(entries: SettlementEntry[]): Award[] {
+  const awards: Award[] = [];
+
+  const maxRevenue = Math.max(...entries.map((e) => e.propertyRevenue));
+  if (maxRevenue > 0) {
+    awards.push({
+      key: "revenue",
+      icon: "💹",
+      label: "物件収益王",
+      winners: entries.filter((e) => e.propertyRevenue === maxRevenue),
+    });
+  }
+
+  // 資産成長(netWorthDelta)は0円/マイナスでも比較として意味があるため、0件チェックはしない
+  // (収益王・独占マイスターと違い「誰も達成していない」という概念が無いため)。
+  const maxDelta = Math.max(...entries.map((e) => e.netWorthDelta));
+  awards.push({
+    key: "growth",
+    icon: "📈",
+    label: "資産成長No.1",
+    winners: entries.filter((e) => e.netWorthDelta === maxDelta),
+  });
+
+  const monopolyCounts = entries.map((e) => ({ entry: e, count: monopolyNotes(e).length }));
+  const maxMonopolyCount = Math.max(...monopolyCounts.map((m) => m.count));
+  if (maxMonopolyCount > 0) {
+    awards.push({
+      key: "monopoly",
+      icon: "🏰",
+      label: "独占マイスター",
+      winners: monopolyCounts.filter((m) => m.count === maxMonopolyCount).map((m) => m.entry),
+    });
+  }
+
+  return awards;
+}
+
+function AwardChip({ award }: { award: Award }) {
+  const names = award.winners.map((w) => w.playerName).join("・");
+  return (
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-black/10 bg-white/70 py-1 pl-1 pr-3 dark:border-white/10 dark:bg-slate-800/60 sm:shrink sm:justify-center sm:py-1.5">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs dark:bg-amber-400/20">
+        {award.icon}
+      </span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="whitespace-nowrap text-[9px] font-bold text-slate-400 dark:text-slate-500">{award.label}</span>
+        <span className="truncate text-[11px] font-bold text-slate-700 dark:text-slate-200">{names}</span>
+      </span>
+    </div>
+  );
+}
+
 function monopolyNotes(entry: SettlementEntry): { key: string; label: string; region: boolean }[] {
   const notes = new Map<string, { key: string; label: string; region: boolean }>();
   for (const item of entry.propertyBreakdown) {
@@ -94,18 +203,57 @@ function monopolyNotes(entry: SettlementEntry): { key: string; label: string; re
   return [...notes.values()];
 }
 
-function SettlementRankingRow({ entry, rank }: { entry: SettlementEntry; rank: number }) {
+function RankMoveBadge({ rankChange }: { rankChange: number | null }) {
+  if (rankChange === null || rankChange === 0) return null;
+  const up = rankChange > 0;
+  return (
+    <span
+      className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-bold ${
+        up
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
+          : "bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300"
+      }`}
+    >
+      {up ? "▲" : "▼"}
+      {Math.abs(rankChange)}
+    </span>
+  );
+}
+
+function SettlementRankingRow({
+  entry,
+  rank,
+  rankChange,
+}: {
+  entry: SettlementEntry;
+  rank: number;
+  rankChange: number | null;
+}) {
   const notes = monopolyNotes(entry);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   return (
-    <div className="rounded-xl border border-black/10 p-3 dark:border-white/10">
+    <div
+      className={`rounded-xl border p-3 ${
+        rank === 1 ? "border-amber-300 bg-amber-50/60 dark:border-amber-400/40 dark:bg-amber-400/5" : "border-black/10 dark:border-white/10"
+      }`}
+    >
       <div className="flex items-center gap-2">
         <span className="shrink-0 text-xs font-bold text-slate-400 dark:text-slate-500">{rank}位</span>
+        <RankMoveBadge rankChange={rankChange} />
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.playerColor }} />
-        <span className="truncate text-sm font-bold text-slate-800 dark:text-white">{entry.playerName}さん</span>
-        <span className="ml-auto shrink-0 text-sm font-black text-slate-800 dark:text-white">
-          {formatMoney(entry.netWorthAfter)}
+        <span className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">{entry.playerName}さん</span>
+        <span className="ml-auto shrink-0 text-right">
+          <span className="block text-sm font-black text-slate-800 dark:text-white">{formatMoney(entry.netWorthAfter)}</span>
+          <span
+            className={`block text-[10px] font-bold ${
+              entry.netWorthDelta >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            前年比 {formatMoneyDelta(entry.netWorthDelta)}
+          </span>
         </span>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
@@ -154,8 +302,6 @@ function SettlementRankingRow({ entry, rank }: { entry: SettlementEntry; rank: n
           {showBreakdown && (
             <div className="mt-1.5 space-y-1">
               {entry.propertyBreakdown.map((item) => {
-                // ここでは表示するだけ: amountはcalculateSettlement()が既に確定させた値をそのまま
-                // 出す(再計算しない)。ジャンルだけpropertyDisplay.tsから都度導出する(表示専用)。
                 const def = getPropertyDef(item.propertyId);
                 const genre = def ? propertyGenreOf(def) : null;
                 return (
