@@ -281,7 +281,13 @@ export function GameScreen() {
       )}
 
       {status === "finished" && winnerIds && (
-        <GameOverModal players={players} winnerIds={winnerIds} totalYears={totalYears} onRestart={resetGame} />
+        <GameOverModal
+          players={players}
+          winnerIds={winnerIds}
+          totalYears={totalYears}
+          netWorthHistory={netWorthHistory}
+          onRestart={resetGame}
+        />
       )}
 
       {/* グループ独占は従来どおり非ブロッキングのトースト、地域独占(より稀少)だけnaviの
