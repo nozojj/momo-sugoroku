@@ -18,6 +18,7 @@ import { DEBUFF_DEFS, listRivalPlayerOptions } from "@/lib/game/debuffEffects";
 import type { WarpEffect, TargetSelectEffect, RivalDebuffEffect, ActiveDebuff } from "@/types/game";
 import { calculateSettlement } from "@/lib/game/settlement";
 import { mergeGameState } from "@/store/persistMigration";
+import { createSafeJSONStorage } from "@/store/persistStorage";
 import {
   createInitialState,
   makeLogId,
@@ -843,6 +844,9 @@ export const useGameStore = create<GameStore>()(
     },
     {
       name: "shonan-sugoroku-save",
+      // 壊れたlocalStorageデータでrehydrationが止まらないようにするgetItemガードは
+      // persistStorage.ts へ分離済み。ここでは呼び出すだけ。
+      storage: createSafeJSONStorage(() => window.localStorage),
       // 旧セーブのバリデーション・マイグレーション本体は persistMigration.ts へ分離済み
       // (セーブ互換処理とゲーム進行処理の責務を分けるため)。ここでは呼び出すだけ。
       merge: mergeGameState,
