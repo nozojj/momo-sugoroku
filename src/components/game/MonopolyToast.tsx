@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { MonopolyAchievement } from "@/types/game";
+import { playSE } from "@/lib/audio/soundManager";
 
 interface MonopolyToastProps {
   achievement: MonopolyAchievement;
@@ -15,6 +16,7 @@ const AUTO_DISMISS_MS = 3200;
  *  キャラクター演出(CharacterAnnouncer)は使わない、独立した小さなコンポーネント。 */
 export function MonopolyToast({ achievement, onDismiss }: MonopolyToastProps) {
   useEffect(() => {
+    playSE("monopoly_group");
     const timer = window.setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
