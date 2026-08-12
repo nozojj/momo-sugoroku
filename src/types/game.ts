@@ -138,6 +138,11 @@ export interface PropertyGroup {
   buildingType?: BuildingType;
 }
 
+/** 物件の粗い分類軸(UI表示・将来の集計/絞り込み用)。既存のcategory(自由記述、
+ *  「ラーメン店」のような店名に近い粒度)とは別軸として持つ。新しいジャンルを増やすときは
+ *  ここに1件足し、propertyDisplay.tsのPROPERTY_GENRE_LABEL等に1エントリ足すだけでよい。 */
+export type PropertyGenre = "food" | "tourism" | "commercial" | "agriculture" | "leisure" | "community";
+
 /** 物件の定義(静的データ)。 */
 export interface PropertyDef {
   id: string;
@@ -156,6 +161,10 @@ export interface PropertyDef {
   isRealLandmark?: boolean;
   /** 明示的な建物タイプ上書き。省略時はcategory/nameからの自動推測。 */
   buildingType?: BuildingType;
+  /** 省略可。無ければpropertyDisplay.tsのpropertyGenreOf()がcategoryの文字列から自動推測する
+   *  (buildingStyle.tsのresolveBuildingForNodeと同じ「明示指定+自動推測フォールバック」形)。
+   *  自動生成物件(generatedPropertyDefs)やエディタ作成分にまで全件手動で振る必要は無い。 */
+  genre?: PropertyGenre;
 }
 
 /** 物件所有の3段階。通常所有 → グループ独占 → region独占の順に強い。 */
@@ -175,6 +184,12 @@ export interface MonopolyAchievement {
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
 
+/** ぶっとび系カードのワープ先スコープ。新しいスコープを増やすときはここに1件足し、
+ *  warpEffects.tsのWARP_HANDLERS/WARP_ANNOUNCE_THEMEにそれぞれ1エントリ足すだけでよい。
+ *  "nearby"はMapNode.areaではなく座標ベースの近傍判定(mapGraph.ts参照。areaは598ノード中45件が
+ *  未設定・大半が1ノードだけのシングルトン値で「同じ街」判定には使えなかったため採用しなかった)。 */
+export type WarpScope = "anywhere" | "nearby" | "destination";
+
 /** 車の見た目モード。急行系カード(複数ダイス移動)使用時に一時的に切り替わる速さの段階。
  *  normalが通常状態で、それ以外はendTurn()完了時に必ずnormalへ戻る。 */
 export type VehicleMode = "normal" | "expressLv1" | "expressLv2" | "expressLv3" | "expressLv4";
@@ -189,9 +204,55 @@ export interface MultiDiceEffect {
   vehicleMode: VehicleMode;
 }
 
+/** ランダムな場所へ即座にワープするカードの効果。multiDiceと違い、使った瞬間にサイコロを
+ *  振らずに移動先を確定して着地処理まで進める「即時アクション型」(cardEffects.tsのisDiceModifierEffect
+ *  とは別カテゴリ)。scopeを変えるだけで新しいぶっとびカードを追加できる。 */
+export interface WarpEffect {
+  type: "warp";
+  scope: WarpScope;
+}
+
+/** 場所指定系カード(warp系)の選択方式。新しい方式を増やすときはここに1件足し、
+ *  targetSelectEffects.tsのTARGET_SELECT_HANDLERSに1エントリ足すだけでよい。選んだ結果が
+ *  必ずノードIDへ解決できる方式だけがここに属する。 */
+export type WarpTargetSelectKind = "station" | "region" | "propertyGroup";
+
+/** TargetSelectOverlayで選ぶ対象の種類全般。WarpTargetSelectKindに加えて、選んだ結果が
+ *  ノードではなく「デバフを与える対象プレイヤー」であるrivalPlayer(妨害系カード)を含む。
+ *  TargetSelectInfo.selectKind(表示用の記録)はこの広い型を使うが、TargetSelectEffect.selectKind
+ *  (warp系カードの効果定義)はWarpTargetSelectKindだけに絞ってあるため、TARGET_SELECT_HANDLERSは
+ *  rivalPlayerを扱えなくてよい(型で保証される)。rivalPlayerの選択肢生成はdebuffEffects.tsの
+ *  listRivalPlayerOptions()が担当し、「選んだ後どうするか」はgameStore.tsのconfirmTargetSelection()
+ *  がCardEffect.typeを見て直接分岐する。 */
+export type TargetSelectKind = WarpTargetSelectKind | "rivalPlayer";
+
+/** プレイヤーが行き先を選んでからワープするカードの効果。warpEffect(即時・ランダム)とは違い、
+ *  使った瞬間はまだ移動先を確定しない。useCard()はTARGET_SELECT_HANDLERS[selectKind].listOptions()
+ *  で選択肢を作ってstatus:"selectingCardTarget"へ遷移するだけにし、実際の移動先確定・カード消費は
+ *  confirmTargetSelection()(選択確定時)まで遅延させる。 */
+export interface TargetSelectEffect {
+  type: "targetSelect";
+  selectKind: WarpTargetSelectKind;
+}
+
+/** 妨害系カードが対象プレイヤーに与える持続効果の種類。新しい効果を増やすときはここに1件足し、
+ *  debuffEffects.tsのDEBUFF_DEFSに1エントリ足すだけでよい。消費するタイミング(次の相手の
+ *  advanceToNextTurn()か、次の相手のrollDice()か)は効果の性質ごとに異なるため、消費ロジック自体は
+ *  該当するターン処理の関数側に置く(landingEffects.ts等と違い、単一の「消費フック」には
+ *  一本化していない。既存のpendingDoubleMove等と同じ、素朴な「使うところが直接見る」形)。 */
+export type DebuffKind = "skipNextRoll" | "halveDiceNextRoll";
+
+/** 相手プレイヤーを選んでデバフを付与するカードの効果。targetSelectEffect(選択後にワープ)とは
+ *  選択UIを共有するが、選択確定後の帰結が「移動」ではなく「対象のactiveDebuffsへの追加」である点が
+ *  異なるため、別のCardEffect種別として分ける(warpパイプラインには一切合流しない)。 */
+export interface RivalDebuffEffect {
+  type: "rivalDebuff";
+  debuffKind: DebuffKind;
+}
+
 /** カード効果。単純な効果(diceAgain/doubleMove)は文字列そのまま、パラメータを持つ効果は
  *  {type: "..."}形式のオブジェクトで表す(既存カードのeffectは無変更でこの型に収まる)。 */
-export type CardEffect = CardEffectType | MultiDiceEffect;
+export type CardEffect = CardEffectType | MultiDiceEffect | WarpEffect | TargetSelectEffect | RivalDebuffEffect;
 
 /** カードのレア度。抽選重みは data/cards.ts の RARITY_WEIGHT で定義する。 */
 export type CardRarity = "common" | "rare" | "superRare";
@@ -218,6 +279,17 @@ export interface MoneyEventDef {
   amount: number;
 }
 
+/** 妨害系カードによってプレイヤーに付与された、次の自分の手番(の該当タイミング)まで持続する効果。
+ *  付与された瞬間ではなく、そのプレイヤー自身のadvanceToNextTurn()/rollDice()等で初めて消費される。
+ *  同じ種類が複数付与されるケースにも対応できるよう、1件ごとに一意なidを持つ配列で保持する。 */
+export interface ActiveDebuff {
+  id: string;
+  kind: DebuffKind;
+  /** 誰が仕掛けたか(ログ・将来の「誰にやられたか」演出用) */
+  sourcePlayerId: string;
+  sourceCardName: string;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -235,6 +307,9 @@ export interface Player {
   cardIds: string[];
   /** 現在の目的地に一番乗りしたことがあるか(このゲームで) */
   destinationsReached: number;
+  /** 妨害系カードによる持続デバフ。該当するタイミング(次の自分の手番の開始/ロール等)で
+   *  消費されるまで残る。旧セーブには存在しないフィールドなので、読み込み時は必ず[]にフォールバックする。 */
+  activeDebuffs: ActiveDebuff[];
 }
 
 /** ゲーム全体のステータス(状態遷移)。 */
@@ -247,6 +322,9 @@ export type GameStatus =
   | "purchaseOffer" // 物件購入の確認待ち
   | "destinationArrived" // 目的地到着演出中(ボーナス表示・次の目的地提示の確認待ち)
   | "destinationFocus" // 次の目的地マスへカメラが移動し、強調表示している間(自動 or タップでスキップ)
+  | "cardWarpAnnounce" // ぶっとび系カード使用直後、CharacterAnnouncerが発動を告げている間(この裏でcurrentNodeIdを書き換える)
+  | "cardWarpFocus" // ワープ先マスへカメラが瞬間移動し、強調表示している間(自動 or タップでスキップ。destinationFocusと同じ仕組みを再利用)
+  | "selectingCardTarget" // 選択が要るカード使用中、プレイヤーが対象の選択肢(駅/地域/物件グループ/相手プレイヤー等)を選んでいる間。まだカードは消費していない(ワープ専用ではない汎用ステータス)
   | "moneyRoulette" // プラス/マイナスマスのルーレット演出中(確定額表示・次へ待ち)
   | "cardDraw" // カードマスの抽選演出中(結果表示・自動で次へ)
   | "cardOverflow" // 所持上限到達につき、捨てるカードの選択待ち(自動進行しない)
@@ -297,6 +375,39 @@ export interface CardDrawInfo {
   playerId: string;
   playerName: string;
   cardId: string;
+}
+
+/** status: "cardWarpAnnounce"/"cardWarpFocus" のときに表示するワープ演出の内容。
+ *  targetNodeIdは使用時点でWARP_HANDLERSにより確定済み(演出中に変わらない)。
+ *  CharacterAnnouncer用の演出設定(テーマ等)はここには持たせず、ArrivalInfo/SettlementInfoと
+ *  同様に純粋なドメインデータのみを持つ。テーマの決定はWarpAnnounceModal(アダプター)側の責務。 */
+export interface CardWarpInfo {
+  playerId: string;
+  playerName: string;
+  cardId: string;
+  cardName: string;
+  targetNodeId: string;
+  targetNodeName: string;
+}
+
+/** TargetSelectOverlayが表示する選択肢1件。selectKindを問わない共通の形にしてあり、
+ *  optionIdの意味(ノードIDそのものか、駅ハブノードIDか、物件グループIDか)は
+ *  TARGET_SELECT_HANDLERS側だけが知っていればよく、UI・GameStateはそれを気にしない。 */
+export interface TargetSelectOption {
+  optionId: string;
+  label: string;
+  icon?: string;
+}
+
+/** status: "selectingCardTarget" のときに表示する選択画面の内容。カードはまだ手札から
+ *  消費されていない(選択確定はconfirmTargetSelection()、キャンセルはcancelTargetSelection()が行う)。 */
+export interface TargetSelectInfo {
+  playerId: string;
+  playerName: string;
+  cardId: string;
+  cardName: string;
+  selectKind: TargetSelectKind;
+  options: TargetSelectOption[];
 }
 
 /** status: "cardOverflow" のときに表示する、カード整理画面の内容。
@@ -395,6 +506,10 @@ export interface GameState {
   monopolyAchievement: MonopolyAchievement | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
+  /** cardWarpAnnounce/cardWarpFocus状態のときに表示するワープ演出の内容 */
+  cardWarpInfo: CardWarpInfo | null;
+  /** selectingCardTarget状態のときに表示する選択画面の内容 */
+  targetSelectInfo: TargetSelectInfo | null;
   /** moneyRoulette状態のときに表示するルーレット演出の内容 */
   moneyRouletteInfo: MoneyRouletteInfo | null;
   /** cardDraw状態のときに表示する抽選演出の内容 */

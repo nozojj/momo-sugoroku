@@ -2,7 +2,7 @@
 
 import type { CardOverflowInfo } from "@/types/game";
 import { getCardDef } from "@/data/cards";
-import { RARITY_BADGE_CLASS, RARITY_LABEL } from "@/lib/game/cardDisplay";
+import { CARD_CATEGORY_BADGE_CLASS, CARD_CATEGORY_LABEL, RARITY_BADGE_CLASS, RARITY_LABEL, cardCategoryOf } from "@/lib/game/cardDisplay";
 
 interface CardOverflowModalProps {
   info: CardOverflowInfo;
@@ -28,11 +28,18 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
           <p className="text-[10px] font-bold text-fuchsia-500">今回引いたカード</p>
           <p className="mt-1 text-2xl">{newDef.icon}</p>
           <p className="mt-1 text-sm font-bold text-slate-800 dark:text-white">{newDef.name}</p>
-          <span
-            className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${RARITY_BADGE_CLASS[newDef.rarity]}`}
-          >
-            {RARITY_LABEL[newDef.rarity]}
-          </span>
+          <div className="mt-1 flex items-center justify-center gap-1">
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${CARD_CATEGORY_BADGE_CLASS[cardCategoryOf(newDef)]}`}
+            >
+              {CARD_CATEGORY_LABEL[cardCategoryOf(newDef)]}
+            </span>
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${RARITY_BADGE_CLASS[newDef.rarity]}`}
+            >
+              {RARITY_LABEL[newDef.rarity]}
+            </span>
+          </div>
           <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{newDef.description}</p>
         </div>
 
@@ -52,10 +59,17 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
               >
                 <span className="text-xl">{def.icon}</span>
                 <span className="mt-0.5 text-xs font-bold text-slate-700 dark:text-slate-200">{def.name}</span>
-                <span
-                  className={`mt-1 inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${RARITY_BADGE_CLASS[def.rarity]}`}
-                >
-                  {RARITY_LABEL[def.rarity]}
+                <span className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                  <span
+                    className={`inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${CARD_CATEGORY_BADGE_CLASS[cardCategoryOf(def)]}`}
+                  >
+                    {CARD_CATEGORY_LABEL[cardCategoryOf(def)]}
+                  </span>
+                  <span
+                    className={`inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${RARITY_BADGE_CLASS[def.rarity]}`}
+                  >
+                    {RARITY_LABEL[def.rarity]}
+                  </span>
                 </span>
                 <span className="mt-1 text-[10px] leading-tight text-slate-400 dark:text-slate-500">
                   {def.description}

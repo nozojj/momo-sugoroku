@@ -6,6 +6,7 @@ import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { getPropertyOwner, ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
+import { PROPERTY_GENRE_BADGE_CLASS, PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
 
 interface PurchaseModalProps {
   groupId: string;
@@ -78,6 +79,11 @@ export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: Pur
                     </p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">{def.category}</p>
                   </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${PROPERTY_GENRE_BADGE_CLASS[propertyGenreOf(def)]}`}
+                  >
+                    {PROPERTY_GENRE_ICON[propertyGenreOf(def)]} {PROPERTY_GENRE_LABEL[propertyGenreOf(def)]}
+                  </span>
                   {isOwnedBySelf && (
                     <span className="shrink-0 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
                       所有中

@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { SettlementInfo, SettlementEntry, NetWorthHistoryEntry, Player } from "@/types/game";
 import { formatMoney, formatMoneyDelta } from "@/lib/format";
 import { PROPERTY_REVENUE_CONFIG } from "@/lib/game/propertyBalance";
+import { getPropertyDef } from "@/data/properties";
+import { PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
 import { NetWorthTrendChart } from "./NetWorthTrendChart";
 
 interface SettlementScreenProps {
@@ -93,6 +96,7 @@ function monopolyNotes(entry: SettlementEntry): { key: string; label: string; re
 
 function SettlementRankingRow({ entry, rank }: { entry: SettlementEntry; rank: number }) {
   const notes = monopolyNotes(entry);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   return (
     <div className="rounded-xl border border-black/10 p-3 dark:border-white/10">
@@ -133,6 +137,47 @@ function SettlementRankingRow({ entry, rank }: { entry: SettlementEntry; rank: n
               {note.label}
             </span>
           ))}
+        </div>
+      )}
+
+      {entry.propertyBreakdown.length > 0 && (
+        <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/10">
+          <button
+            type="button"
+            onClick={() => setShowBreakdown((v) => !v)}
+            className="flex w-full items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400"
+          >
+            <span>物件ごとの内訳({entry.propertyBreakdown.length}件)</span>
+            <span>{showBreakdown ? "閉じる ▲" : "見る ▼"}</span>
+          </button>
+
+          {showBreakdown && (
+            <div className="mt-1.5 space-y-1">
+              {entry.propertyBreakdown.map((item) => {
+                // ここでは表示するだけ: amountはcalculateSettlement()が既に確定させた値をそのまま
+                // 出す(再計算しない)。ジャンルだけpropertyDisplay.tsから都度導出する(表示専用)。
+                const def = getPropertyDef(item.propertyId);
+                const genre = def ? propertyGenreOf(def) : null;
+                return (
+                  <div key={item.propertyId} className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="min-w-0 truncate">
+                      {item.region && <span className="text-slate-400 dark:text-slate-500">{item.region} ・ </span>}
+                      {genre && (
+                        <span className="text-slate-400 dark:text-slate-500">
+                          {PROPERTY_GENRE_ICON[genre]}
+                          {PROPERTY_GENRE_LABEL[genre]} ・{" "}
+                        </span>
+                      )}
+                      <span className="text-slate-700 dark:text-slate-300">{item.propertyName}</span>
+                      {item.tier === "regionMonopoly" && <span className="ml-1 text-sky-500">🌐</span>}
+                      {item.tier === "groupMonopoly" && <span className="ml-1 text-amber-500">✨</span>}
+                    </span>
+                    <span className="shrink-0 font-bold text-slate-700 dark:text-slate-300">{formatMoneyDelta(item.amount)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

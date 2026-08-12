@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RouteOption, VehicleMode } from "@/types/game";
 import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
 import { shortestPath } from "@/lib/game/mapGraph";
-import { getPropertiesInGroup } from "@/data/properties";
-import { getPropertyGroupDef } from "@/data/propertyGroups";
+import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
+import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { isRegionMonopolized } from "@/lib/game/propertyOwnership";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
 import { CarToken } from "./CarToken";
@@ -21,6 +22,10 @@ interface BoardProps {
   status: GameStatus;
   /** destinationFocus演出(カメラ移動+目的地強調)が完了した(自動 or タップスキップ)ときに呼ばれる */
   onDestinationFocusComplete: () => void;
+  /** cardWarpFocus中にカメラを合わせる対象ノード(ワープ先)。status:"cardWarpFocus"のときのみ使う。 */
+  cardWarpTargetNodeId?: string | null;
+  /** cardWarpFocus演出(カメラ瞬間移動+ワープ先強調)が完了した(自動 or タップスキップ)ときに呼ばれる */
+  onCardWarpFocusComplete?: () => void;
   /** 急行系カード使用中に一時的に切り替わる車の見た目。currentPlayerIndexの駒にのみ適用する。 */
   activeVehicleMode: VehicleMode | null;
   /** 現在地→目的地の最短ルートを道路上に発光表示するか。既定true。
@@ -53,6 +58,9 @@ const DESTINATION_FOCUS_PAN_MS = 420;
 const DESTINATION_FOCUS_HOLD_MS = 1200;
 /** タップでスキップした場合、目的地中央の最終位置へ即座にジャンプしてからこの時間だけ表示を保持する。 */
 const DESTINATION_FOCUS_SKIP_HOLD_MS = 450;
+/** cardWarpFocus(ワープ先カメラ演出)で表示を保持する時間。destinationFocusと違いパン演出は無く
+ *  (瞬間移動の「カット」を主役にするため)、この時間だけ静止表示してから通常カメラへ戻る。 */
+const CARD_WARP_FOCUS_HOLD_MS = 1100;
 /** このズーム未満は「全体表示」段階(建物イラストを間引き、マスの色分け表示だけにする)。
  *  移動中(isMovingPhase)はズーム値に関わらず常に詳細表示にする。 */
 const ZOOM_DETAIL_THRESHOLD = 0.9;
@@ -120,6 +128,8 @@ export function Board({
   onSelectRoute,
   status,
   onDestinationFocusComplete,
+  cardWarpTargetNodeId = null,
+  onCardWarpFocusComplete,
   activeVehicleMode,
   showShortestRoute = true,
 }: BoardProps) {
@@ -141,6 +151,10 @@ export function Board({
   const destinationFocusResolvedRef = useRef(false);
   /** このdestinationFocusサイクルで既にタップスキップ済みか(複数タップでの多重スキップ防止) */
   const destinationFocusSkippedRef = useRef(false);
+  /** cardWarpFocus(ワープ先カメラ演出)用。destinationFocus系refと同じ役割分担。 */
+  const wasCardWarpFocusRef = useRef(false);
+  const cardWarpFocusTimerRef = useRef<number | null>(null);
+  const cardWarpFocusResolvedRef = useRef(false);
 
   const { width, height, edges } = useMemo(() => {
     const xs = map.nodes.map((n) => n.x);
@@ -208,17 +222,30 @@ export function Board({
     return { zoom: z, pan: { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 } };
   }
 
-  /** 目的地カメラ演出(destinationFocus)中のズーム/パン。次の目的地マスを中心に、
-   *  移動中(getMovementCamera)より少し引いたズームで周辺の道も見えるように映す。 */
-  function getDestinationFocusCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+  /** 指定ノードを中心に据えたカメラ(ズーム/パン)を計算する共通ヘルパー。
+   *  destinationFocus(次の目的地)・cardWarpFocus(ワープ先)のどちらもこれを使う:
+   *  「対象ノードを中心に、通常より寄ったズームで見せる」という演出の本体はここに1つだけ持つ。 */
+  function getNodeFocusCamera(rect: DOMRect, targetNodeId: string | null): { zoom: number; pan: { x: number; y: number } } {
     const z = clampZoom(isMobile ? MOBILE_DESTINATION_ZOOM : DESKTOP_DESTINATION_ZOOM);
-    const node = nodeById.get(destinationNodeId);
+    const node = targetNodeId ? nodeById.get(targetNodeId) : undefined;
     return {
       zoom: z,
       pan: node
         ? { x: rect.width / 2 - (node.x - minX) * z, y: rect.height / 2 - (node.y - minY) * z }
         : { x: (rect.width - width * z) / 2, y: (rect.height - height * z) / 2 },
     };
+  }
+
+  /** 目的地カメラ演出(destinationFocus)中のズーム/パン。次の目的地マスを中心に、
+   *  移動中(getMovementCamera)より少し引いたズームで周辺の道も見えるように映す。 */
+  function getDestinationFocusCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+    return getNodeFocusCamera(rect, destinationNodeId);
+  }
+
+  /** ワープ先カメラ演出(cardWarpFocus)中のズーム/パン。destinationFocusと同じズーム段階を使い、
+   *  対象ノードだけをcardWarpTargetNodeIdに差し替える。 */
+  function getCardWarpFocusCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
+    return getNodeFocusCamera(rect, cardWarpTargetNodeId);
   }
 
   /** 移動中(サイコロを振った後〜着地まで、分岐選択中も含む)のズーム/パン。現在プレイヤーを中心に、
@@ -292,6 +319,7 @@ export function Board({
   }, [currentPlayerIndex, currentPlayer?.currentNodeId]);
 
   const isDestinationFocus = status === "destinationFocus";
+  const isCardWarpFocus = status === "cardWarpFocus";
 
   /** destinationFocus演出を終了する。通常完了・タップスキップどちらの経路からも呼ばれるため、
    *  refで二重発火(=onDestinationFocusCompleteの二重呼び出し)を防ぐ。 */
@@ -370,6 +398,58 @@ export function Board({
       finishDestinationFocus();
     }, DESTINATION_FOCUS_SKIP_HOLD_MS);
   }
+
+  /** cardWarpFocus演出を終了する。ワープ先カメラ演出→通常カメラへ戻す→onCardWarpFocusComplete()
+   *  という順序はdestinationFocusのfinish関数と同じ考え方(refで二重発火を防ぐ)。 */
+  function finishCardWarpFocus() {
+    if (cardWarpFocusResolvedRef.current) return;
+    cardWarpFocusResolvedRef.current = true;
+    if (cardWarpFocusTimerRef.current !== null) {
+      window.clearTimeout(cardWarpFocusTimerRef.current);
+      cardWarpFocusTimerRef.current = null;
+    }
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      const { zoom: z, pan: p } = getIdleCamera(rect);
+      setZoom(z);
+      setPan(p);
+    }
+    autoFollowRef.current = true;
+    onCardWarpFocusComplete?.();
+  }
+
+  // cardWarpFocusに入った瞬間、ワープ先マスへカメラを「瞬間移動」させる(destinationFocusと違い
+  // パン演出は行わない。位置そのものが不連続な瞬間移動なので、なめらかなパンより「カット」で
+  // 見せた方が違和感が無い)。instantCameraTransitionはdestinationFocusのタップスキップと同じ
+  // 仕組みをそのまま再利用している。
+  useEffect(() => {
+    const previous = wasCardWarpFocusRef.current;
+    if (isCardWarpFocus && !previous) {
+      cardWarpFocusResolvedRef.current = false;
+      autoFollowRef.current = false;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        const { zoom: z, pan: p } = getCardWarpFocusCamera(rect);
+        setInstantCameraTransition(true);
+        setZoom(z);
+        setPan(p);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setInstantCameraTransition(false));
+        });
+      }
+
+      if (cardWarpFocusTimerRef.current !== null) window.clearTimeout(cardWarpFocusTimerRef.current);
+      cardWarpFocusTimerRef.current = window.setTimeout(() => {
+        finishCardWarpFocus();
+      }, CARD_WARP_FOCUS_HOLD_MS);
+    }
+    wasCardWarpFocusRef.current = isCardWarpFocus;
+    return () => {
+      wasCardWarpFocusRef.current = previous;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCardWarpFocus]);
 
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -455,6 +535,10 @@ export function Board({
       skipDestinationFocus();
       return;
     }
+    if (isCardWarpFocus) {
+      finishCardWarpFocus();
+      return;
+    }
     onDebugClick(e);
   }
 
@@ -478,7 +562,7 @@ export function Board({
         onPointerLeave={onPointerUp}
         onWheel={onWheel}
         onClick={onBoardClick}
-        style={{ cursor: dragging ? "grabbing" : isDestinationFocus ? "pointer" : "grab" }}
+        style={{ cursor: dragging ? "grabbing" : isDestinationFocus || isCardWarpFocus ? "pointer" : "grab" }}
       >
         <div
           style={{
@@ -572,8 +656,13 @@ export function Board({
               const isLandmark = groupProperties.some((p) => p.isRealLandmark);
               const fillColor = isLandmark ? LANDMARK_STYLE.fill : (groupOwnerColor(groupProperties, players) ?? style.fill);
               const strokeColor = isLandmark ? LANDMARK_STYLE.stroke : style.stroke;
+              // 地域(region)を1人で完全独占しているプレイヤー(いなければundefined)。グループ単位の
+              // 色分け(fillColor、既存・無改修)とは別レイヤーとして、そのプレイヤーの色でリングを
+              // 重ねるだけ(地域独占の方がグループ独占より稀少なので、視覚的に一段強い表現にする)。
+              const regionOwner = group ? regionMonopolyOwner(group.region, players) : undefined;
               const icon = group?.icon ?? style.icon;
               const isDestination = node.id === destinationNodeId;
+              const isCardWarpTarget = node.id === cardWarpTargetNodeId;
               const isSelectable = selectableIds.has(node.id);
               const radius = node.isMajorHub ? lodRadius.hub : lodRadius.node;
               const iconSize = node.isMajorHub ? lodIconSize.hub : lodIconSize.node;
@@ -586,6 +675,12 @@ export function Board({
                       盤面全体は暗くせず、目的地マス周辺だけに効果を留める。 */}
                   {isDestination && isDestinationFocus && (
                     <circle cx={cx} cy={cy} r={radius + 30} fill="#ffb703" opacity={0.3} className="animate-spotlight-glow" />
+                  )}
+                  {/* ワープ先カメラ演出(cardWarpFocus)中だけ表示する「今だけ強調」の光彩。
+                      destinationFocusの光彩と同じ見た目を再利用するが、🎯(目的地ラベル)は出さない
+                      (ワープ先が目的地とは限らないため、目的地専用の表示と混同させない)。 */}
+                  {isCardWarpTarget && isCardWarpFocus && (
+                    <circle cx={cx} cy={cy} r={radius + 30} fill="#22d3ee" opacity={0.3} className="animate-spotlight-glow" />
                   )}
                   {/* 通常時(destinationFocus中でない)の目的地マス案内。ソフトグロー(面)+静止リング(輪郭)の
                       2層で構成し、常時ループするアニメーションは使わない(上品な強調に留める)。
@@ -600,6 +695,11 @@ export function Board({
                   )}
                   {isSelectable && <circle cx={cx} cy={cy} r={radius + 6} fill="#fde68a" opacity={0.55} className="animate-pulse-node" />}
                   {isLandmark && <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#caa23d" strokeWidth={1.5} opacity={0.6} />}
+                  {/* 地域完全独占リング。fillColor(グループ単位、既存)の上にプレイヤー色の点線リングを
+                      重ねるだけで、既存の色分けロジックには一切触れない。 */}
+                  {regionOwner && (
+                    <circle cx={cx} cy={cy} r={radius + 7} fill="none" stroke={regionOwner.color} strokeWidth={3} strokeDasharray="4 3" opacity={0.9} />
+                  )}
                   <rect
                     x={cx - radius}
                     y={cy - radius}
@@ -680,6 +780,7 @@ export function Board({
                   offsetY={dy}
                   isCurrentTurn={i === currentPlayerIndex}
                   vehicleMode={i === currentPlayerIndex ? (activeVehicleMode ?? "normal") : "normal"}
+                  instant={i === currentPlayerIndex && isCardWarpFocus && instantCameraTransition}
                 />
               );
             })}
@@ -832,4 +933,11 @@ function groupOwnerColor(groupProperties: PropertyDef[], players: Player[]): str
     if (groupProperties.every((p) => player.ownedPropertyIds.includes(p.id))) return player.color;
   }
   return undefined;
+}
+
+/** その地域(region)の全グループの全物件を1人のプレイヤーが買い切っているときだけ、
+ *  そのプレイヤーを返す(propertyOwnership.tsのisRegionMonopolized()をそのまま使うだけの
+ *  薄いラッパー。判定ロジック自体はゲームロジック側のまま、ここでは呼び出すだけ)。 */
+function regionMonopolyOwner(region: string, players: Player[]): Player | undefined {
+  return players.find((p) => isRegionMonopolized(region, p.id, players, propertyDefs, propertyGroupDefs));
 }

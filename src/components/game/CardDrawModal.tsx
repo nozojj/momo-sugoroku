@@ -2,12 +2,34 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CardDef, CardDrawInfo } from "@/types/game";
+import type { CharacterAnnouncement } from "@/types/characterAnnouncer";
 import { getCardDef, getDrawableCards } from "@/data/cards";
-import { RARITY_BADGE_CLASS, RARITY_LABEL } from "@/lib/game/cardDisplay";
+import { CARD_CATEGORY_BADGE_CLASS, CARD_CATEGORY_LABEL, RARITY_BADGE_CLASS, RARITY_LABEL, cardCategoryOf } from "@/lib/game/cardDisplay";
+import { CharacterAnnouncer } from "./CharacterAnnouncer";
 
 interface CardDrawModalProps {
   info: CardDrawInfo;
   onContinue: () => void;
+}
+
+/** rare/superRareのときだけ、ロレット確定後にnaviの一言コメントを挟む(ArrivalModal等と同じ
+ *  CharacterAnnouncerアダプターパターン)。commonは現行どおりテンポ優先でこの演出を挟まない。 */
+function buildDrawAnnouncement(def: CardDef): CharacterAnnouncement {
+  const isSuperRare = def.rarity === "superRare";
+  return {
+    characterId: "navi",
+    expression: isSuperRare ? "surprised" : "happy",
+    enterDirection: "right",
+    side: "right",
+    animationType: "slide",
+    theme: isSuperRare ? "celebratory" : "normal",
+    lines: isSuperRare
+      ? [
+          { text: "おおっと、これは…!", expression: "surprised" },
+          { text: `「${def.name}」だ! やったね!`, expression: "happy" },
+        ]
+      : [{ text: `「${def.name}」を手に入れた!`, expression: "happy" }],
+  };
 }
 
 /** 演出タイミング(調整用定数)。MoneyRouletteModalと同じ考え方: 抽選ロジックには一切関与しない。
@@ -50,16 +72,27 @@ export function CardDrawModal({ info, onContinue }: CardDrawModalProps) {
     return () => window.clearTimeout(timer);
   }, [step, sequence.length, intervals]);
 
+  // rare/superRareのときだけ、確定表示のホールド後にnaviの一言(CharacterAnnouncer)を挟む。
+  // commonは従来どおりHOLD_DURATION_MS後に即onContinue()する(頻繁に踏むマスなのでテンポ優先)。
+  const [showAnnounce, setShowAnnounce] = useState(false);
   const firedRef = useRef(false);
   useEffect(() => {
     if (!settled) return;
     const timer = window.setTimeout(() => {
       if (firedRef.current) return;
       firedRef.current = true;
-      onContinue();
+      if (resultDef && resultDef.rarity !== "common") {
+        setShowAnnounce(true);
+      } else {
+        onContinue();
+      }
     }, HOLD_DURATION_MS);
     return () => window.clearTimeout(timer);
-  }, [settled, onContinue]);
+  }, [settled, onContinue, resultDef]);
+
+  if (showAnnounce && resultDef) {
+    return <CharacterAnnouncer announcement={buildDrawAnnouncement(resultDef)} onComplete={onContinue} />;
+  }
 
   if (!shown) return null;
 
@@ -89,11 +122,18 @@ export function CardDrawModal({ info, onContinue }: CardDrawModalProps) {
 
           {settled && (
             <>
-              <span
-                className={`mt-2 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${RARITY_BADGE_CLASS[shown.rarity]}`}
-              >
-                {RARITY_LABEL[shown.rarity]}
-              </span>
+              <div className="mt-2 flex items-center justify-center gap-1.5">
+                <span
+                  className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${CARD_CATEGORY_BADGE_CLASS[cardCategoryOf(shown)]}`}
+                >
+                  {CARD_CATEGORY_LABEL[cardCategoryOf(shown)]}
+                </span>
+                <span
+                  className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${RARITY_BADGE_CLASS[shown.rarity]}`}
+                >
+                  {RARITY_LABEL[shown.rarity]}
+                </span>
+              </div>
               <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{shown.description}</p>
             </>
           )}

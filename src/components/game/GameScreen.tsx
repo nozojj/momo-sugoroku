@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useHasHydrated } from "@/store/useHasHydrated";
 import { getMap } from "@/data/maps";
-import { getNode, shortestDistance } from "@/lib/game/mapGraph";
+import { getNode, shortestDistance, destinationCandidateNodes } from "@/lib/game/mapGraph";
 import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
 import { Board } from "./Board";
 import { Dice } from "./Dice";
@@ -12,13 +12,16 @@ import { GameHud } from "./GameHud";
 import { GameDrawer } from "./GameDrawer";
 import { RouteChoiceOverlay } from "./RouteChoiceOverlay";
 import { PurchaseModal } from "./PurchaseModal";
-import { ArrivalModal } from "./ArrivalModal";
+import { DestinationCelebrationScreen } from "./DestinationCelebrationScreen";
+import { WarpAnnounceModal } from "./WarpAnnounceModal";
+import { TargetSelectOverlay } from "./TargetSelectOverlay";
 import { MoneyRouletteModal } from "./MoneyRouletteModal";
 import { CardDrawModal } from "./CardDrawModal";
 import { CardOverflowModal } from "./CardOverflowModal";
 import { SettlementIntroAnnouncer } from "./SettlementIntroAnnouncer";
 import { SettlementScreen } from "./SettlementScreen";
 import { MonopolyToast } from "./MonopolyToast";
+import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
@@ -43,6 +46,8 @@ export function GameScreen() {
   const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
   const monopolyAchievement = useGameStore((s) => s.monopolyAchievement);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
+  const cardWarpInfo = useGameStore((s) => s.cardWarpInfo);
+  const targetSelectInfo = useGameStore((s) => s.targetSelectInfo);
   const moneyRouletteInfo = useGameStore((s) => s.moneyRouletteInfo);
   const cardDrawInfo = useGameStore((s) => s.cardDrawInfo);
   const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
@@ -62,6 +67,10 @@ export function GameScreen() {
   const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
+  const continueAfterWarpAnnounce = useGameStore((s) => s.continueAfterWarpAnnounce);
+  const continueAfterCardWarpFocus = useGameStore((s) => s.continueAfterCardWarpFocus);
+  const confirmTargetSelection = useGameStore((s) => s.confirmTargetSelection);
+  const cancelTargetSelection = useGameStore((s) => s.cancelTargetSelection);
   const continueAfterDestinationFocus = useGameStore((s) => s.continueAfterDestinationFocus);
   const continueAfterMoneyRoulette = useGameStore((s) => s.continueAfterMoneyRoulette);
   const continueAfterCardDraw = useGameStore((s) => s.continueAfterCardDraw);
@@ -111,6 +120,23 @@ export function GameScreen() {
   }
 
   const map = getMap(mapId);
+
+  // 目的地到着のお祝い画面も同じ考え方でBoardを完全に差し替える(小さいオーバーレイではなく
+  // 専用イベント画面にする)。continueAfterArrival()を呼ぶだけで、destinationArrived→
+  // destinationFocusという既存の遷移(Board側のカメラ演出含む)には一切手を入れていない。
+  // candidateDestinationNamesはルーレット演出用の見せかけの候補地名(演出専用、ゲームロジックには
+  // 一切影響しない)。destinationCandidateNodes()はpickRandomDestination()と同じ候補プールを返す
+  // 既存の純関数で、ここでは名前を読み取るだけ。
+  if (status === "destinationArrived" && arrivalInfo) {
+    return (
+      <DestinationCelebrationScreen
+        arrivalInfo={arrivalInfo}
+        candidateDestinationNames={destinationCandidateNodes(map).map((n) => n.name)}
+        onContinue={continueAfterArrival}
+      />
+    );
+  }
+
   const destinationNode = getNode(map, destinationNodeId);
   const calendar = getCalendar(turn);
   const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
@@ -135,6 +161,8 @@ export function GameScreen() {
           onSelectRoute={chooseRoute}
           status={status}
           onDestinationFocusComplete={continueAfterDestinationFocus}
+          cardWarpTargetNodeId={cardWarpInfo?.targetNodeId ?? null}
+          onCardWarpFocusComplete={continueAfterCardWarpFocus}
           activeVehicleMode={activeVehicleMode}
         />
       </div>
@@ -214,8 +242,6 @@ export function GameScreen() {
         }}
       />
 
-      {monopolyAchievement && <MonopolyToast achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />}
-
       {status === "purchaseOffer" && pendingPropertyGroupId && currentPlayer && (
         <PurchaseModal
           groupId={pendingPropertyGroupId}
@@ -226,8 +252,12 @@ export function GameScreen() {
         />
       )}
 
-      {status === "destinationArrived" && arrivalInfo && (
-        <ArrivalModal arrivalInfo={arrivalInfo} onContinue={continueAfterArrival} />
+      {status === "cardWarpAnnounce" && cardWarpInfo && (
+        <WarpAnnounceModal info={cardWarpInfo} onContinue={continueAfterWarpAnnounce} />
+      )}
+
+      {status === "selectingCardTarget" && targetSelectInfo && (
+        <TargetSelectOverlay info={targetSelectInfo} onSelect={confirmTargetSelection} onCancel={cancelTargetSelection} />
       )}
 
       {status === "moneyRoulette" && moneyRouletteInfo && (
@@ -252,6 +282,18 @@ export function GameScreen() {
 
       {status === "finished" && winnerIds && (
         <GameOverModal players={players} winnerIds={winnerIds} totalYears={totalYears} onRestart={resetGame} />
+      )}
+
+      {/* グループ独占は従来どおり非ブロッキングのトースト、地域独占(より稀少)だけnaviの
+          CharacterAnnouncer演出にする(GameStore側のmonopolyAchievement/dismissMonopolyAchievement
+          は共通のまま、表示コンポーネントをkindで出し分けるだけ)。他のstatus駆動モーダル
+          (PurchaseModal等)より後ろにJSX上で置く: 同じz-50でもDOM順で後の要素が上に重なるため、
+          「物件購入を続けている最中に独占を達成した」瞬間でも演出が確実に手前に出るようにする。 */}
+      {monopolyAchievement && monopolyAchievement.kind === "group" && (
+        <MonopolyToast achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />
+      )}
+      {monopolyAchievement && monopolyAchievement.kind === "region" && (
+        <MonopolyAnnounceModal achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />
       )}
     </div>
   );

@@ -14,13 +14,16 @@ interface CarTokenProps {
   isCurrentTurn: boolean;
   /** 急行系カード使用中に一時的に切り替わる車の見た目。省略時は通常車("normal")。 */
   vehicleMode?: VehicleMode;
+  /** trueの間は位置トランジションを無効化し、x/yの変更を即座に反映する(ぶっとび系カードの
+   *  瞬間移動用。Board.tsxのinstantCameraTransitionと同じ「カットで見せる」目的で使う)。 */
+  instant?: boolean;
 }
 
-/** プレイヤーの車コマ。位置(x,y)の変化はCSSトランジションでアニメーションする。
+/** プレイヤーの車コマ。位置(x,y)の変化はCSSトランジションでアニメーションする(instant時を除く)。
  *  vehicleModeに対応する画像がVEHICLE_ASSET_URLSに登録されていればそれを描画し、
  *  無ければ手続き的SVGのプレースホルダー(VEHICLE_PLACEHOLDER_STYLE)を描画する
  *  (CharacterSprite.tsxと同じ「画像→プレースホルダー」の解決順序)。 */
-export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, vehicleMode = "normal" }: CarTokenProps) {
+export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, vehicleMode = "normal", instant = false }: CarTokenProps) {
   const assetUrl = VEHICLE_ASSET_URLS[vehicleMode];
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
 
@@ -28,7 +31,7 @@ export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, 
     <g
       style={{
         transform: `translate(${x + offsetX}px, ${y - 22 + offsetY}px)`,
-        transition: "transform 420ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: instant ? "none" : "transform 420ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {isCurrentTurn && (

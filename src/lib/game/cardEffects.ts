@@ -24,9 +24,9 @@ export interface CardEffectResult {
 export type CardEffectHandler = (ctx: CardEffectContext) => CardEffectResult;
 
 /** CardDef.effectの種別を取り出す。単純な効果(diceAgain/doubleMove)は文字列そのもの、
- *  パラメータを持つ効果(multiDice)は{type: "..."}オブジェクトなので、レジストリの
- *  キーとして扱えるよう正規化する。 */
-type EffectKind = CardEffectType | "multiDice";
+ *  パラメータを持つ効果(multiDice/warp/targetSelect/rivalDebuff)は{type: "..."}オブジェクトなので、
+ *  レジストリのキーとして扱えるよう正規化する。 */
+type EffectKind = CardEffectType | "multiDice" | "warp" | "targetSelect" | "rivalDebuff";
 export function effectKind(effect: CardEffect): EffectKind {
   return typeof effect === "string" ? effect : effect.type;
 }

@@ -26,14 +26,77 @@ export function getTraversableOptions(
   return allowedByCard;
 }
 
+/**
+ * ぶっとび系カードのワープ先として着地させてよいノードか。
+ * - 接続0件(孤立ノード)は理論上存在しないが防御的に除外する。
+ * - type:"warp"(将来の固定ワープマス用に予約された種別。現状マップ上に使用例は無い)は
+ *   カードのランダムワープ先としては意味が衝突しうるので除外する。
+ * - 全ての出口がカード必須(requiresCardId)で、かつそのカードを持っていない場合は、
+ *   着地後そのプレイヤーが身動き取れなくなる(現状マップ上にそのようなノードは無いが、
+ *   将来requiresCardId付きの道が追加されても詰まないようにする防御)。
+ */
+export function isWarpCandidate(node: MapNode, ownedCardIds: string[]): boolean {
+  if (node.type === "warp") return false;
+  if (node.connections.length === 0) return false;
+  return node.connections.some((e) => !e.requiresCardId || ownedCardIds.includes(e.requiresCardId));
+}
+
+/**
+ * 与えられたノード列(呼び出し側が既に絞り込んだ候補プール)から、構造的に着地させてよいもの
+ * (isWarpCandidate)だけを対象にランダムに1件選ぶ。有効な候補が1件も無ければ(理論上ほぼ
+ * 発生しないが)元のプール全体にフォールバックする。
+ *
+ * ぶっとび系(pickWarpTarget)・場所指定系(targetSelectEffects.tsのregion/propertyGroup)の
+ * どちらも最終的にはここへ合流する: 「基準ノードを候補に含めるか除外するか」は呼び出し側が
+ * 渡すノード列そのもので制御し、この関数自身は一切除外ロジックを持たない。
+ */
+export function pickWarpTargetAmong(nodes: MapNode[], ownedCardIds: string[]): string {
+  const valid = nodes.filter((n) => isWarpCandidate(n, ownedCardIds));
+  const pool = valid.length > 0 ? valid : nodes;
+  return pool[Math.floor(Math.random() * pool.length)].id;
+}
+
+/** "nearby"スコープの近傍判定に使う半径(ボード座標系のpx)。MapNode.areaは598ノード中45件が
+ *  未設定・大半が1ノードだけのシングルトン値で「同じ街」判定に使えなかったため、座標ベースの
+ *  地理的近さで代替する。実測: この半径なら最悪でも17件・中央値54件の候補が確保できる。
+ *  調整用定数。実機確認後はこの1箇所だけ変更すればよい。 */
+export const NEARBY_WARP_RADIUS = 250;
+
+/**
+ * ぶっとび系カード(scope: "anywhere" | "nearby")のワープ先を1つ選ぶ。
+ * destinationスコープ(現在の目的地マスへ直行)はstate.destinationNodeIdをそのまま使えばよく、
+ * 候補選定が不要なのでこの関数の対象外(warpEffects.tsのWARP_HANDLERS側で直接返す)。
+ *
+ * ここでは「現在地(fromNodeId)自身は候補から除外する」(その場に留まるだけの結果を避けるため)。
+ * 場所指定系(地域を選ぶ等)のように基準ノード自体を候補に含めたい場合は、この関数を使わず
+ * pickWarpTargetAmong()に直接、基準ノードを含めたノード列を渡す(targetSelectEffects.ts参照)。
+ */
+export function pickWarpTarget(
+  map: MapData,
+  scope: "anywhere" | "nearby",
+  fromNodeId: string,
+  ownedCardIds: string[],
+): string {
+  const origin = getNode(map, fromNodeId);
+  const excludingOrigin = map.nodes.filter((n) => n.id !== fromNodeId);
+  const nearbyPool = excludingOrigin.filter((n) => Math.hypot(n.x - origin.x, n.y - origin.y) <= NEARBY_WARP_RADIUS);
+  const pool = scope === "nearby" && nearbyPool.length > 0 ? nearbyPool : excludingOrigin;
+  return pickWarpTargetAmong(pool, ownedCardIds);
+}
+
+/** 目的地候補として扱ってよいノード一覧。isDestinationCandidateが1件も無ければ全ノードへ
+ *  フォールバックする(マップ編集で目的地候補が消えてもゲームが起動できるようにする防御)。
+ *  pickRandomDestination()の候補プールと、station/region選択系カードの選択肢一覧が
+ *  同じ考え方を共有できるよう1箇所にまとめてある。 */
+export function destinationCandidateNodes(map: MapData): MapNode[] {
+  const flagged = map.nodes.filter((n) => n.isDestinationCandidate);
+  return flagged.length > 0 ? flagged : map.nodes;
+}
+
 export function pickRandomDestination(map: MapData, excludeNodeId?: string): string {
-  const candidates = map.nodes.filter(
-    (n) => n.isDestinationCandidate && n.id !== excludeNodeId,
-  );
-  const byFlag = map.nodes.filter((n) => n.isDestinationCandidate);
-  // 目的地候補が編集で1件も残っていない場合でもゲームが起動できるよう、
-  // 全ノードから選ぶところまでフォールバックする。
-  const pool = candidates.length > 0 ? candidates : byFlag.length > 0 ? byFlag : map.nodes;
+  const basePool = destinationCandidateNodes(map);
+  const excludingCurrent = basePool.filter((n) => n.id !== excludeNodeId);
+  const pool = excludingCurrent.length > 0 ? excludingCurrent : basePool;
   const picked = pool[Math.floor(Math.random() * pool.length)];
   return picked.id;
 }

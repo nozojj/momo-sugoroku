@@ -37,3 +37,8 @@ const allPropertyGroupDefs: PropertyGroup[] = [...propertyGroupDefs, ...generate
 export function getPropertyGroupDef(id: string): PropertyGroup | undefined {
   return allPropertyGroupDefs.find((g) => g.id === id);
 }
+
+/** 全物件グループ(明示定義+マップ生成分)の一覧。物件グループ選択系カードの選択肢作成に使う。 */
+export function getAllPropertyGroupDefs(): PropertyGroup[] {
+  return allPropertyGroupDefs;
+}

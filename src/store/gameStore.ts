@@ -1,22 +1,29 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { GameState, Player, RouteOption } from "@/types/game";
-import { getMap, defaultMapId, maps } from "@/data/maps";
-import { getNode, getTraversableOptions, pickRandomDestination, rollDice as rollDiceValue } from "@/lib/game/mapGraph";
+import { getMap, defaultMapId } from "@/data/maps";
+import { getNode, getTraversableOptions } from "@/lib/game/mapGraph";
+import { resolveDiceRoll } from "@/lib/game/diceRoll";
+import { detectDestinationArrival } from "@/lib/game/destinationArrival";
+import { movePlayerForward } from "@/lib/game/playerMovement";
 import { getPropertyDef, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
-import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
-import { PROPERTY_REVENUE_CONFIG } from "@/lib/game/propertyBalance";
+import { detectMonopolyAchievement } from "@/lib/game/propertyMonopoly";
 import { getCardDef } from "@/data/cards";
 import { resolveLandingOutcome } from "@/lib/game/landingEffects";
 import { CARD_EFFECT_HANDLERS, effectKind, isDiceModifierEffect } from "@/lib/game/cardEffects";
+import { WARP_HANDLERS } from "@/lib/game/warpEffects";
+import { TARGET_SELECT_HANDLERS } from "@/lib/game/targetSelectEffects";
+import { DEBUFF_DEFS, listRivalPlayerOptions } from "@/lib/game/debuffEffects";
+import type { WarpEffect, TargetSelectEffect, RivalDebuffEffect, ActiveDebuff } from "@/types/game";
 import { calculateSettlement } from "@/lib/game/settlement";
+import { mergeGameState } from "@/store/persistMigration";
 import {
   createInitialState,
   makeLogId,
+  makeDebuffId,
   computeWinnerIds,
   getCalendar,
-  DESTINATION_BONUS,
   DEFAULT_TOTAL_TURNS,
   MAX_CARDS_PER_PLAYER,
 } from "@/lib/game/engine";
@@ -40,6 +47,8 @@ const IDLE_STATE: GameState = {
   pendingPropertyGroupId: null,
   monopolyAchievement: null,
   arrivalInfo: null,
+  cardWarpInfo: null,
+  targetSelectInfo: null,
   moneyRouletteInfo: null,
   cardDrawInfo: null,
   cardOverflowInfo: null,
@@ -49,7 +58,7 @@ const IDLE_STATE: GameState = {
   winnerIds: null,
 };
 
-interface GameStore extends GameState {
+export interface GameStore extends GameState {
   /** ゲーム未開始 or 終了後の初期状態かどうか */
   hasActiveGame: () => boolean;
   startGame: (playerNames: string[], totalYears: number) => void;
@@ -70,6 +79,19 @@ interface GameStore extends GameState {
   dismissMonopolyAchievement: () => void;
   /** 到着演出モーダルを閉じ、次の目的地へのカメラ演出(destinationFocus)へ進む */
   continueAfterArrival: () => void;
+  /** ワープ発動アナウンス(CharacterAnnouncer)を終え、実際にcurrentNodeIdをワープ先へ書き換えて
+   *  カメラ演出(cardWarpFocus)へ進む。ここまでプレイヤーの位置は一切変わっていない。 */
+  continueAfterWarpAnnounce: () => void;
+  /** ワープ先カメラ演出(自動完了 or タップスキップ)を終え、通常の着地処理(resolveLanding)へ進む。
+   *  以降は通常移動と完全に同じ経路(resolveLanding→checkDestinationArrival→…→endTurn)をたどる。 */
+  continueAfterCardWarpFocus: () => void;
+  /** 選択が要るカードの選択画面で、選択肢(optionId)を1つ確定する。ここで初めてカードを消費する。
+   *  カードの種類によって帰結が分岐する: targetSelect(warp系)ならTARGET_SELECT_HANDLERSで
+   *  ワープ先を解決してcardWarpAnnounce以降(既存のワープ演出)へ、rivalDebuff(妨害系)なら
+   *  対象プレイヤーのactiveDebuffsへ追加してそのままターンを終える。 */
+  confirmTargetSelection: (optionId: string) => void;
+  /** 選択が要るカードの選択画面をキャンセルする。カードは消費されず手札に残り、rollingへ戻る。 */
+  cancelTargetSelection: () => void;
   /** 目的地カメラ演出(自動完了 or タップスキップ)を終え、次のプレイヤーへ手番を送る */
   continueAfterDestinationFocus: () => void;
   /** ルーレット演出モーダルを閉じて先の着地処理(到着判定・ターン送り)を続行する */
@@ -97,43 +119,36 @@ function pushLog(state: GameState, message: string): GameState["log"] {
   return [...state.log, { id: makeLogId(), turn: state.turn, message }];
 }
 
+/** ダイスの出目・移動量そのものを修飾する予約系カード(doubleMove/multiDice)が既に予約されているか。
+ *  即時アクション型カード(warp/targetSelect)はrollDice()を経由しないため、既に予約された効果が
+ *  誰にも消費されず次のプレイヤーへ漏れてしまう。予約系どうしの重複ガードと合わせて3箇所で
+ *  同じ判定を使うので、ここに1つだけ持つ。 */
+function blockedByPendingDiceModifier(state: GameState): boolean {
+  return state.pendingDoubleMove || state.pendingDiceCount > 1;
+}
+
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => {
       // --- 着地処理・ターン終了(クロージャでset/getを直接使う) ---
 
-      /** 目的地に到着していたら、ボーナス付与・次の目的地抽選・到着演出への遷移まで行う。到着していたらtrueを返す。 */
+      /** 目的地に到着していたら、ボーナス付与・次の目的地抽選・到着演出への遷移まで行う。到着していたらtrueを返す。
+       *  判定・計算そのものはdestinationArrival.tsのdetectDestinationArrival()(純関数)へ委譲し、
+       *  ここでは結果を受け取ってset()するだけ。呼び出しタイミング(finishLandingAndEndTurn()経由、
+       *  remainingMoves<=0での最終停止時のみ)は変更していない。 */
       function checkDestinationArrival(): boolean {
         const state = get();
         const map = getMap(state.mapId);
         const player = currentPlayer(state);
-        if (player.currentNodeId !== state.destinationNodeId) return false;
-
-        const arrivedNode = getNode(map, state.destinationNodeId);
-        const playersAfterBonus = updatePlayer(state.players, player.id, (p) => ({
-          ...p,
-          money: p.money + DESTINATION_BONUS,
-          destinationsReached: p.destinationsReached + 1,
-        }));
-        const nextDestinationId = pickRandomDestination(map, state.destinationNodeId);
-        const nextDestination = getNode(map, nextDestinationId);
+        const result = detectDestinationArrival(map, player, state.players, state.destinationNodeId);
+        if (!result.arrived) return false;
 
         set({
-          players: playersAfterBonus,
-          destinationNodeId: nextDestinationId,
+          players: result.players,
+          destinationNodeId: result.destinationNodeId,
           status: "destinationArrived",
-          arrivalInfo: {
-            playerId: player.id,
-            playerName: player.name,
-            playerColor: player.color,
-            destinationName: arrivedNode.name,
-            bonus: DESTINATION_BONUS,
-            nextDestinationName: nextDestination.name,
-          },
-          log: pushLog(
-            state,
-            `${player.name}さんが目的地「${arrivedNode.name}」に到着! ボーナス+${DESTINATION_BONUS}万円。次の目的地は「${nextDestination.name}」`,
-          ),
+          arrivalInfo: result.arrivalInfo,
+          log: pushLog(state, result.logMessage),
         });
         return true;
       }
@@ -174,29 +189,62 @@ export const useGameStore = create<GameStore>()(
         return true;
       }
 
-      /** 手番を次のプレイヤーへ送る(決算判定は済んでいる前提)。規定ターン終了ならゲーム終了へ。 */
+      /**
+       * 手番を次のプレイヤーへ送る(決算判定は済んでいる前提)。規定ターン終了ならゲーム終了へ。
+       *
+       * skipNextRollを持つプレイヤーは、実際に手番を得る前にその場で1回分だけ消費して読み飛ばす。
+       * advanceToNextTurn()を再帰呼び出しする形にはしていない: set()を都度発火させると
+       * 中間状態(実際にはプレイヤーには見えない一瞬)が積み重なるだけでなく、将来「複数ターン
+       * 停止」のような効果を足したときに再帰の終了条件が増えて追いにくくなる。代わりに、
+       * 「次に実際に行動するプレイヤー」をループで求めてから最後に1回だけset()する形にして、
+       * 状態異常専用の仕組み(汎用エンジン)は作らずに済ませている。
+       * 全員が同時にskipNextRollを持つ(理論上ほぼ発生しない)異常系でも、ループ回数を
+       * プレイヤー数で打ち切ることで無限ループを防ぐ。
+       */
       function advanceToNextTurn() {
         const state = get();
-        const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-        const nextTurn = nextIndex === 0 ? state.turn + 1 : state.turn;
+        let players = state.players;
+        let index = state.currentPlayerIndex;
+        let turn = state.turn;
+        let log = state.log;
 
-        if (nextTurn > state.totalTurns) {
-          const winnerIds = computeWinnerIds(state.players);
-          set({
-            status: "finished",
-            winnerIds,
-            log: pushLog(state, `規定ターン終了! ${winnerIds.length > 1 ? "引き分け" : "勝者決定"}`),
-          });
-          return;
+        for (let i = 0; i < players.length; i++) {
+          const nextIndex = (index + 1) % players.length;
+          const nextTurn = nextIndex === 0 ? turn + 1 : turn;
+
+          if (nextTurn > state.totalTurns) {
+            const winnerIds = computeWinnerIds(players);
+            set({
+              players,
+              status: "finished",
+              winnerIds,
+              log: [...log, { id: makeLogId(), turn, message: `規定ターン終了! ${winnerIds.length > 1 ? "引き分け" : "勝者決定"}` }],
+            });
+            return;
+          }
+
+          index = nextIndex;
+          turn = nextTurn;
+          const candidate = players[index];
+          const skip = candidate.activeDebuffs.find((d) => d.kind === "skipNextRoll");
+          if (!skip) break; // このプレイヤーが実際に手番を行う
+
+          players = updatePlayer(players, candidate.id, (p) => ({
+            ...p,
+            activeDebuffs: p.activeDebuffs.filter((d) => d.id !== skip.id),
+          }));
+          log = [...log, { id: makeLogId(), turn, message: `${candidate.name}さんは「${skip.sourceCardName}」の効果でこの手番はお休みです。` }];
         }
 
         set({
-          currentPlayerIndex: nextIndex,
-          turn: nextTurn,
+          players,
+          currentPlayerIndex: index,
+          turn,
           status: "rolling",
           diceResult: null,
           remainingMoves: 0,
           pendingPropertyGroupId: null,
+          log,
         });
       }
 
@@ -299,12 +347,116 @@ export const useGameStore = create<GameStore>()(
           if (!player.cardIds.includes(cardId)) return;
           const def = getCardDef(cardId);
           if (!def || def.kind !== "usable" || !def.effect) return;
-          const handler = CARD_EFFECT_HANDLERS[effectKind(def.effect)];
+          const kind = effectKind(def.effect);
+
+          // ぶっとび系カード(即時アクション型): 次のロールに効くstatePatchを返す予約型とは違い、
+          // サイコロを振らずにその場で移動先を確定し、着地処理まで進める。予約型カード
+          // (doubleMove/multiDice)が既に予約されていると、ワープはrollDice()を経由しないため
+          // その予約が誰にも消費されず次のプレイヤーへ漏れてしまう。予約系どうしの重複と同じ
+          // ガードで、未消費のまま使用不可にする。
+          if (kind === "warp") {
+            if (blockedByPendingDiceModifier(state)) {
+              set({
+                log: pushLog(
+                  state,
+                  `${player.name}さんは「${def.name}」を使おうとしたが、すでに移動系カードの効果が予約されているため使えなかった。`,
+                ),
+              });
+              return;
+            }
+
+            const map = getMap(state.mapId);
+            const effect = def.effect as WarpEffect;
+            const targetNodeId = WARP_HANDLERS[effect.scope]({ state, map, player });
+            const targetNode = getNode(map, targetNodeId);
+            const playersAfterUse = updatePlayer(state.players, player.id, (p) => ({
+              ...p,
+              cardIds: p.cardIds.filter((id) => id !== cardId),
+            }));
+            set({
+              players: playersAfterUse,
+              status: "cardWarpAnnounce",
+              cardWarpInfo: {
+                playerId: player.id,
+                playerName: player.name,
+                cardId: def.id,
+                cardName: def.name,
+                targetNodeId,
+                targetNodeName: targetNode.name,
+              },
+              log: pushLog(state, `${player.name}さんが「${def.name}」を使った!`),
+            });
+            return;
+          }
+
+          // 場所指定系カード: warpと違い、使った時点ではまだ移動先を確定しない。選択肢一覧だけを
+          // 作ってstatus:"selectingCardTarget"へ遷移する。カードの消費・移動先確定は
+          // confirmTargetSelection()(選択確定時)まで遅延させる(キャンセルすればカードは手札に残る)。
+          if (kind === "targetSelect") {
+            if (blockedByPendingDiceModifier(state)) {
+              set({
+                log: pushLog(
+                  state,
+                  `${player.name}さんは「${def.name}」を使おうとしたが、すでに移動系カードの効果が予約されているため使えなかった。`,
+                ),
+              });
+              return;
+            }
+
+            const map = getMap(state.mapId);
+            const effect = def.effect as TargetSelectEffect;
+            const options = TARGET_SELECT_HANDLERS[effect.selectKind].listOptions({ state, map, player });
+            set({
+              status: "selectingCardTarget",
+              targetSelectInfo: {
+                playerId: player.id,
+                playerName: player.name,
+                cardId: def.id,
+                cardName: def.name,
+                selectKind: effect.selectKind,
+                options,
+              },
+            });
+            return;
+          }
+
+          // 妨害系カード: targetSelectと同じ選択UI(TargetSelectOverlay)を再利用するが、選ぶのは
+          // ノードではなく相手プレイヤー。使った時点ではまだ何も起きない(移動もしない)。カードの
+          // 消費・デバフ付与はconfirmTargetSelection()(選択確定時)まで遅延させる。予約系カードが
+          // 既に予約されている場合にrollDice()を経由せず手番を終えてしまう問題は warp/targetSelect と
+          // 全く同じなので、同じガードを使う。
+          if (kind === "rivalDebuff") {
+            if (blockedByPendingDiceModifier(state)) {
+              set({
+                log: pushLog(
+                  state,
+                  `${player.name}さんは「${def.name}」を使おうとしたが、すでに移動系カードの効果が予約されているため使えなかった。`,
+                ),
+              });
+              return;
+            }
+
+            const options = listRivalPlayerOptions({ state, player });
+            set({
+              status: "selectingCardTarget",
+              targetSelectInfo: {
+                playerId: player.id,
+                playerName: player.name,
+                cardId: def.id,
+                cardName: def.name,
+                selectKind: "rivalPlayer",
+                options,
+              },
+            });
+            return;
+          }
+
+          const handler = CARD_EFFECT_HANDLERS[kind];
           if (!handler) return;
 
           // ダイスの出目・移動量そのものを修飾する効果(doubleMove/multiDice)は同時に2つ以上
           // 予約できない。既に予約済みなら、このカードは消費せず状態も変えずに理由をログへ残す。
-          if (isDiceModifierEffect(def.effect) && (state.pendingDoubleMove || state.pendingDiceCount > 1)) {
+          if (isDiceModifierEffect(def.effect) && blockedByPendingDiceModifier(state)) {
             set({
               log: pushLog(
                 state,
@@ -322,20 +474,103 @@ export const useGameStore = create<GameStore>()(
           set({ players: playersAfterUse, ...result.statePatch, log: pushLog(state, result.logMessage) });
         },
 
+        confirmTargetSelection: (optionId: string) => {
+          const state = get();
+          if (state.status !== "selectingCardTarget" || !state.targetSelectInfo) return;
+          const info = state.targetSelectInfo;
+          const option = info.options.find((o) => o.optionId === optionId);
+          if (!option) return;
+          const player = state.players.find((p) => p.id === info.playerId);
+          if (!player) return;
+          const def = getCardDef(info.cardId);
+          if (!def || def.kind !== "usable" || !def.effect) return;
+          const kind = effectKind(def.effect);
+
+          // 妨害系カード: 選んだ相手のactiveDebuffsへ1件追加するだけで、移動もカメラ演出も一切
+          // 発生しない(TargetSelectOverlay→カード消費→デバフ付与→ログ→手番終了、という
+          // 最も単純な帰結)。デバフの消費(実際の効果発動)は対象プレイヤー自身の手番が来たときに
+          // advanceToNextTurn()/rollDice()側が行う(下記参照)。
+          if (kind === "rivalDebuff") {
+            const effect = def.effect as RivalDebuffEffect;
+            const target = state.players.find((p) => p.id === optionId);
+            if (!target) return;
+
+            const debuff: ActiveDebuff = {
+              id: makeDebuffId(),
+              kind: effect.debuffKind,
+              sourcePlayerId: player.id,
+              sourceCardName: info.cardName,
+            };
+            const playersAfter = state.players.map((p) => {
+              if (p.id === player.id) return { ...p, cardIds: p.cardIds.filter((id) => id !== info.cardId) };
+              if (p.id === target.id) return { ...p, activeDebuffs: [...p.activeDebuffs, debuff] };
+              return p;
+            });
+
+            set({
+              players: playersAfter,
+              status: "resolvingEvent",
+              targetSelectInfo: null,
+              log: pushLog(state, DEBUFF_DEFS[effect.debuffKind].describeGrant(player.name, target.name, info.cardName)),
+            });
+            endTurn();
+            return;
+          }
+
+          if (kind !== "targetSelect") return; // 防御(理論上到達しない)
+          const effect = def.effect as TargetSelectEffect;
+
+          const map = getMap(state.mapId);
+          const targetNodeId = TARGET_SELECT_HANDLERS[effect.selectKind].resolveTarget({ state, map, player }, optionId);
+          const targetNode = getNode(map, targetNodeId);
+
+          const playersAfterUse = updatePlayer(state.players, player.id, (p) => ({
+            ...p,
+            cardIds: p.cardIds.filter((id) => id !== info.cardId),
+          }));
+
+          set({
+            players: playersAfterUse,
+            status: "cardWarpAnnounce",
+            targetSelectInfo: null,
+            cardWarpInfo: {
+              playerId: player.id,
+              playerName: player.name,
+              cardId: info.cardId,
+              cardName: info.cardName,
+              targetNodeId,
+              targetNodeName: targetNode.name,
+            },
+            log: pushLog(state, `${player.name}さんが「${info.cardName}」で「${option.label}」を選んだ!`),
+          });
+        },
+
+        cancelTargetSelection: () => {
+          const state = get();
+          if (state.status !== "selectingCardTarget") return;
+          set({ status: "rolling", targetSelectInfo: null });
+        },
+
         rollDice: () => {
           const state = get();
           if (state.status !== "rolling" || state.diceResult !== null) return;
           const diceCount = state.pendingDiceCount;
-          const faces = Array.from({ length: diceCount }, () => rollDiceValue());
-          const rawSum = faces.reduce((sum, face) => sum + face, 0);
-          const result = state.pendingDoubleMove ? rawSum * 2 : rawSum;
           const player = currentPlayer(state);
-          const wasDoubled = state.pendingDoubleMove;
+
+          // 妨害系カード(halveDiceNextRoll)の検知・消費はここ(store側)で行う。出目・合計・
+          // 半減/倍化の計算そのものはdiceRoll.tsのresolveDiceRoll()(純関数)へ委譲する。
+          const halveDebuff = player.activeDebuffs.find((d) => d.kind === "halveDiceNextRoll");
+          const { faces, rawSum, result, rollDescription, modifierSuffix } = resolveDiceRoll({
+            diceCount,
+            halveDebuff: halveDebuff ? { sourceCardName: halveDebuff.sourceCardName } : null,
+            pendingDoubleMove: state.pendingDoubleMove,
+          });
+
           const players = updatePlayer(state.players, player.id, (p) => ({
             ...p,
             moveHistory: [p.currentNodeId],
+            activeDebuffs: halveDebuff ? p.activeDebuffs.filter((d) => d.id !== halveDebuff.id) : p.activeDebuffs,
           }));
-          const rollDescription = diceCount > 1 ? `${faces.join("+")}=${rawSum}` : `${rawSum}`;
           set({
             players,
             diceFaces: faces,
@@ -346,7 +581,7 @@ export const useGameStore = create<GameStore>()(
             status: "moving",
             log: pushLog(
               state,
-              `${player.name}さんがサイコロを${diceCount > 1 ? diceCount + "個" : ""}振った: ${rollDescription}${wasDoubled ? " (2倍で" + result + "マス)" : ""}`,
+              `${player.name}さんがサイコロを${diceCount > 1 ? diceCount + "個" : ""}振った: ${rollDescription}${modifierSuffix}`,
             ),
           });
         },
@@ -375,11 +610,7 @@ export const useGameStore = create<GameStore>()(
 
           if (options.length === 1) {
             const to = options[0].to;
-            const players = updatePlayer(state.players, player.id, (p) => ({
-              ...p,
-              moveHistory: [...p.moveHistory, to],
-              currentNodeId: to,
-            }));
+            const players = updatePlayer(state.players, player.id, (p) => movePlayerForward(p, to));
             set({ players, remainingMoves: state.remainingMoves - 1 });
             return;
           }
@@ -399,11 +630,7 @@ export const useGameStore = create<GameStore>()(
           if (state.status !== "selectingRoute") return;
           if (!state.routeOptions.some((o) => o.nodeId === nodeId)) return;
           const player = currentPlayer(state);
-          const players = updatePlayer(state.players, player.id, (p) => ({
-            ...p,
-            moveHistory: [...p.moveHistory, nodeId],
-            currentNodeId: nodeId,
-          }));
+          const players = updatePlayer(state.players, player.id, (p) => movePlayerForward(p, nodeId));
           set({
             players,
             remainingMoves: state.remainingMoves - 1,
@@ -464,31 +691,24 @@ export const useGameStore = create<GameStore>()(
             ownedPropertyIds: [...p.ownedPropertyIds, def.id],
           }));
 
-          // 独占達成の検知: 購入「前」の所有状況(state.players)では未達成、購入「後」の所有状況
-          // (players)では達成、という差分だけを見る。そのグループは既に全物件が埋まるため、
-          // 同じ購入で再度この分岐に入ることはない(=通知は達成した瞬間の1回だけ)。
-          // 判定・倍率はどちらもpropertyOwnership.ts/propertyBalance.tsの既存値をそのまま使う。
+          // 独占達成の判定(購入前後の所有状況の差分)はpropertyMonopoly.tsへ切り出し済み。
+          // ここでは結果を受け取ってset()するだけ。
           const group = getPropertyGroupDef(def.groupId);
-          const wasGroupMonopoly = isGroupMonopolized(def.groupId, player.id, state.players, propertyDefs);
-          const isGroupMonopolyNow = isGroupMonopolized(def.groupId, player.id, players, propertyDefs);
-          const isRegionMonopolyNow =
-            !!group && isRegionMonopolized(group.region, player.id, players, propertyDefs, propertyGroupDefs);
-
-          let logMessage = `${player.name}さんが「${def.name}」を購入した(${def.price}万円)`;
-          let monopolyAchievement: GameState["monopolyAchievement"] = null;
-          if (!wasGroupMonopoly && isRegionMonopolyNow && group) {
-            logMessage += ` 🎉 ${group.region}エリアを完全独占!物件収益が${PROPERTY_REVENUE_CONFIG.regionMonopolyMultiplier}倍になります!`;
-            monopolyAchievement = { kind: "region", name: group.region, multiplier: PROPERTY_REVENUE_CONFIG.regionMonopolyMultiplier };
-          } else if (!wasGroupMonopoly && isGroupMonopolyNow && group) {
-            logMessage += ` 🎉 ${group.name}を独占!物件収益が${PROPERTY_REVENUE_CONFIG.groupMonopolyMultiplier}倍になります!`;
-            monopolyAchievement = { kind: "group", name: group.name, multiplier: PROPERTY_REVENUE_CONFIG.groupMonopolyMultiplier };
-          }
+          const { monopolyAchievement, logSuffix } = detectMonopolyAchievement(
+            def,
+            group,
+            player.id,
+            state.players,
+            players,
+            propertyDefs,
+            propertyGroupDefs,
+          );
 
           // statusはpurchaseOfferのまま維持する: 同じグループの別の物件を続けて購入できるようにするため。
           set({
             players,
             monopolyAchievement,
-            log: pushLog(state, logMessage),
+            log: pushLog(state, `${player.name}さんが「${def.name}」を購入した(${def.price}万円)${logSuffix}`),
           });
         },
 
@@ -510,6 +730,29 @@ export const useGameStore = create<GameStore>()(
           const state = get();
           if (state.status !== "destinationArrived") return;
           set({ arrivalInfo: null, status: "destinationFocus" });
+        },
+
+        continueAfterWarpAnnounce: () => {
+          const state = get();
+          if (state.status !== "cardWarpAnnounce" || !state.cardWarpInfo) return;
+          const { playerId, playerName, targetNodeId, targetNodeName } = state.cardWarpInfo;
+          const players = updatePlayer(state.players, playerId, (p) => ({
+            ...p,
+            currentNodeId: targetNodeId,
+            moveHistory: [targetNodeId],
+          }));
+          set({
+            players,
+            status: "cardWarpFocus",
+            log: pushLog(state, `${playerName}さんが「${targetNodeName}」へワープした!`),
+          });
+        },
+
+        continueAfterCardWarpFocus: () => {
+          const state = get();
+          if (state.status !== "cardWarpFocus") return;
+          set({ cardWarpInfo: null });
+          resolveLanding();
         },
 
         continueAfterDestinationFocus: () => {
@@ -600,57 +843,9 @@ export const useGameStore = create<GameStore>()(
     },
     {
       name: "shonan-sugoroku-save",
-      // バージョン番号の上げ忘れに依存しないよう、読み込みのたびに毎回検証する。
-      // `merge`は復元データがストアへ実際に反映される「前」に割り込めるので、
-      // 不正なノードID(マップを作り直した後の残骸)を持つ保存は、1フレームも
-      // ストアに反映させずにそのまま破棄できる(onRehydrateStorageは反映"後"の後始末なので、
-      // 反映された瞬間に描画がクラッシュするケースに間に合わなかった)。
-      merge: (persisted, currentState) => {
-        const state = persisted as Partial<GameState> | undefined;
-        if (!state || typeof state.mapId !== "string" || !(state.mapId in maps)) {
-          return currentState;
-        }
-        const validNodeIds = new Set(maps[state.mapId].nodes.map((n) => n.id));
-        const destOk = !state.destinationNodeId || validNodeIds.has(state.destinationNodeId);
-        const playersOk =
-          !state.players ||
-          state.players.every(
-            (p) =>
-              validNodeIds.has(p.currentNodeId) &&
-              (p.moveHistory ?? []).every((id) => validNodeIds.has(id)),
-          );
-        if (!destOk || !playersOk) {
-          return currentState;
-        }
-        // 旧セーブ(previousNodeIdのみ持ち、moveHistoryが無い)を読み込んだ場合のフォールバック。
-        const players = state.players?.map((p) =>
-          p.moveHistory && p.moveHistory.length > 0 ? p : { ...p, moveHistory: [p.currentNodeId] },
-        );
-
-        // 旧セーブ(SettlementEntryにnetWorthAfterが無い形式)を決算演出/画面の表示中に
-        // 保存していた場合の防御。お金は書き込み時点で既に反映済みなので実害はなく、
-        // その年の決算表示だけを1回スキップしてrollingへ戻す。
-        const staleEntry = state.settlementInfo?.entries?.[0];
-        const hasStaleSettlementInfo =
-          (state.status === "settlementIntro" || state.status === "settlement") &&
-          !!state.settlementInfo &&
-          (!staleEntry || !("netWorthAfter" in staleEntry));
-        const settlementOverride = hasStaleSettlementInfo
-          ? { status: "rolling" as const, settlementInfo: null }
-          : {};
-
-        return {
-          ...currentState,
-          ...state,
-          ...(players ? { players } : {}),
-          // 旧セーブにキー自体が無ければcurrentState(IDLE_STATE由来)の既定値がそのまま使われる。
-          netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
-          pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
-          activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,
-          diceFaces: state.diceFaces ?? currentState.diceFaces,
-          ...settlementOverride,
-        };
-      },
+      // 旧セーブのバリデーション・マイグレーション本体は persistMigration.ts へ分離済み
+      // (セーブ互換処理とゲーム進行処理の責務を分けるため)。ここでは呼び出すだけ。
+      merge: mergeGameState,
     },
   ),
 );

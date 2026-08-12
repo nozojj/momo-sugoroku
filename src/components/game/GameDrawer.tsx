@@ -1,8 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import type { GameStatus, LogEntry, Player } from "@/types/game";
+import { getCardDef } from "@/data/cards";
+import { getPropertyDef, propertyDefs } from "@/data/properties";
+import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { ownershipTier } from "@/lib/game/propertyOwnership";
+import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 import { PlayerHud } from "./PlayerHud";
 import { EventLog } from "./EventLog";
+import { CardDetailSheet } from "./CardDetailSheet";
+import { PropertyDetailSheet } from "./PropertyDetailSheet";
 
 interface GameDrawerProps {
   open: boolean;
@@ -50,11 +58,42 @@ export function GameDrawer({
   log,
   onReset,
 }: GameDrawerProps) {
+  // カード/物件の詳細シートの開閉は、手番や所持状態を一切変えないローカルなUI状態なので、
+  // GameStatusには乗せずここで管理する(見て閉じるだけならセーブ/ロードに影響させる必要が無い)。
+  const [inspecting, setInspecting] = useState<{ playerId: string; cardId: string } | null>(null);
+  const [inspectingProperty, setInspectingProperty] = useState<{ playerId: string; propertyId: string } | null>(null);
+
+  function handleClose() {
+    onClose();
+    setInspecting(null);
+    setInspectingProperty(null);
+  }
+
+  const inspectingDef = inspecting ? getCardDef(inspecting.cardId) : null;
+  const inspectingPlayerIndex = inspecting ? players.findIndex((p) => p.id === inspecting.playerId) : -1;
+  const inspectingUsable =
+    inspectingDef?.kind === "usable" &&
+    inspectingPlayerIndex === currentPlayerIndex &&
+    status === "rolling" &&
+    diceResult === null;
+
+  // 物件詳細: 年間収益はここでも計算し直さず、既存のownershipTier()/calculateAnnualRevenue()
+  // (決算で使っているものと同一の関数)を呼んで表示するだけ。所有権・収益は一切変更しない。
+  const inspectingPropertyDef = inspectingProperty ? getPropertyDef(inspectingProperty.propertyId) : null;
+  const inspectingPropertyGroup = inspectingPropertyDef ? getPropertyGroupDef(inspectingPropertyDef.groupId) : undefined;
+  const inspectingPropertyTier =
+    inspectingProperty && inspectingPropertyDef
+      ? ownershipTier(inspectingPropertyDef, inspectingProperty.playerId, players, propertyDefs, propertyGroupDefs)
+      : "normal";
+  const inspectingPropertyRevenue = inspectingPropertyDef
+    ? calculateAnnualRevenue(inspectingPropertyDef, inspectingPropertyTier)
+    : 0;
+
   return (
     <>
       <div
         className={`fixed inset-0 z-30 bg-black/40 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onClose}
+        onClick={handleClose}
         aria-hidden="true"
       />
       <div
@@ -69,7 +108,7 @@ export function GameDrawer({
           <h2 className="text-base font-black text-slate-800 dark:text-white">メニュー</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="閉じる"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
           >
@@ -97,7 +136,8 @@ export function GameDrawer({
                 player={player}
                 isActive={i === currentPlayerIndex}
                 canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null}
-                onUseCard={onUseCard}
+                onInspectCard={(cardId) => setInspecting({ playerId: player.id, cardId })}
+                onInspectProperty={(propertyId) => setInspectingProperty({ playerId: player.id, propertyId })}
               />
             ))}
           </div>
@@ -119,6 +159,28 @@ export function GameDrawer({
           </button>
         </section>
       </div>
+
+      {inspecting && inspectingDef && (
+        <CardDetailSheet
+          def={inspectingDef}
+          usable={inspectingUsable}
+          onUse={() => {
+            onUseCard(inspecting.cardId);
+            setInspecting(null);
+          }}
+          onClose={() => setInspecting(null)}
+        />
+      )}
+
+      {inspectingProperty && inspectingPropertyDef && (
+        <PropertyDetailSheet
+          def={inspectingPropertyDef}
+          group={inspectingPropertyGroup}
+          annualRevenue={inspectingPropertyRevenue}
+          isMonopoly={inspectingPropertyTier !== "normal"}
+          onClose={() => setInspectingProperty(null)}
+        />
+      )}
     </>
   );
 }

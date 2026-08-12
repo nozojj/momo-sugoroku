@@ -7,13 +7,18 @@ import { cardDefs } from "@/data/cards";
 import { getPropertyDef, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
-import { RARITY_BADGE_CLASS } from "@/lib/game/cardDisplay";
+import { CARD_CATEGORY_DOT_CLASS, CARD_CATEGORY_ORDER, RARITY_BADGE_CLASS, cardCategoryOf } from "@/lib/game/cardDisplay";
+import { PROPERTY_GENRE_DOT_CLASS, propertyGenreOf } from "@/lib/game/propertyDisplay";
 
 interface PlayerHudProps {
   player: Player;
   isActive: boolean;
   canUseCard: boolean;
-  onUseCard: (cardId: string) => void;
+  /** カードのピルをタップしたときに呼ばれる。タップ即使用はしない(CardDetailSheetを開くだけ)。
+   *  実際の使用は詳細シートの「使う」ボタン経由でuseCard()が呼ばれる(呼び出し元が管理)。 */
+  onInspectCard: (cardId: string) => void;
+  /** 所有物件のピルをタップしたときに呼ばれる。PropertyDetailSheetを開くだけ(所有権は不変)。 */
+  onInspectProperty: (propertyId: string) => void;
 }
 
 function cardDef(id: string): CardDef | undefined {
@@ -45,8 +50,16 @@ function monopolyBadges(player: Player): { key: string; label: string; region: b
   return [...regionBadges, ...groupBadges];
 }
 
-export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHudProps) {
+export function PlayerHud({ player, isActive, canUseCard, onInspectCard, onInspectProperty }: PlayerHudProps) {
   const badges = monopolyBadges(player);
+  // カードはカテゴリ順にソートするだけ(見出し付きグループ化はまだしない)。8枚上限なら
+  // カテゴリバッジの色分け+並び順で十分読み取れる想定。将来カード枚数/種類が増えたときは、
+  // ここでCARD_CATEGORY_ORDERを使ってRecord<CardCategory, ...>にグループ化する形へ拡張できる
+  // (cardCategoryOf()自体は変更不要)。
+  const sortedCardEntries = player.cardIds
+    .map((cardId, index) => ({ cardId, index, def: cardDef(cardId) }))
+    .filter((entry): entry is { cardId: string; index: number; def: CardDef } => !!entry.def)
+    .sort((a, b) => CARD_CATEGORY_ORDER.indexOf(cardCategoryOf(a.def)) - CARD_CATEGORY_ORDER.indexOf(cardCategoryOf(b.def)));
 
   return (
     <div
@@ -94,37 +107,40 @@ export function PlayerHud({ player, isActive, canUseCard, onUseCard }: PlayerHud
           {player.ownedPropertyIds.map((propertyId) => {
             const def = getPropertyDef(propertyId);
             if (!def) return null;
+            const genre = propertyGenreOf(def);
             return (
-              <span
+              <button
                 key={propertyId}
+                type="button"
+                onClick={() => onInspectProperty(propertyId)}
                 title={`${def.category} / ${formatMoney(def.price)}`}
-                className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-500/50 dark:bg-emerald-400/10 dark:text-emerald-300"
+                className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-500/50 dark:bg-emerald-400/10 dark:text-emerald-300"
               >
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PROPERTY_GENRE_DOT_CLASS[genre]}`} aria-hidden="true" />
                 {def.icon ? `${def.icon} ` : "🏠 "}
                 {def.name}
-              </span>
+              </button>
             );
           })}
         </div>
       )}
 
-      {player.cardIds.length > 0 && (
+      {sortedCardEntries.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {player.cardIds.map((cardId, i) => {
-            const def = cardDef(cardId);
-            if (!def) return null;
+          {sortedCardEntries.map(({ cardId, index, def }) => {
             const usable = canUseCard && def.kind === "usable";
+            const category = cardCategoryOf(def);
             return (
               <button
-                key={`${cardId}-${i}`}
+                key={`${cardId}-${index}`}
                 type="button"
-                disabled={!usable}
-                onClick={() => usable && onUseCard(cardId)}
+                onClick={() => onInspectCard(cardId)}
                 title={def.description}
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${RARITY_BADGE_CLASS[def.rarity]} ${
+                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${RARITY_BADGE_CLASS[def.rarity]} ${
                   usable ? "ring-2 ring-fuchsia-400" : "opacity-70"
                 }`}
               >
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${CARD_CATEGORY_DOT_CLASS[category]}`} aria-hidden="true" />
                 {def.icon} {def.name}
               </button>
             );

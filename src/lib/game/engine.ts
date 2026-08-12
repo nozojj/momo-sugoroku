@@ -47,6 +47,12 @@ export function makeLogId(): string {
   return `log_${logSeq}_${Date.now()}`;
 }
 
+let debuffSeq = 0;
+export function makeDebuffId(): string {
+  debuffSeq += 1;
+  return `debuff_${debuffSeq}_${Date.now()}`;
+}
+
 /** 所有物件の資産価値(assetValue)合計。netWorth()とcalculateSettlement()の両方から使う。 */
 export function propertyValueOf(player: Player): number {
   return player.ownedPropertyIds.reduce((sum, id) => {
@@ -77,6 +83,7 @@ export function createPlayer(id: string, name: string, colorIndex: number, start
     ownedPropertyIds: [],
     cardIds: [],
     destinationsReached: 0,
+    activeDebuffs: [],
   };
 }
 
@@ -104,6 +111,8 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     pendingPropertyGroupId: null,
     monopolyAchievement: null,
     arrivalInfo: null,
+    cardWarpInfo: null,
+    targetSelectInfo: null,
     moneyRouletteInfo: null,
     cardDrawInfo: null,
     cardOverflowInfo: null,
