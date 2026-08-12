@@ -29,9 +29,33 @@ function getAudioElement(id: SoundEffectId): HTMLAudioElement | null {
   return el;
 }
 
+/**
+ * React StrictMode(開発モードのみ)は同じマウントeffectを「実行→クリーンアップ→再実行」と
+ * 同一の同期実行内で二重に呼ぶ。setTimeout等でスケジュールする副作用はクリーンアップの
+ * clearTimeoutで自然に後始末されるが、playSE()をeffect本体に直接書くと対応する取り消し
+ * 手段が無く、素朴に実装すると2回再生されてしまう(MonopolyToastで実際に確認済み)。
+ *
+ * ここでは「同一の同期実行(マイクロタスク境界の前)」に限定して同じidの重複だけを無視する。
+ * 時間ベースのクールダウン(例: 50ms以内は無視)にしないのは、roulette_tickのように
+ * 正規の仕様で最短30ms間隔の連続再生を行うSEを誤って抑止しないため。setTimeoutで
+ * スケジュールされた正規の連続呼び出しは、次のマクロタスクが実行される前に必ず
+ * マイクロタスクキューが空になる(=このSetからidが取り除かれる)ため、この区別が成立する。
+ */
+const playedThisTick = new Set<SoundEffectId>();
+
+function isDuplicateWithinSameTick(id: SoundEffectId): boolean {
+  if (playedThisTick.has(id)) return true;
+  playedThisTick.add(id);
+  queueMicrotask(() => {
+    playedThisTick.delete(id);
+  });
+  return false;
+}
+
 export function playSE(id: SoundEffectId): void {
   const { seEnabled, seVolume } = useAudioSettingsStore.getState();
   if (!seEnabled) return;
+  if (isDuplicateWithinSameTick(id)) return;
 
   const el = getAudioElement(id);
   if (!el) return;
