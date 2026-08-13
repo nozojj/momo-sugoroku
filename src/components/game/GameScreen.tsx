@@ -6,6 +6,7 @@ import { useHasHydrated } from "@/store/useHasHydrated";
 import { getMap } from "@/data/maps";
 import { getNode, shortestDistance, destinationCandidateNodes } from "@/lib/game/mapGraph";
 import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
+import { getYearEventDef } from "@/lib/game/yearEvent";
 import { Board } from "./Board";
 import { Dice } from "./Dice";
 import { GameHud } from "./GameHud";
@@ -22,6 +23,7 @@ import { SettlementIntroAnnouncer } from "./SettlementIntroAnnouncer";
 import { SettlementScreen } from "./SettlementScreen";
 import { MonopolyToast } from "./MonopolyToast";
 import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
+import { YearEventAnnounceModal } from "./YearEventAnnounceModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 
@@ -52,6 +54,8 @@ export function GameScreen() {
   const cardDrawInfo = useGameStore((s) => s.cardDrawInfo);
   const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
   const settlementInfo = useGameStore((s) => s.settlementInfo);
+  const currentYearEventId = useGameStore((s) => s.currentYearEventId);
+  const yearEventAnnounceInfo = useGameStore((s) => s.yearEventAnnounceInfo);
   const netWorthHistory = useGameStore((s) => s.netWorthHistory);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
@@ -65,6 +69,7 @@ export function GameScreen() {
   const buyProperty = useGameStore((s) => s.buyProperty);
   const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
   const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
+  const dismissYearEventAnnounce = useGameStore((s) => s.dismissYearEventAnnounce);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
   const continueAfterWarpAnnounce = useGameStore((s) => s.continueAfterWarpAnnounce);
@@ -139,6 +144,7 @@ export function GameScreen() {
 
   const destinationNode = getNode(map, destinationNodeId);
   const calendar = getCalendar(turn);
+  const currentYearEvent = getYearEventDef(currentYearEventId);
   const totalYears = Math.round(totalTurns / MONTHS_PER_YEAR);
   const distanceToDestination =
     currentPlayer && (status === "rolling" || status === "moving" || status === "selectingRoute")
@@ -172,6 +178,7 @@ export function GameScreen() {
         currentPlayerColor={currentPlayer?.color ?? "#94a3b8"}
         destinationName={destinationNode.name}
         calendarText={`${calendar.year}年目 ${calendar.month}月`}
+        yearEvent={currentYearEvent}
         onOpenDrawer={() => setDrawerOpen(true)}
         movementInfo={
           status === "rolling" || status === "moving" || status === "selectingRoute"
@@ -236,6 +243,7 @@ export function GameScreen() {
         totalYears={totalYears}
         turn={turn}
         totalTurns={totalTurns}
+        currentYearEventId={currentYearEventId}
         log={log}
         onReset={() => {
           if (window.confirm("ゲームを終了して最初からやり直しますか?")) resetGame();
@@ -247,6 +255,7 @@ export function GameScreen() {
           groupId={pendingPropertyGroupId}
           player={currentPlayer}
           players={players}
+          currentYearEventId={currentYearEventId}
           onBuy={buyProperty}
           onFinish={finishPropertyShopping}
         />
@@ -300,6 +309,14 @@ export function GameScreen() {
       )}
       {monopolyAchievement && monopolyAchievement.kind === "region" && (
         <MonopolyAnnounceModal achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />
+      )}
+
+      {/* 年度イベント(「今年の湘南」)の告知。monopolyAchievementと同じくstatusには依存しない
+          一時通知で、新しいGameStatusは増やさない。ゲーム開始時(1年目)・決算後に新年度へ
+          進んだ瞬間のどちらもgameStore側が同じyearEventAnnounceInfoにセットするため、
+          ここでの出し分けは不要。 */}
+      {yearEventAnnounceInfo && (
+        <YearEventAnnounceModal info={yearEventAnnounceInfo} onDismiss={dismissYearEventAnnounce} />
       )}
     </div>
   );

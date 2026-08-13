@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { getNode } from "@/lib/game/mapGraph";
+import { getYearEventDef } from "@/lib/game/yearEvent";
 import { placePlayerAt, mockSingleDiceFace, driveToLandingToward } from "./gameStore.testHelpers";
 
 const MAP_ID = "shonan-full";
@@ -97,5 +98,79 @@ describe("年度末の決算: status/turn遷移", () => {
     expect(finished.status).toBe("finished");
     expect(finished.winnerIds).not.toBeNull();
     expect(finished.winnerIds).toEqual(["p1"]); // 1人プレイなので唯一のプレイヤーが必ず勝者
+  });
+});
+
+describe("年度イベント(「今年の湘南」): 抽選タイミング・GameStateへの反映", () => {
+  beforeEach(() => {
+    assertFixturePreconditions();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("ゲーム開始(1年目)時点でcurrentYearEventId・yearEventAnnounceInfoが設定されている", () => {
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["テストP1"], 1);
+
+    const state = useGameStore.getState();
+    expect(getYearEventDef(state.currentYearEventId)).toBeDefined();
+    expect(state.yearEventAnnounceInfo).toEqual({ year: 1, eventId: state.currentYearEventId });
+  });
+
+  it("dismissYearEventAnnounce()はyearEventAnnounceInfoだけをnullにし、currentYearEventIdは変えない", () => {
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["テストP1"], 1);
+    const before = useGameStore.getState();
+    expect(before.yearEventAnnounceInfo).not.toBeNull();
+
+    useGameStore.getState().dismissYearEventAnnounce();
+    const after = useGameStore.getState();
+
+    expect(after.yearEventAnnounceInfo).toBeNull();
+    expect(after.currentYearEventId).toBe(before.currentYearEventId);
+    expect(after.status).toBe(before.status);
+  });
+
+  it("決算をまたぐとcurrentYearEventIdが再抽選され、settlementInfo.yearEventIdは決算対象年度(またぐ前)の値と一致する", () => {
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["テストP1"], 2); // totalTurns = 24
+    useGameStore.setState({ turn: 12 });
+
+    const yearEventIdBeforeCrossing = useGameStore.getState().currentYearEventId;
+    expect(getYearEventDef(yearEventIdBeforeCrossing)).toBeDefined();
+
+    playOutOneTurn();
+
+    const settled = useGameStore.getState();
+    // 決算(1年目分)にはまだ新年度の抽選が反映されていないこと。
+    expect(settled.settlementInfo?.yearEventId).toBe(yearEventIdBeforeCrossing);
+    expect(settled.currentYearEventId).toBe(yearEventIdBeforeCrossing);
+
+    useGameStore.getState().continueAfterSettlementIntro();
+    useGameStore.getState().continueAfterSettlement();
+
+    const next = useGameStore.getState();
+    expect(next.turn).toBe(13);
+    expect(getYearEventDef(next.currentYearEventId)).toBeDefined();
+    expect(next.yearEventAnnounceInfo).toEqual({ year: 2, eventId: next.currentYearEventId });
+  });
+
+  it("最終年度終了時は次年度の年度イベントを抽選しない(currentYearEventIdが変化せず、yearEventAnnounceInfoも更新されない)", () => {
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["テストP1"], 1); // totalTurns = 12(1年のみ)
+    useGameStore.setState({ turn: 12, yearEventAnnounceInfo: null });
+
+    const yearEventIdBeforeFinal = useGameStore.getState().currentYearEventId;
+
+    playOutOneTurn();
+    useGameStore.getState().continueAfterSettlementIntro();
+    useGameStore.getState().continueAfterSettlement();
+
+    const finished = useGameStore.getState();
+    expect(finished.status).toBe("finished");
+    expect(finished.currentYearEventId).toBe(yearEventIdBeforeFinal);
+    expect(finished.yearEventAnnounceInfo).toBeNull();
   });
 });

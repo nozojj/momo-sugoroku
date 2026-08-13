@@ -6,6 +6,8 @@ import { formatMoney, formatMoneyDelta } from "@/lib/format";
 import { PROPERTY_REVENUE_CONFIG } from "@/lib/game/propertyBalance";
 import { getPropertyDef } from "@/data/properties";
 import { PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
+import { getYearEventDef } from "@/lib/game/yearEvent";
+import type { YearEventDef } from "@/types/game";
 import { NetWorthTrendChart } from "./NetWorthTrendChart";
 
 interface SettlementScreenProps {
@@ -34,6 +36,7 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
   const ranked = [...info.entries].sort((a, b) => b.netWorthAfter - a.netWorthAfter);
   const rankChanges = computeRankChanges(info.entries, history);
   const awards = computeAwards(info.entries);
+  const yearEvent = getYearEventDef(info.yearEventId);
 
   return (
     <div className="min-h-dvh w-full overflow-y-auto p-4 pb-8">
@@ -42,6 +45,17 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
           <p className="text-4xl">🧾</p>
           <h1 className="mt-2 text-lg font-bold text-slate-800 dark:text-white">{info.year}年目 決算</h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">総資産の多い順に表示しています</p>
+          {yearEvent && (
+            <p
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-300"
+              title={yearEvent.description}
+            >
+              <span className="text-slate-400 dark:text-slate-500">今年の湘南:</span>
+              <span>
+                {yearEvent.icon} {yearEvent.label}
+              </span>
+            </p>
+          )}
         </div>
 
         {awards.length > 0 && (
@@ -60,6 +74,7 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
                 entry={entry}
                 rank={i + 1}
                 rankChange={rankChanges.get(entry.playerId) ?? null}
+                yearEvent={yearEvent}
               />
             ))}
           </div>
@@ -224,10 +239,14 @@ function SettlementRankingRow({
   entry,
   rank,
   rankChange,
+  yearEvent,
 }: {
   entry: SettlementEntry;
   rank: number;
   rankChange: number | null;
+  /** この決算に適用された年度イベント。物件内訳の各行に補正バッジを出すために使う
+   *  (undefinedなら"平年"扱いで一切バッジを出さない)。 */
+  yearEvent: YearEventDef | undefined;
 }) {
   const notes = monopolyNotes(entry);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -318,7 +337,23 @@ function SettlementRankingRow({
                       {item.tier === "regionMonopoly" && <span className="ml-1 text-sky-500">🌐</span>}
                       {item.tier === "groupMonopoly" && <span className="ml-1 text-amber-500">✨</span>}
                     </span>
-                    <span className="shrink-0 font-bold text-slate-700 dark:text-slate-300">{formatMoneyDelta(item.amount)}</span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {yearEvent && item.yearEventMultiplier !== undefined && item.yearEventMultiplier !== 1 && (
+                        <span
+                          className={`rounded px-1 py-0.5 text-[9px] font-bold ${
+                            item.yearEventMultiplier > 1
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
+                              : "bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300"
+                          }`}
+                          title={`${yearEvent.icon} ${yearEvent.label}の影響`}
+                        >
+                          {yearEvent.icon}
+                          {item.yearEventMultiplier > 1 ? "+" : ""}
+                          {Math.round((item.yearEventMultiplier - 1) * 100)}%
+                        </span>
+                      )}
+                      <span className="font-bold text-slate-700 dark:text-slate-300">{formatMoneyDelta(item.amount)}</span>
+                    </span>
                   </div>
                 );
               })}

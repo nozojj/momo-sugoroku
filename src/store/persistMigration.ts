@@ -1,6 +1,7 @@
 import type { GameState } from "@/types/game";
 import type { GameStore } from "@/store/gameStore";
 import { maps } from "@/data/maps";
+import { getYearEventDef } from "@/lib/game/yearEvent";
 
 /**
  * persist(zustand)のmerge処理。gameStore.ts本体(ゲーム進行ロジック)から切り出した、
@@ -79,6 +80,16 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     status: migratedStatus,
     ...(players ? { players } : {}),
     // 旧セーブにキー自体が無ければcurrentState(IDLE_STATE由来)の既定値がそのまま使われる。
+    // currentYearEventIdは単純な??ではなくgetYearEventDef()で存在確認までする: 将来
+    // yearEventDefsのidをリネーム/削除した場合でも、旧セーブが指す消えたidをそのまま
+    // 復元してクラッシュさせず、currentStateの値へ安全にフォールバックする(存在しない
+    // idのままでもyearEventGenreMultiplier()は全ジャンル×1として扱うため実害は無いが、
+    // 表示側のgetYearEventDef()呼び出しが毎回undefinedになるのを避けるための保険)。
+    currentYearEventId: getYearEventDef(state.currentYearEventId) ? state.currentYearEventId! : currentState.currentYearEventId,
+    // 演出中(yearEventAnnounceInfo非null)のまま保存されたセーブを読み込んでも、statusには
+    // 依存しない一時通知なので演出が再度出るだけで操作不能にはならない(cardWarpInfo等と違い
+    // stale-status防御は不要)。念のためundefined(旧セーブにキー自体が無い場合)だけ吸収する。
+    yearEventAnnounceInfo: state.yearEventAnnounceInfo ?? currentState.yearEventAnnounceInfo,
     netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
     pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
     activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,

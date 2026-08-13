@@ -18,6 +18,8 @@ import { propertyDefs } from "@/data/properties";
 import { propertyGroupDefs, getPropertyGroupDef } from "@/data/propertyGroups";
 import { PROPERTY_REVENUE_CONFIG } from "@/lib/game/propertyBalance";
 import { STARTING_MONEY } from "@/lib/game/engine";
+import { yearEventDefs } from "@/data/yearEvents";
+import { propertyGenreOf } from "@/lib/game/propertyDisplay";
 
 const KAGAWA_GROUP_ID = "grp_kagawa";
 const CHIGASAKI_GROUP_ID = "grp_chigasaki_chuo";
@@ -95,6 +97,19 @@ function makePlayer(id: string, money: number, ownedPropertyIds: string[]): Play
 
 function expectedRevenueOf(defs: PropertyDef[], multiplier: number): number {
   return defs.reduce((sum, d) => sum + Math.round(d.price * d.revenueRate * multiplier), 0);
+}
+
+/** 年度イベントのジャンル別倍率を反映した期待値。tierMultiplier(独占倍率等)と
+ *  yearEventのgenreMultipliers(該当ジャンルの物件だけ)を両方掛け合わせる。 */
+function expectedRevenueWithYearEvent(defs: PropertyDef[], tierMultiplier: number, yearEventId: string): number {
+  const event = yearEventDefs.find((e) => e.id === yearEventId);
+  if (!event) {
+    throw new Error(`テスト前提が崩れています: yearEventDefsに"${yearEventId}"が見つかりません。`);
+  }
+  return defs.reduce((sum, d) => {
+    const genreMultiplier = event.genreMultipliers[propertyGenreOf(d)] ?? 1;
+    return sum + Math.round(d.price * d.revenueRate * tierMultiplier * genreMultiplier);
+  }, 0);
 }
 
 describe("calculateSettlement()", () => {
@@ -177,5 +192,52 @@ describe("calculateSettlement()", () => {
 
     expect(updatedPlayers[0].money).toBe(2000 + entries[0].propertyRevenue);
     expect(entries[0].cash).toBe(updatedPlayers[0].money);
+  });
+});
+
+describe("calculateSettlement(): 年度イベント倍率", () => {
+  it("yearEventIdを省略すると倍率1(補正なし)扱いになり、既存の期待値と一致する", () => {
+    const player = makePlayer("p1", 1500, [tamuraProp.id]);
+    const { entries } = calculateSettlement([player], 1, []);
+    const entry = entries[0];
+
+    expect(entry.propertyBreakdown[0].yearEventMultiplier).toBe(1);
+    expect(entry.propertyRevenue).toBe(Math.round(tamuraProp.price * tamuraProp.revenueRate * PROPERTY_REVENUE_CONFIG.baseMultiplier));
+  });
+
+  it('"normal"(平年)は全ジャンル倍率1で、省略時と同じ結果になる', () => {
+    const player = makePlayer("p1", 1500, [tamuraProp.id]);
+    const { entries } = calculateSettlement([player], 1, [], "normal");
+
+    expect(entries[0].propertyBreakdown[0].yearEventMultiplier).toBe(1);
+  });
+
+  it("存在しないyearEventIdは補正なし(倍率1)へ安全にフォールバックする(旧セーブ相当)", () => {
+    const player = makePlayer("p1", 1500, [tamuraProp.id]);
+    const { entries } = calculateSettlement([player], 1, [], "no_such_event_id");
+
+    expect(entries[0].propertyBreakdown[0].yearEventMultiplier).toBe(1);
+  });
+
+  it('"heatwave": 該当ジャンル(food)の物件だけ倍率1.05が掛かる(tamuraProp = food genre)', () => {
+    expect(propertyGenreOf(tamuraProp)).toBe("food");
+    const player = makePlayer("p1", 1500, [tamuraProp.id]);
+    const { entries } = calculateSettlement([player], 1, [], "heatwave");
+    const entry = entries[0];
+
+    expect(entry.propertyBreakdown[0].yearEventMultiplier).toBe(1.05);
+    expect(entry.propertyRevenue).toBe(
+      Math.round(tamuraProp.price * tamuraProp.revenueRate * PROPERTY_REVENUE_CONFIG.baseMultiplier * 1.05),
+    );
+  });
+
+  it("独占倍率と年度イベント倍率は両方乗算される(grp_kagawaグループ独占 × coolSummerのagricultureブースト)", () => {
+    const player = makePlayer("p1", 1500, kagawaProps.map((p) => p.id));
+    const { entries } = calculateSettlement([player], 1, [], "coolSummer");
+    const entry = entries[0];
+
+    expect(entry.propertyRevenue).toBe(
+      expectedRevenueWithYearEvent(kagawaProps, PROPERTY_REVENUE_CONFIG.groupMonopolyMultiplier, "coolSummer"),
+    );
   });
 });

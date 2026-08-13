@@ -7,18 +7,23 @@ import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { getPropertyOwner, ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 import { PROPERTY_GENRE_BADGE_CLASS, PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
+import { getYearEventDef, yearEventGenreMultiplier } from "@/lib/game/yearEvent";
 
 interface PurchaseModalProps {
   groupId: string;
   player: Player;
   players: Player[];
+  /** 現在の年度イベント(「今年の湘南」)id。購入判断に使えるよう、想定年間収益に
+   *  そのジャンルの倍率を反映する。省略/未解決時は倍率1(補正なし)として扱う。 */
+  currentYearEventId?: string;
   onBuy: (propertyId: string) => void;
   onFinish: () => void;
 }
 
-export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: PurchaseModalProps) {
+export function PurchaseModal({ groupId, player, players, currentYearEventId, onBuy, onFinish }: PurchaseModalProps) {
   const group = getPropertyGroupDef(groupId);
   const properties = getPropertiesInGroup(groupId);
+  const yearEvent = getYearEventDef(currentYearEventId);
 
   // 「あと○件で独占」判定: グループ内に他プレイヤー所有の物件が1件でもあれば、このプレイヤーは
   // 二度とそのグループを独占できない(売却は存在しないため)。その場合は「あと○件」を一切出さない。
@@ -52,7 +57,8 @@ export function PurchaseModal({ groupId, player, players, onBuy, onFinish }: Pur
             // 所有済みの物件はその所有者の現在の独占状況を反映した収益、未所有は通常倍率(まだ
             // 独占が成立していないので"normal"で正しい)。判定はownershipTier()をそのまま使う。
             const tier = owner ? ownershipTier(def, owner.id, players, propertyDefs, propertyGroupDefs) : "normal";
-            const expectedRevenue = calculateAnnualRevenue(def, tier);
+            const genreMultiplier = yearEventGenreMultiplier(yearEvent, propertyGenreOf(def));
+            const expectedRevenue = calculateAnnualRevenue(def, tier, genreMultiplier);
             const canAfford = player.money >= def.price;
             const isOwnedBySelf = owner?.id === player.id;
             const isOwnedByOther = !!owner && !isOwnedBySelf;

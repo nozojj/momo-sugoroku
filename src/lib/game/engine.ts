@@ -2,6 +2,7 @@ import type { GameState, Player } from "@/types/game";
 import { getPropertyDef } from "@/data/properties";
 import { getMap } from "@/data/maps";
 import { pickRandomDestination } from "./mapGraph";
+import { drawYearEvent } from "./yearEvent";
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
@@ -92,6 +93,10 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
   const players = playerNames.map((name, i) => createPlayer(`p${i + 1}`, name, i, map.startNodeId));
   const destinationNodeId = pickRandomDestination(map, map.startNodeId);
   const totalTurns = totalTurnsForYears(totalYears);
+  // 1年目の年度イベントもここで抽選する。advanceToNextTurn()が新年度へ進むたびに行う抽選
+  // (gameStore.ts参照)と全く同じ「turnがisYearStartになる瞬間に1回引く」というルールを、
+  // 1年目(turn=1)についてもこの1箇所で満たす。
+  const yearEvent = drawYearEvent();
   return {
     mapId,
     players,
@@ -117,12 +122,19 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     cardDrawInfo: null,
     cardOverflowInfo: null,
     settlementInfo: null,
+    currentYearEventId: yearEvent.id,
+    yearEventAnnounceInfo: { year: 1, eventId: yearEvent.id },
     netWorthHistory: [],
     log: [
       {
         id: makeLogId(),
         turn: 1,
         message: `ゲーム開始! 最初の目的地は「${getMap(mapId).nodes.find((n) => n.id === destinationNodeId)?.name}」`,
+      },
+      {
+        id: makeLogId(),
+        turn: 1,
+        message: `1年目が始まりました。今年の湘南は「${yearEvent.icon} ${yearEvent.label}」です。`,
       },
     ],
     winnerIds: null,

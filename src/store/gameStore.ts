@@ -17,6 +17,7 @@ import { TARGET_SELECT_HANDLERS } from "@/lib/game/targetSelectEffects";
 import { DEBUFF_DEFS, listRivalPlayerOptions } from "@/lib/game/debuffEffects";
 import type { WarpEffect, TargetSelectEffect, RivalDebuffEffect, ActiveDebuff } from "@/types/game";
 import { calculateSettlement } from "@/lib/game/settlement";
+import { drawYearEvent } from "@/lib/game/yearEvent";
 import { mergeGameState } from "@/store/persistMigration";
 import { createSafeJSONStorage } from "@/store/persistStorage";
 import {
@@ -54,6 +55,8 @@ const IDLE_STATE: GameState = {
   cardDrawInfo: null,
   cardOverflowInfo: null,
   settlementInfo: null,
+  currentYearEventId: "",
+  yearEventAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
   winnerIds: null,
@@ -78,6 +81,8 @@ export interface GameStore extends GameState {
   finishPropertyShopping: () => void;
   /** MonopolyToastの表示が終わった(自動タイムアウト)ときに呼び、通知状態をクリアする */
   dismissMonopolyAchievement: () => void;
+  /** YearEventAnnounceModal(「今年の湘南」演出)の表示が終わったときに呼び、通知状態をクリアする */
+  dismissYearEventAnnounce: () => void;
   /** 到着演出モーダルを閉じ、次の目的地へのカメラ演出(destinationFocus)へ進む */
   continueAfterArrival: () => void;
   /** ワープ発動アナウンス(CharacterAnnouncer)を終え、実際にcurrentNodeIdをワープ先へ書き換えて
@@ -170,10 +175,13 @@ export const useGameStore = create<GameStore>()(
         if (nextIndex !== 0 || !getCalendar(nextTurn).isYearStart) return false;
 
         const settledYear = getCalendar(state.turn).year;
+        // state.currentYearEventIdはこの時点ではまだ決算対象年度(settledYear)のもの
+        // (新年度分の再抽選はこの後、実際にturnが繰り上がるadvanceToNextTurn()側で行う)。
         const { entries, updatedPlayers, historyEntry } = calculateSettlement(
           state.players,
           settledYear,
           state.netWorthHistory,
+          state.currentYearEventId,
         );
         const isFinalSettlement = nextTurn > state.totalTurns;
 
@@ -181,7 +189,7 @@ export const useGameStore = create<GameStore>()(
           players: updatedPlayers,
           netWorthHistory: [...state.netWorthHistory, historyEntry],
           status: "settlementIntro",
-          settlementInfo: { year: settledYear, isFinalSettlement, entries },
+          settlementInfo: { year: settledYear, isFinalSettlement, yearEventId: state.currentYearEventId, entries },
           log: pushLog(
             state,
             `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.propertyRevenue}万円`).join("、")}`,
@@ -208,6 +216,12 @@ export const useGameStore = create<GameStore>()(
         let index = state.currentPlayerIndex;
         let turn = state.turn;
         let log = state.log;
+        // 新年度(4月)へ進む瞬間だけ設定する。turnが実際にisYearStartへ繰り上がるのは
+        // このループ内でだけなので、抽選もここ1箇所に置く(createInitialState()が1年目分を
+        // 別途担当する。詳細はそちらのコメント参照)。ゲーム終了(nextTurn > totalTurns)の
+        // 分岐はturn=nextTurnへ到達する前にreturnするため、「次年度が存在しない」最終年度末には
+        // ここは実行されない。
+        let yearEventUpdate: { currentYearEventId: string; yearEventAnnounceInfo: GameState["yearEventAnnounceInfo"] } | null = null;
 
         for (let i = 0; i < players.length; i++) {
           const nextIndex = (index + 1) % players.length;
@@ -226,6 +240,14 @@ export const useGameStore = create<GameStore>()(
 
           index = nextIndex;
           turn = nextTurn;
+
+          if (nextIndex === 0 && getCalendar(turn).isYearStart) {
+            const yearEvent = drawYearEvent();
+            const year = getCalendar(turn).year;
+            yearEventUpdate = { currentYearEventId: yearEvent.id, yearEventAnnounceInfo: { year, eventId: yearEvent.id } };
+            log = [...log, { id: makeLogId(), turn, message: `${year}年目が始まりました。今年の湘南は「${yearEvent.icon} ${yearEvent.label}」です。` }];
+          }
+
           const candidate = players[index];
           const skip = candidate.activeDebuffs.find((d) => d.kind === "skipNextRoll");
           if (!skip) break; // このプレイヤーが実際に手番を行う
@@ -246,6 +268,7 @@ export const useGameStore = create<GameStore>()(
           remainingMoves: 0,
           pendingPropertyGroupId: null,
           log,
+          ...yearEventUpdate,
         });
       }
 
@@ -726,6 +749,8 @@ export const useGameStore = create<GameStore>()(
         },
 
         dismissMonopolyAchievement: () => set({ monopolyAchievement: null }),
+
+        dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
 
         continueAfterArrival: () => {
           const state = get();

@@ -6,19 +6,23 @@ interface GameHudProps {
   destinationName: string;
   calendarText: string;
   onOpenDrawer: () => void;
+  /** 現在の年度イベント(「今年の湘南」)の表示。YearEventAnnounceModalの演出が終わった後も、
+   *  ここで常時確認できるようにする。省略時(データ未解決)はバッジ自体を出さない。 */
+  yearEvent?: { icon: string; label: string; description: string } | null;
   /** rolling(サイコロを振る前)〜moving/selectingRoute(移動中)の間、目的地までの最短マス数を
    *  追加表示する。remainingMovesはmoving/selectingRouteのときだけ値を持ち(rolling中はnull)、
    *  その場合は残りマス数の行を出さない。 */
   movementInfo?: { remainingMoves: number | null; distanceToDestination: number | null };
 }
 
-/** マップ上部に常時表示する最小限のHUD。手番・目的地・年月だけを見せる。 */
+/** マップ上部に常時表示する最小限のHUD。手番・目的地・年月・今年の年度イベントだけを見せる。 */
 export function GameHud({
   currentPlayerName,
   currentPlayerColor,
   destinationName,
   calendarText,
   onOpenDrawer,
+  yearEvent,
   movementInfo,
 }: GameHudProps) {
   return (
@@ -33,6 +37,17 @@ export function GameHud({
           <span className="truncate text-slate-600 dark:text-slate-300">🎯 {destinationName}</span>
           <span className="text-slate-300 dark:text-slate-600">・</span>
           <span className="shrink-0 font-mono text-slate-500 dark:text-slate-400">{calendarText}</span>
+          {yearEvent && (
+            <>
+              <span className="text-slate-300 dark:text-slate-600">・</span>
+              <span
+                className="shrink-0 truncate font-semibold text-slate-700 dark:text-slate-200"
+                title={yearEvent.description}
+              >
+                {yearEvent.icon} {yearEvent.label}
+              </span>
+            </>
+          )}
         </div>
         <button
           type="button"

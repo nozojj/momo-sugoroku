@@ -170,6 +170,23 @@ export interface PropertyDef {
 /** 物件所有の3段階。通常所有 → グループ独占 → region独占の順に強い。 */
 export type OwnershipTier = "normal" | "groupMonopoly" | "regionMonopoly";
 
+/** 年度イベント(「今年の湘南」)の定義(静的データ)。4月の年度開始のたびに1件抽選され、
+ *  その年度の決算まで固定される。genreMultipliersに無いジャンルは常に×1.0(平年はこの
+ *  オブジェクト自体を空にする)。data/yearEvents.tsのyearEventDefsで定義する。 */
+export interface YearEventDef {
+  id: string;
+  /** 「猛暑の年」のような表示名 */
+  label: string;
+  /** 表示用の絵文字アイコン */
+  icon: string;
+  /** プレイヤー向けの説明文(HUD・演出で使う) */
+  description: string;
+  /** 抽選重み。数値が大きいほど選ばれやすい(data/cards.tsのRARITY_WEIGHTと同じ考え方)。 */
+  weight: number;
+  /** ジャンルごとの決算収益倍率。未指定ジャンルは×1.0。 */
+  genreMultipliers: Partial<Record<PropertyGenre, number>>;
+}
+
 /** 物件購入によって独占(グループ/地域)が今まさに達成された、という1回限りの通知情報。
  *  MonopolyToastが表示し、一定時間後にdismissMonopolyAchievement()でnullへ戻す。
  *  ゲームの勝敗・収益計算には一切関与しない、UI通知専用の一時的な状態。 */
@@ -179,6 +196,17 @@ export interface MonopolyAchievement {
   name: string;
   /** PROPERTY_REVENUE_CONFIGの該当倍率をそのまま渡す(ここでは再計算しない) */
   multiplier: number;
+}
+
+/** 年度開始時、「今年の湘南」を告知する演出の内容。monopolyAchievementと同様、statusとは
+ *  独立した一時的な通知情報(GameStatusを増やさない)。YearEventAnnounceModalが表示し、
+ *  タップ完了でdismissYearEventAnnounce()によりnullへ戻る。ゲームの勝敗・収益計算には
+ *  一切関与しない。eventIdはyearEventDefsから引く静的データなので、label/icon/倍率等は
+ *  ここへスナップショットせず表示側で都度解決する。 */
+export interface YearEventAnnounceInfo {
+  /** この年度イベントが適用される年度(1始まり) */
+  year: number;
+  eventId: string;
 }
 
 /** カードの定義(静的データ)。 */
@@ -440,6 +468,9 @@ export interface SettlementEntry {
     groupName?: string;
     /** tierが"regionMonopoly"のとき、注記表示用の地域名。 */
     region?: string;
+    /** この決算で適用された年度イベントのジャンル別倍率(該当ジャンルが対象外なら1)。
+     *  旧セーブ(この項目追加前)には無いので必ずoptional。 */
+    yearEventMultiplier?: number;
   }[];
   /** 今年度の物件収益(合計) */
   propertyRevenue: number;
@@ -464,6 +495,9 @@ export interface SettlementInfo {
   year: number;
   /** この決算が規定年数の最終年度のものか。SettlementScreenのボタン文言("次の年度へ"/"結果を見る")の出し分けに使う。 */
   isFinalSettlement: boolean;
+  /** この決算(year)の間ずっと適用されていた年度イベントのid。旧セーブ(この項目追加前)には
+   *  無いので必ずoptional。省略時はSettlementScreen側で「補正なし」として扱う。 */
+  yearEventId?: string;
   entries: SettlementEntry[];
 }
 
@@ -518,6 +552,15 @@ export interface GameState {
   cardOverflowInfo: CardOverflowInfo | null;
   /** settlementIntro/settlement状態のときに表示する決算結果 */
   settlementInfo: SettlementInfo | null;
+  /** 今年度(4月始まり)に適用中の年度イベントのid。yearEventDefsから参照する。年度開始
+   *  (ゲーム開始時の1年目、または決算後に新年度へ進む瞬間)のたびに再抽選され、次の年度開始まで
+   *  固定される。旧セーブ(この項目追加前)には無いidが入っていても、getYearEventDef()が
+   *  undefinedを返しyearEventGenreMultiplier()が全ジャンル×1として扱うため安全にフォールバックする。 */
+  currentYearEventId: string;
+  /** 年度開始時、「今年の湘南」を告知する演出の内容。monopolyAchievementと同様、statusとは
+   *  独立した一時的な通知情報(GameStatusは増やさない)。YearEventAnnounceModalが表示し終えたら
+   *  dismissYearEventAnnounce()でnullに戻る。 */
+  yearEventAnnounceInfo: YearEventAnnounceInfo | null;
   /** 年度ごとの総資産スナップショットの履歴(資産推移グラフ用)。決算のたびに1件追加される。 */
   netWorthHistory: NetWorthHistoryEntry[];
   log: LogEntry[];

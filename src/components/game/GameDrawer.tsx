@@ -7,6 +7,8 @@ import { getPropertyDef, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
+import { propertyGenreOf } from "@/lib/game/propertyDisplay";
+import { getYearEventDef, yearEventGenreMultiplier } from "@/lib/game/yearEvent";
 import { PlayerHud } from "./PlayerHud";
 import { EventLog } from "./EventLog";
 import { CardDetailSheet } from "./CardDetailSheet";
@@ -26,6 +28,8 @@ interface GameDrawerProps {
   totalYears: number;
   turn: number;
   totalTurns: number;
+  /** 現在の年度イベント(「今年の湘南」)id。物件詳細の想定年間収益に反映する。 */
+  currentYearEventId?: string;
   log: LogEntry[];
   onReset: () => void;
 }
@@ -55,6 +59,7 @@ export function GameDrawer({
   totalYears,
   turn,
   totalTurns,
+  currentYearEventId,
   log,
   onReset,
 }: GameDrawerProps) {
@@ -85,8 +90,13 @@ export function GameDrawer({
     inspectingProperty && inspectingPropertyDef
       ? ownershipTier(inspectingPropertyDef, inspectingProperty.playerId, players, propertyDefs, propertyGroupDefs)
       : "normal";
+  const currentYearEvent = getYearEventDef(currentYearEventId);
   const inspectingPropertyRevenue = inspectingPropertyDef
-    ? calculateAnnualRevenue(inspectingPropertyDef, inspectingPropertyTier)
+    ? calculateAnnualRevenue(
+        inspectingPropertyDef,
+        inspectingPropertyTier,
+        yearEventGenreMultiplier(currentYearEvent, propertyGenreOf(inspectingPropertyDef)),
+      )
     : 0;
 
   return (
