@@ -355,6 +355,48 @@
   ],
   "modifiedNodes": [
     {
+      "id": "hub_hiratsuka",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_chigasaki",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_tsujido",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_enoshima",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_kamakura",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_samukawa",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
+      "id": "hub_shonandai",
+      "patch": {
+        "isMajorHub": true
+      }
+    },
+    {
       "id": "r_hrlp_gate_hrlp_w_1",
       "patch": {
         "type": "moneyGain"
@@ -2300,6 +2342,11 @@
   ],
   "addedEdges": [
     {
+      "from": "r_rk_fj_4",
+      "to": "fjrt_n",
+      "roadType": "residential"
+    },
+    {
       "from": "inlp_se",
       "to": "incl_nw",
       "roadType": "residential"
@@ -2337,11 +2384,6 @@
     {
       "from": "ed_mshbwuqf_mo2a",
       "to": "r_sm_kg_2",
-      "roadType": "residential"
-    },
-    {
-      "from": "r_sm_kg_2",
-      "to": "ed_mshbwu3n_y0wj",
       "roadType": "residential"
     },
     {
@@ -2602,6 +2644,11 @@
     {
       "from": "ed_bend_b12",
       "to": "fjmesh_s",
+      "roadType": "residential"
+    },
+    {
+      "from": "ed_bend_b12",
+      "to": "r_fjmesh_row2a_1",
       "roadType": "residential"
     },
     {
@@ -3267,6 +3314,10 @@
   ],
   "modifiedEdges": [],
   "removedEdges": [
+    {
+      "from": "fjmesh_s",
+      "to": "r_fjmesh_row2a_1"
+    },
     {
       "from": "r_bypass_1_3",
       "to": "r_bypass_1_4"
