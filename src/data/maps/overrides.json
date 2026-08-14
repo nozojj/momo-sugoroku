@@ -2347,6 +2347,11 @@
       "roadType": "residential"
     },
     {
+      "from": "wp_sm_sc_bend_w",
+      "to": "r_sc_rk_1",
+      "roadType": "residential"
+    },
+    {
       "from": "inlp_se",
       "to": "incl_nw",
       "roadType": "residential"
