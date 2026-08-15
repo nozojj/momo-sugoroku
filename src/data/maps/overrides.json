@@ -298,7 +298,7 @@
     { "id": "smrt_w", "x": 395, "y": 118 },
     { "id": "smrt_nw", "x": 395, "y": 78 },
     { "id": "wp_sm_residential", "x": 405, "y": -5 },
-    { "id": "smrs_n", "x": 405, "y": -45 },
+    { "id": "smrs_n", "x": 401, "y": -42 },
     { "id": "smrs_ne", "x": 445, "y": -45 },
     { "id": "smrs_e", "x": 445, "y": -5 },
     { "id": "smrs_se", "x": 445, "y": 35 },
@@ -306,8 +306,8 @@
     { "id": "smrs_sw", "x": 365, "y": 35 },
     { "id": "smrs_w", "x": 365, "y": -5 },
     { "id": "smrs_nw", "x": 365, "y": -45 },
-    { "id": "r_north_west_gate_1", "x": 439, "y": -75 },
-    { "id": "r_north_west_gate_2", "x": 422, "y": -60 },
+    { "id": "r_north_west_gate_1", "x": 440, "y": -76 },
+    { "id": "r_north_west_gate_2", "x": 421, "y": -59 },
     { "id": "wp_mid_route_bend_w1", "x": 600, "y": -5 },
     { "id": "r_mid_west_h1_1", "x": 520, "y": -5 },
     { "id": "tmgo_n", "x": 195, "y": 435 },
@@ -351,7 +351,13 @@
     { "id": "incl_w", "x": 1683, "y": 1105 },
     { "id": "incl_nw", "x": 1683, "y": 1063 },
     { "id": "wp_inamura_kaigan", "x": 1725, "y": 1105 },
-    { "id": "wp_komachi3", "x": 1709, "y": 868 }
+    { "id": "wp_komachi3", "x": 1709, "y": 868 },
+    { "id": "sctw_c1r3", "x": 1080, "y": 114 },
+    { "id": "fjmesh_s", "x": 976, "y": 865 },
+    { "id": "r_fjmesh_row2a_1", "x": 924, "y": 865 },
+    { "id": "wp_north_route_west", "x": 460, "y": -93 },
+    { "id": "wp_fj_meiten_ent", "x": 1080, "y": 517 },
+    { "id": "wp_hr_sakura", "x": 223, "y": 542 }
   ],
   "modifiedNodes": [
     {
