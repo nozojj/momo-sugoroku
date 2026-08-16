@@ -3443,5 +3443,12 @@
     }
   ],
   "customProperties": [],
-  "buildingOverrides": []
+  "buildingOverrides": [
+    { "nodeId": "wp_fj_meiten_ent", "offsetX": -24 },
+    { "nodeId": "r_rk_fj_4", "offsetX": -28 },
+    { "nodeId": "hub_fujisawa", "offsetX": 32 },
+    { "nodeId": "r_fj_kg_1", "offsetX": 44 },
+    { "nodeId": "r_fjrt_ring4_1", "offsetX": -20 },
+    { "nodeId": "r_fj_kg_2", "offsetX": 44, "offsetY": -28 }
+  ]
 }
