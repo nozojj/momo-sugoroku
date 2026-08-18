@@ -43,6 +43,7 @@ export const BUILDING_TYPE_OPTIONS: BuildingType[] = [
  *  BuildingSpriteはプレースホルダー図形の代わりにその画像を描画する。 */
 export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {
   shop: "/tiles/shop.webp",
+  restaurant: "/tiles/restaurant.webp",
 };
 
 const KEYWORD_RULES: [BuildingType, string[]][] = [
