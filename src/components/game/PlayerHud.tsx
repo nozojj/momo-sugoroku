@@ -16,6 +16,11 @@ interface PlayerHudProps {
   canUseCard: boolean;
   /** 妨害キャラ(仮称)を現在このプレイヤーが所有しているか。仮アイコン表示のみに使う。 */
   hasTroubleCharacter: boolean;
+  /** 現在の総資産順位(1始まり)。GameDrawer.tsxがrankPlayers()(engine.ts、GameOverModalの
+   *  最終順位と同一ロジック)を呼んで算出したものをそのまま受け取るだけで、ここでは計算しない。 */
+  rank: number;
+  /** 自分と同じ総資産のプレイヤーが他にもいるか(同着)。表示専用で、rank自体の値には影響しない。 */
+  tied: boolean;
   /** カードのピルをタップしたときに呼ばれる。タップ即使用はしない(CardDetailSheetを開くだけ)。
    *  実際の使用は詳細シートの「使う」ボタン経由でuseCard()が呼ばれる(呼び出し元が管理)。 */
   onInspectCard: (cardId: string) => void;
@@ -52,8 +57,13 @@ function monopolyBadges(player: Player): { key: string; label: string; region: b
   return [...regionBadges, ...groupBadges];
 }
 
-export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, onInspectCard, onInspectProperty }: PlayerHudProps) {
+export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, rank, tied, onInspectCard, onInspectProperty }: PlayerHudProps) {
   const badges = monopolyBadges(player);
+  // 順位バッジの文言・色。同着は基本「同率n位」で表す(GameOverModalの別チップ表示とは違い、
+  // HUDの面積が小さいため文言に畳み込む)。1位だけ金色系(amber)で強調し、2位以下は
+  // 妨害キャラバッジ(slate-600)と紛れない共通の落ち着いた色(slate-500)にする。
+  const rankLabel = tied ? `同率${rank}位` : `${rank}位`;
+  const rankBadgeClass = rank === 1 ? "bg-amber-500" : "bg-slate-500";
   // カードはカテゴリ順にソートするだけ(見出し付きグループ化はまだしない)。8枚上限なら
   // カテゴリバッジの色分け+並び順で十分読み取れる想定。将来カード枚数/種類が増えたときは、
   // ここでCARD_CATEGORY_ORDERを使ってRecord<CardCategory, ...>にグループ化する形へ拡張できる
@@ -90,7 +100,10 @@ export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, o
             </span>
           )}
         </div>
-        <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">総資産 {formatMoney(netWorth(player))}</span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${rankBadgeClass}`}>{rankLabel}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">総資産 {formatMoney(netWorth(player))}</span>
+        </span>
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

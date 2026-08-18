@@ -72,6 +72,30 @@ export function computeWinnerIds(players: Player[]): string[] {
   return worths.filter((w) => w.worth === max).map((w) => w.id);
 }
 
+/** 総資産(netWorth)に基づく順位1件分。GameOverModal(最終結果)とPlayerHud(プレイ中の順位バッジ)
+ *  の両方がこの同じ形を使う。 */
+export interface RankedPlayer {
+  player: Player;
+  netWorth: number;
+  /** 「自分より総資産が多い人数+1」で求める競技式順位(1,2,2,4のように同着の次が飛ぶ)。 */
+  rank: number;
+  tied: boolean;
+}
+
+/** netWorth降順に並べ、同着を正しく扱う順位(1,2,2,4)を振る。1位に限らず何位でも同着を検出する。
+ *  ゲーム終了時の最終順位・プレイ中の順位バッジのどちらもこの1つの関数だけを使い、
+ *  同着の扱いを常に一致させる(GameStateには順位を保存せず、呼び出しのたびにplayersから導出する)。 */
+export function rankPlayers(players: Player[]): RankedPlayer[] {
+  const withNetWorth = players.map((p) => ({ player: p, netWorth: netWorth(p) }));
+  return withNetWorth
+    .map((entry) => {
+      const rank = 1 + withNetWorth.filter((o) => o.netWorth > entry.netWorth).length;
+      const tied = withNetWorth.filter((o) => o.netWorth === entry.netWorth).length > 1;
+      return { ...entry, rank, tied };
+    })
+    .sort((a, b) => b.netWorth - a.netWorth);
+}
+
 export function createPlayer(
   id: string,
   name: string,

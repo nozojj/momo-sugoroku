@@ -2,7 +2,7 @@
 
 import type { NetWorthHistoryEntry, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
-import { netWorth } from "@/lib/game/engine";
+import { rankPlayers, type RankedPlayer } from "@/lib/game/engine";
 import { propertyDefs } from "@/data/properties";
 import { propertyGroupDefs } from "@/data/propertyGroups";
 import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
@@ -77,26 +77,6 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
       </div>
     </div>
   );
-}
-
-interface RankedPlayer {
-  player: Player;
-  netWorth: number;
-  /** 「自分より総資産が多い人数+1」で求める競技式順位(1,2,2,4のように同着の次が飛ぶ)。 */
-  rank: number;
-  tied: boolean;
-}
-
-/** netWorth降順に並べ、同着を正しく扱う順位(1,2,2,4)を振る。1位に限らず何位でも同着を検出する。 */
-function rankPlayers(players: Player[]): RankedPlayer[] {
-  const withNetWorth = players.map((p) => ({ player: p, netWorth: netWorth(p) }));
-  return withNetWorth
-    .map((entry) => {
-      const rank = 1 + withNetWorth.filter((o) => o.netWorth > entry.netWorth).length;
-      const tied = withNetWorth.filter((o) => o.netWorth === entry.netWorth).length > 1;
-      return { ...entry, rank, tied };
-    })
-    .sort((a, b) => b.netWorth - a.netWorth);
 }
 
 /** 指定プレイヤーが最終的に独占しているグループ/地域の一覧。PlayerHud.tsxのmonopolyBadges()

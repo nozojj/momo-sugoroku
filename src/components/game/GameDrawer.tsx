@@ -5,6 +5,7 @@ import type { GameStatus, LogEntry, Player } from "@/types/game";
 import { getCardDef } from "@/data/cards";
 import { getPropertyDef, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
+import { rankPlayers } from "@/lib/game/engine";
 import { ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 import { propertyGenreOf } from "@/lib/game/propertyDisplay";
@@ -107,6 +108,11 @@ export function GameDrawer({
       )
     : 0;
 
+  // プレイ中の順位バッジ用。GameOverModal.tsxと同じrankPlayers()を呼ぶだけで、GameStateには
+  // 順位を保持しない(playersが変わるたびにここで都度算出する)。表示順(players配列そのまま、
+  // 手番順)は変更せず、算出した順位をplayerId経由でルックアップするためだけにMap化する。
+  const rankById = new Map(rankPlayers(players).map((r) => [r.player.id, r]));
+
   return (
     <>
       <div
@@ -148,17 +154,22 @@ export function GameDrawer({
         <section className="flex flex-col gap-2">
           <p className={labelCls}>プレイヤー</p>
           <div className="flex flex-col gap-2">
-            {players.map((player, i) => (
-              <PlayerHud
-                key={player.id}
-                player={player}
-                isActive={i === currentPlayerIndex}
-                canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null && canCurrentPlayerAct}
-                hasTroubleCharacter={player.id === troubleCharacterOwnerId}
-                onInspectCard={(cardId) => setInspecting({ playerId: player.id, cardId })}
-                onInspectProperty={(propertyId) => setInspectingProperty({ playerId: player.id, propertyId })}
-              />
-            ))}
+            {players.map((player, i) => {
+              const ranked = rankById.get(player.id)!;
+              return (
+                <PlayerHud
+                  key={player.id}
+                  player={player}
+                  isActive={i === currentPlayerIndex}
+                  canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null && canCurrentPlayerAct}
+                  hasTroubleCharacter={player.id === troubleCharacterOwnerId}
+                  rank={ranked.rank}
+                  tied={ranked.tied}
+                  onInspectCard={(cardId) => setInspecting({ playerId: player.id, cardId })}
+                  onInspectProperty={(propertyId) => setInspectingProperty({ playerId: player.id, propertyId })}
+                />
+              );
+            })}
           </div>
         </section>
 
