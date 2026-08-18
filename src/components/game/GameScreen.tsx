@@ -24,8 +24,10 @@ import { SettlementScreen } from "./SettlementScreen";
 import { MonopolyToast } from "./MonopolyToast";
 import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
 import { YearEventAnnounceModal } from "./YearEventAnnounceModal";
+import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
+import { useCpuAutoplay } from "./useCpuAutoplay";
 
 const STEP_ANIMATION_MS = 460;
 
@@ -56,6 +58,8 @@ export function GameScreen() {
   const settlementInfo = useGameStore((s) => s.settlementInfo);
   const currentYearEventId = useGameStore((s) => s.currentYearEventId);
   const yearEventAnnounceInfo = useGameStore((s) => s.yearEventAnnounceInfo);
+  const troubleCharacterOwnerId = useGameStore((s) => s.troubleCharacterOwnerId);
+  const troubleCharacterAnnounceInfo = useGameStore((s) => s.troubleCharacterAnnounceInfo);
   const netWorthHistory = useGameStore((s) => s.netWorthHistory);
   const log = useGameStore((s) => s.log);
   const winnerIds = useGameStore((s) => s.winnerIds);
@@ -70,6 +74,7 @@ export function GameScreen() {
   const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
   const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
   const dismissYearEventAnnounce = useGameStore((s) => s.dismissYearEventAnnounce);
+  const dismissTroubleCharacterAnnounce = useGameStore((s) => s.dismissTroubleCharacterAnnounce);
   const useCard = useGameStore((s) => s.useCard);
   const continueAfterArrival = useGameStore((s) => s.continueAfterArrival);
   const continueAfterWarpAnnounce = useGameStore((s) => s.continueAfterWarpAnnounce);
@@ -86,6 +91,12 @@ export function GameScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const currentPlayer = players[currentPlayerIndex];
+  // CPUの手番中は、人間が誤ってサイコロ・分岐・購入・カード選択等を操作できないようにする
+  // (演出自体はuseCpuAutoplay()が既存アクションを呼ぶことでそのまま表示される)。
+  const isCurrentHuman = currentPlayer?.controlledBy !== "cpu";
+
+  // CPUプレイヤーの意思決定・実行(rollDice等の既存アクションを呼ぶだけ)。
+  useCpuAutoplay();
 
   // マス移動を1歩ずつアニメーションしながら自動で進める
   useEffect(() => {
@@ -108,7 +119,11 @@ export function GameScreen() {
   }
 
   if (status === "waiting") {
-    return <StartScreen onStart={(names, totalYears) => startGame(names, totalYears)} />;
+    return (
+      <StartScreen
+        onStart={(names, totalYears, controlledBy) => startGame(names, totalYears, controlledBy)}
+      />
+    );
   }
 
   // 決算画面表示中はBoard/HUD/Diceを一切マウントしない(StartScreenと同じ完全差し替え)。
@@ -197,10 +212,10 @@ export function GameScreen() {
           routeOptions={routeOptions}
           destinationNodeId={destinationNodeId}
           ownedCardIds={currentPlayer.cardIds}
-          onSelectRoute={chooseRoute}
+          onSelectRoute={isCurrentHuman ? chooseRoute : () => {}}
           backNodeId={backNodeId}
           remainingMovesAfterBack={remainingMoves + 1}
-          onStepBack={stepBack}
+          onStepBack={isCurrentHuman ? stepBack : () => {}}
         />
       )}
 
@@ -209,7 +224,7 @@ export function GameScreen() {
           diceResult={status === "moving" ? diceResult : null}
           diceFaces={status === "moving" ? diceFaces : null}
           diceCount={status === "moving" ? (diceFaces?.length ?? 1) : pendingDiceCount}
-          canRoll={status === "rolling" && diceResult === null}
+          canRoll={isCurrentHuman && status === "rolling" && diceResult === null}
           doubleArmed={pendingDoubleMove}
           onRoll={rollDice}
         />
@@ -218,7 +233,7 @@ export function GameScreen() {
             残り {remainingMoves} マス
           </p>
         )}
-        {status === "moving" && backNodeId && (
+        {status === "moving" && backNodeId && isCurrentHuman && (
           <button
             type="button"
             onClick={stepBack}
@@ -237,6 +252,7 @@ export function GameScreen() {
         status={status}
         diceResult={diceResult}
         onUseCard={useCard}
+        canCurrentPlayerAct={isCurrentHuman}
         destinationName={destinationNode.name}
         year={calendar.year}
         month={calendar.month}
@@ -244,6 +260,7 @@ export function GameScreen() {
         turn={turn}
         totalTurns={totalTurns}
         currentYearEventId={currentYearEventId}
+        troubleCharacterOwnerId={troubleCharacterOwnerId}
         log={log}
         onReset={() => {
           if (window.confirm("ゲームを終了して最初からやり直しますか?")) resetGame();
@@ -256,8 +273,8 @@ export function GameScreen() {
           player={currentPlayer}
           players={players}
           currentYearEventId={currentYearEventId}
-          onBuy={buyProperty}
-          onFinish={finishPropertyShopping}
+          onBuy={isCurrentHuman ? buyProperty : () => {}}
+          onFinish={isCurrentHuman ? finishPropertyShopping : () => {}}
         />
       )}
 
@@ -266,7 +283,11 @@ export function GameScreen() {
       )}
 
       {status === "selectingCardTarget" && targetSelectInfo && (
-        <TargetSelectOverlay info={targetSelectInfo} onSelect={confirmTargetSelection} onCancel={cancelTargetSelection} />
+        <TargetSelectOverlay
+          info={targetSelectInfo}
+          onSelect={isCurrentHuman ? confirmTargetSelection : () => {}}
+          onCancel={isCurrentHuman ? cancelTargetSelection : () => {}}
+        />
       )}
 
       {status === "moneyRoulette" && moneyRouletteInfo && (
@@ -280,8 +301,8 @@ export function GameScreen() {
       {status === "cardOverflow" && cardOverflowInfo && (
         <CardOverflowModal
           info={cardOverflowInfo}
-          onDiscardExisting={(index) => resolveCardOverflow({ discard: "existing", index })}
-          onKeepCurrentHand={() => resolveCardOverflow({ discard: "newCard" })}
+          onDiscardExisting={isCurrentHuman ? (index) => resolveCardOverflow({ discard: "existing", index }) : () => {}}
+          onKeepCurrentHand={isCurrentHuman ? () => resolveCardOverflow({ discard: "newCard" }) : () => {}}
         />
       )}
 
@@ -317,6 +338,13 @@ export function GameScreen() {
           ここでの出し分けは不要。 */}
       {yearEventAnnounceInfo && (
         <YearEventAnnounceModal info={yearEventAnnounceInfo} onDismiss={dismissYearEventAnnounce} />
+      )}
+
+      {/* 妨害キャラ(仮称)の登場/所有者交代/悪さ発生の告知。yearEventAnnounceInfoと同じく
+          statusには依存しない一時通知で、新しいGameStatusは増やさない。CPU手番中でもこの通知の
+          有無によってターン進行が止まることはない(CharacterAnnouncerが自走してonDismissを呼ぶ)。 */}
+      {troubleCharacterAnnounceInfo && (
+        <TroubleCharacterAnnounceModal info={troubleCharacterAnnounceInfo} onDismiss={dismissTroubleCharacterAnnounce} />
       )}
     </div>
   );

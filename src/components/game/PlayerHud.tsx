@@ -14,6 +14,8 @@ interface PlayerHudProps {
   player: Player;
   isActive: boolean;
   canUseCard: boolean;
+  /** 妨害キャラ(仮称)を現在このプレイヤーが所有しているか。仮アイコン表示のみに使う。 */
+  hasTroubleCharacter: boolean;
   /** カードのピルをタップしたときに呼ばれる。タップ即使用はしない(CardDetailSheetを開くだけ)。
    *  実際の使用は詳細シートの「使う」ボタン経由でuseCard()が呼ばれる(呼び出し元が管理)。 */
   onInspectCard: (cardId: string) => void;
@@ -50,7 +52,7 @@ function monopolyBadges(player: Player): { key: string; label: string; region: b
   return [...regionBadges, ...groupBadges];
 }
 
-export function PlayerHud({ player, isActive, canUseCard, onInspectCard, onInspectProperty }: PlayerHudProps) {
+export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, onInspectCard, onInspectProperty }: PlayerHudProps) {
   const badges = monopolyBadges(player);
   // カードはカテゴリ順にソートするだけ(見出し付きグループ化はまだしない)。8枚上限なら
   // カテゴリバッジの色分け+並び順で十分読み取れる想定。将来カード枚数/種類が増えたときは、
@@ -79,6 +81,14 @@ export function PlayerHud({ player, isActive, canUseCard, onInspectCard, onInspe
           </span>
           <span className="truncate font-bold">{player.name}</span>
           {isActive && <span className="shrink-0 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-white">手番</span>}
+          {hasTroubleCharacter && (
+            <span
+              className="shrink-0 rounded bg-slate-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+              title="妨害キャラ(仮称)が取り憑いている"
+            >
+              👻 妨害キャラ
+            </span>
+          )}
         </div>
         <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">総資産 {formatMoney(netWorth(player))}</span>
       </div>

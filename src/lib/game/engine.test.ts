@@ -21,6 +21,7 @@ function makePlayer(id: string, money: number, ownedPropertyIds: string[] = []):
     cardIds: [],
     destinationsReached: 0,
     activeDebuffs: [],
+    controlledBy: "human",
   };
 }
 

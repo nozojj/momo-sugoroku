@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { GameState, Player, RouteOption } from "@/types/game";
+import type { GameState, Player, PlayerController, RouteOption } from "@/types/game";
 import { getMap, defaultMapId } from "@/data/maps";
 import { getNode, getTraversableOptions } from "@/lib/game/mapGraph";
 import { resolveDiceRoll } from "@/lib/game/diceRoll";
@@ -18,6 +18,13 @@ import { DEBUFF_DEFS, listRivalPlayerOptions } from "@/lib/game/debuffEffects";
 import type { WarpEffect, TargetSelectEffect, RivalDebuffEffect, ActiveDebuff } from "@/types/game";
 import { calculateSettlement } from "@/lib/game/settlement";
 import { drawYearEvent } from "@/lib/game/yearEvent";
+import {
+  pickInitialTroubleCharacterOwner,
+  checkTroubleCharacterHandoff as detectTroubleCharacterHandoff,
+  drawTroubleCharacterMischief,
+  applyTroubleCharacterMischief,
+} from "@/lib/game/troubleCharacter";
+import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
 import { mergeGameState } from "@/store/persistMigration";
 import { createSafeJSONStorage } from "@/store/persistStorage";
 import {
@@ -57,6 +64,8 @@ const IDLE_STATE: GameState = {
   settlementInfo: null,
   currentYearEventId: "",
   yearEventAnnounceInfo: null,
+  troubleCharacterOwnerId: null,
+  troubleCharacterAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
   winnerIds: null,
@@ -65,7 +74,7 @@ const IDLE_STATE: GameState = {
 export interface GameStore extends GameState {
   /** ゲーム未開始 or 終了後の初期状態かどうか */
   hasActiveGame: () => boolean;
-  startGame: (playerNames: string[], totalYears: number) => void;
+  startGame: (playerNames: string[], totalYears: number, playerControllers?: PlayerController[]) => void;
   resetGame: () => void;
   useCard: (cardId: string) => void;
   rollDice: () => void;
@@ -83,6 +92,10 @@ export interface GameStore extends GameState {
   dismissMonopolyAchievement: () => void;
   /** YearEventAnnounceModal(「今年の湘南」演出)の表示が終わったときに呼び、通知状態をクリアする */
   dismissYearEventAnnounce: () => void;
+  /** TroubleCharacterAnnounceModal(妨害キャラの登場/交代/悪さ通知)の表示が終わったときに呼び、
+   *  通知状態をクリアする。yearEventAnnounceInfo等と同様statusとは独立しており、
+   *  呼ばなくてもターン進行は止まらない。 */
+  dismissTroubleCharacterAnnounce: () => void;
   /** 到着演出モーダルを閉じ、次の目的地へのカメラ演出(destinationFocus)へ進む */
   continueAfterArrival: () => void;
   /** ワープ発動アナウンス(CharacterAnnouncer)を終え、実際にcurrentNodeIdをワープ先へ書き換えて
@@ -141,7 +154,12 @@ export const useGameStore = create<GameStore>()(
       /** 目的地に到着していたら、ボーナス付与・次の目的地抽選・到着演出への遷移まで行う。到着していたらtrueを返す。
        *  判定・計算そのものはdestinationArrival.tsのdetectDestinationArrival()(純関数)へ委譲し、
        *  ここでは結果を受け取ってset()するだけ。呼び出しタイミング(finishLandingAndEndTurn()経由、
-       *  remainingMoves<=0での最終停止時のみ)は変更していない。 */
+       *  remainingMoves<=0での最終停止時のみ)は変更していない。
+       *
+       *  妨害キャラ(仮称)の初回登場もここで扱う: detectDestinationArrival()本体(目的地抽選ロジック)
+       *  には一切手を入れず、「ゲーム最初の目的地到着(troubleCharacterOwnerIdがまだnull)」のときだけ、
+       *  新しく決定された次の目的地(result.destinationNodeId)から最も遠いプレイヤーを
+       *  pickInitialTroubleCharacterOwner()で選び、同じset()にまとめて反映する。 */
       function checkDestinationArrival(): boolean {
         const state = get();
         const map = getMap(state.mapId);
@@ -149,14 +167,56 @@ export const useGameStore = create<GameStore>()(
         const result = detectDestinationArrival(map, player, state.players, state.destinationNodeId);
         if (!result.arrived) return false;
 
+        const troubleCharacterUpdate =
+          state.troubleCharacterOwnerId === null
+            ? (() => {
+                const ownerId = pickInitialTroubleCharacterOwner(map, result.players, result.destinationNodeId);
+                const owner = result.players.find((p) => p.id === ownerId)!;
+                return {
+                  troubleCharacterOwnerId: ownerId,
+                  troubleCharacterAnnounceInfo: {
+                    kind: "appeared" as const,
+                    ownerId,
+                    ownerName: owner.name,
+                  },
+                };
+              })()
+            : {};
+
         set({
           players: result.players,
           destinationNodeId: result.destinationNodeId,
           status: "destinationArrived",
           arrivalInfo: result.arrivalInfo,
           log: pushLog(state, result.logMessage),
+          ...troubleCharacterUpdate,
         });
         return true;
+      }
+
+      /** 着地(exact landing)が確定したプレイヤーの位置に、現在の妨害キャラ所有者が既にいれば
+       *  moverへ所有者を移す。判定・計算そのものはtroubleCharacter.tsのcheckTroubleCharacterHandoff()
+       *  (純関数)へ委譲し、ここでは結果を受け取ってset()するだけ。checkDestinationArrival()とは
+       *  完全に独立して評価する(呼び出し側のfinishLandingAndEndTurn()で並列に呼ぶ)ため、同じ着地で
+       *  目的地到着と所有者交代が同時に成立しても両方が正しく反映される。 */
+      function checkTroubleCharacterHandoff() {
+        const state = get();
+        const mover = currentPlayer(state);
+        const result = detectTroubleCharacterHandoff(state.troubleCharacterOwnerId, mover, state.players);
+        if (!result.handedOff) return;
+
+        const fromPlayer = state.players.find((p) => p.id === result.fromPlayerId)!;
+        set({
+          troubleCharacterOwnerId: result.newOwnerId,
+          troubleCharacterAnnounceInfo: {
+            kind: "handoff",
+            fromPlayerId: result.fromPlayerId,
+            fromPlayerName: fromPlayer.name,
+            toPlayerId: result.toPlayerId,
+            toPlayerName: mover.name,
+          },
+          log: pushLog(state, `妨害キャラが${fromPlayer.name}さんから${mover.name}さんへ移った!`),
+        });
       }
 
       /**
@@ -222,6 +282,11 @@ export const useGameStore = create<GameStore>()(
         // 分岐はturn=nextTurnへ到達する前にreturnするため、「次年度が存在しない」最終年度末には
         // ここは実行されない。
         let yearEventUpdate: { currentYearEventId: string; yearEventAnnounceInfo: GameState["yearEventAnnounceInfo"] } | null = null;
+        // 妨害キャラ(仮称)の「悪さ」は、実際に今回行動するプレイヤーが確定した瞬間(下のif (!skip)の
+        // 内側)にだけ判定する。advanceToNextTurn()は手番交代のたびに1回しか呼ばれないため、
+        // ここで発生させれば二重発火しない。skipNextRollの消費(既存)より後に評価するので、
+        // 既存の処理順序・挙動には影響しない。
+        let troubleCharacterEventUpdate: { troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"] } | null = null;
 
         for (let i = 0; i < players.length; i++) {
           const nextIndex = (index + 1) % players.length;
@@ -250,7 +315,25 @@ export const useGameStore = create<GameStore>()(
 
           const candidate = players[index];
           const skip = candidate.activeDebuffs.find((d) => d.kind === "skipNextRoll");
-          if (!skip) break; // このプレイヤーが実際に手番を行う
+          if (!skip) {
+            // このプレイヤーが実際に手番を行う。妨害キャラ所有者ならここで悪さを1回だけ発生させる。
+            if (candidate.id === state.troubleCharacterOwnerId) {
+              const mischief = drawTroubleCharacterMischief(troubleCharacterMischiefDefs);
+              const application = applyTroubleCharacterMischief(players, candidate.id, mischief);
+              players = application.players;
+              log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
+              troubleCharacterEventUpdate = {
+                troubleCharacterAnnounceInfo: {
+                  kind: "mischief",
+                  playerId: candidate.id,
+                  playerName: candidate.name,
+                  mischiefKind: mischief.kind,
+                  message: mischief.message,
+                },
+              };
+            }
+            break;
+          }
 
           players = updatePlayer(players, candidate.id, (p) => ({
             ...p,
@@ -269,6 +352,7 @@ export const useGameStore = create<GameStore>()(
           pendingPropertyGroupId: null,
           log,
           ...yearEventUpdate,
+          ...troubleCharacterEventUpdate,
         });
       }
 
@@ -296,6 +380,9 @@ export const useGameStore = create<GameStore>()(
       }
 
       function finishLandingAndEndTurn() {
+        // 妨害キャラの所有者交代は、目的地到着判定とは独立に必ず1回評価する(通常移動・分岐移動・
+        // カードワープのいずれも、着地が確定した経路はすべてここに収束するため個別実装は不要)。
+        checkTroubleCharacterHandoff();
         // 到着していれば演出モーダルを表示して停止する。手番送りは continueAfterArrival() が行う。
         if (checkDestinationArrival()) return;
         endTurn();
@@ -357,8 +444,8 @@ export const useGameStore = create<GameStore>()(
           return s.status !== "waiting" && s.players.length > 0;
         },
 
-        startGame: (playerNames: string[], totalYears: number) => {
-          const initial = createInitialState(defaultMapId, playerNames, totalYears);
+        startGame: (playerNames: string[], totalYears: number, playerControllers: PlayerController[] = []) => {
+          const initial = createInitialState(defaultMapId, playerNames, totalYears, playerControllers);
           set(initial);
         },
 
@@ -751,6 +838,8 @@ export const useGameStore = create<GameStore>()(
         dismissMonopolyAchievement: () => set({ monopolyAchievement: null }),
 
         dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
+
+        dismissTroubleCharacterAnnounce: () => set({ troubleCharacterAnnounceInfo: null }),
 
         continueAfterArrival: () => {
           const state = get();

@@ -92,6 +92,7 @@ function makePlayer(id: string, money: number, ownedPropertyIds: string[]): Play
     cardIds: [],
     destinationsReached: 0,
     activeDebuffs: [],
+    controlledBy: "human",
   };
 }
 

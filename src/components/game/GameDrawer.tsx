@@ -22,6 +22,9 @@ interface GameDrawerProps {
   status: GameStatus;
   diceResult: number | null;
   onUseCard: (cardId: string) => void;
+  /** falseなら現在の手番プレイヤーはCPUで、人間がカードを代わりに使えないようにする
+   *  (useCpuAutoplay()が既存アクションを直接呼ぶので、人間側の操作経路は塞ぐだけでよい)。 */
+  canCurrentPlayerAct: boolean;
   destinationName: string;
   year: number;
   month: number;
@@ -30,6 +33,8 @@ interface GameDrawerProps {
   totalTurns: number;
   /** 現在の年度イベント(「今年の湘南」)id。物件詳細の想定年間収益に反映する。 */
   currentYearEventId?: string;
+  /** 妨害キャラ(仮称)の現在の所有者プレイヤーID。未登場ならnull。PlayerHudのアイコン表示にだけ使う。 */
+  troubleCharacterOwnerId: string | null;
   log: LogEntry[];
   onReset: () => void;
 }
@@ -53,6 +58,7 @@ export function GameDrawer({
   status,
   diceResult,
   onUseCard,
+  canCurrentPlayerAct,
   destinationName,
   year,
   month,
@@ -60,6 +66,7 @@ export function GameDrawer({
   turn,
   totalTurns,
   currentYearEventId,
+  troubleCharacterOwnerId,
   log,
   onReset,
 }: GameDrawerProps) {
@@ -80,7 +87,8 @@ export function GameDrawer({
     inspectingDef?.kind === "usable" &&
     inspectingPlayerIndex === currentPlayerIndex &&
     status === "rolling" &&
-    diceResult === null;
+    diceResult === null &&
+    canCurrentPlayerAct;
 
   // 物件詳細: 年間収益はここでも計算し直さず、既存のownershipTier()/calculateAnnualRevenue()
   // (決算で使っているものと同一の関数)を呼んで表示するだけ。所有権・収益は一切変更しない。
@@ -145,7 +153,8 @@ export function GameDrawer({
                 key={player.id}
                 player={player}
                 isActive={i === currentPlayerIndex}
-                canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null}
+                canUseCard={i === currentPlayerIndex && status === "rolling" && diceResult === null && canCurrentPlayerAct}
+                hasTroubleCharacter={player.id === troubleCharacterOwnerId}
                 onInspectCard={(cardId) => setInspecting({ playerId: player.id, cardId })}
                 onInspectProperty={(propertyId) => setInspectingProperty({ playerId: player.id, propertyId })}
               />

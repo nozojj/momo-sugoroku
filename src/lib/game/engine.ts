@@ -1,4 +1,4 @@
-import type { GameState, Player } from "@/types/game";
+import type { GameState, Player, PlayerController } from "@/types/game";
 import { getPropertyDef } from "@/data/properties";
 import { getMap } from "@/data/maps";
 import { pickRandomDestination } from "./mapGraph";
@@ -72,7 +72,13 @@ export function computeWinnerIds(players: Player[]): string[] {
   return worths.filter((w) => w.worth === max).map((w) => w.id);
 }
 
-export function createPlayer(id: string, name: string, colorIndex: number, startNodeId: string): Player {
+export function createPlayer(
+  id: string,
+  name: string,
+  colorIndex: number,
+  startNodeId: string,
+  controlledBy: PlayerController = "human",
+): Player {
   return {
     id,
     name,
@@ -85,12 +91,21 @@ export function createPlayer(id: string, name: string, colorIndex: number, start
     cardIds: [],
     destinationsReached: 0,
     activeDebuffs: [],
+    controlledBy,
   };
 }
 
-export function createInitialState(mapId: string, playerNames: string[], totalYears = DEFAULT_TOTAL_YEARS): GameState {
+/** playerControllers省略時、または配列丈が足りない分は"human"とみなす(既存呼び出し互換)。 */
+export function createInitialState(
+  mapId: string,
+  playerNames: string[],
+  totalYears = DEFAULT_TOTAL_YEARS,
+  playerControllers: PlayerController[] = [],
+): GameState {
   const map = getMap(mapId);
-  const players = playerNames.map((name, i) => createPlayer(`p${i + 1}`, name, i, map.startNodeId));
+  const players = playerNames.map((name, i) =>
+    createPlayer(`p${i + 1}`, name, i, map.startNodeId, playerControllers[i] ?? "human"),
+  );
   const destinationNodeId = pickRandomDestination(map, map.startNodeId);
   const totalTurns = totalTurnsForYears(totalYears);
   // 1年目の年度イベントもここで抽選する。advanceToNextTurn()が新年度へ進むたびに行う抽選
@@ -124,6 +139,10 @@ export function createInitialState(mapId: string, playerNames: string[], totalYe
     settlementInfo: null,
     currentYearEventId: yearEvent.id,
     yearEventAnnounceInfo: { year: 1, eventId: yearEvent.id },
+    // 妨害キャラ(仮称)はゲーム開始時には存在しない。最初に誰かが目的地へ到着したタイミングで
+    // 初めて割り当てられる(gameStore.tsのcheckDestinationArrival()参照)。
+    troubleCharacterOwnerId: null,
+    troubleCharacterAnnounceInfo: null,
     netWorthHistory: [],
     log: [
       {

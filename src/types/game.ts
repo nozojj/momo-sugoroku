@@ -209,6 +209,25 @@ export interface YearEventAnnounceInfo {
   eventId: string;
 }
 
+/** 妨害キャラ(仮称)の「悪さ」の種類。moneyはその場でmoney増減、debuffは既存の
+ *  ActiveDebuff/DebuffKindをそのまま所有者自身へ付与する(新しいDebuffKindは増やさない)。 */
+export type TroubleCharacterMischiefKind = "money" | "debuff";
+
+/** troubleCharacterMischief.tsで定義する「悪さ」1件分。weightはyearEventDefsと同じ
+ *  「合計100」慣習の重み付き抽選に使う。money/debuffのどちらもmessageは付与時のログ・通知
+ *  にそのまま使うテキストで、ここでは金額や対象デバフ以外の計算ロジックは持たせない。 */
+export type TroubleCharacterMischiefDef =
+  | { id: string; kind: "money"; weight: number; amount: number; message: string }
+  | { id: string; kind: "debuff"; weight: number; debuffKind: DebuffKind; message: string };
+
+/** troubleCharacterAnnounceInfoが表示する通知の種類。monopolyAchievement/
+ *  yearEventAnnounceInfoと同じ「statusとは独立した一時通知」(GameStatusは増やさない)。
+ *  1フィールドで登場/交代/悪さ発生の3種類をまとめて表現し、UI側はkindで出し分ける。 */
+export type TroubleCharacterAnnounceInfo =
+  | { kind: "appeared"; ownerId: string; ownerName: string }
+  | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
+  | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string };
+
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
 
@@ -318,10 +337,18 @@ export interface ActiveDebuff {
   sourceCardName: string;
 }
 
+/** そのプレイヤーを誰が操作するか。"cpu"はuseCpuAutoplay()(実行層)がcpuDecision.tsの
+ *  判断結果を既存アクション(rollDice/chooseRoute/buyProperty/useCard等)へそのまま渡して操作する。
+ *  旧セーブ(この項目追加前)には無いフィールドなので、読み込み時は必ず"human"にフォールバックする
+ *  (persistMigration.ts参照)。 */
+export type PlayerController = "human" | "cpu";
+
 export interface Player {
   id: string;
   name: string;
   color: string;
+  /** このプレイヤーを人間が操作するかCPUが自動操作するか。省略された(旧セーブ)場合は"human"扱い。 */
+  controlledBy: PlayerController;
   /** プレイヤーパネル表示用の車アイコン(絵文字)。MVPでは見た目の差別化程度の意味。 */
   carIcon: string;
   currentNodeId: string;
@@ -561,6 +588,14 @@ export interface GameState {
    *  独立した一時的な通知情報(GameStatusは増やさない)。YearEventAnnounceModalが表示し終えたら
    *  dismissYearEventAnnounce()でnullに戻る。 */
   yearEventAnnounceInfo: YearEventAnnounceInfo | null;
+  /** 妨害キャラ(仮称)の現在の所有者プレイヤーID。ゲーム開始時はnull(未登場)。最初に誰かが
+   *  目的地へ到着したタイミングで初めて割り当てられる。Player側にはフラグを持たせず、
+   *  この単一IDだけで所有状態を管理する(destinationNodeIdと同じ設計)。 */
+  troubleCharacterOwnerId: string | null;
+  /** 妨害キャラの登場/所有者交代/悪さ発生を知らせる通知。monopolyAchievement/
+   *  yearEventAnnounceInfoと同様、statusとは独立した一時通知(GameStatusは増やさない)。
+   *  表示し終えたらdismissTroubleCharacterAnnounce()でnullに戻る。 */
+  troubleCharacterAnnounceInfo: TroubleCharacterAnnounceInfo | null;
   /** 年度ごとの総資産スナップショットの履歴(資産推移グラフ用)。決算のたびに1件追加される。 */
   netWorthHistory: NetWorthHistoryEntry[];
   log: LogEntry[];

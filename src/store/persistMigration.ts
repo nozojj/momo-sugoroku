@@ -44,6 +44,8 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     ...p,
     moveHistory: p.moveHistory && p.moveHistory.length > 0 ? p.moveHistory : [p.currentNodeId],
     activeDebuffs: p.activeDebuffs ?? [],
+    // 旧セーブ(controlledBy追加前)は必ず人間として扱う。
+    controlledBy: p.controlledBy ?? "human",
   }));
 
   // 旧セーブ(SettlementEntryにnetWorthAfterが無い形式)を決算演出/画面の表示中に
@@ -64,6 +66,12 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
   const hasStaleCardWarpInfo =
     (migratedStatus === "cardWarpAnnounce" || migratedStatus === "cardWarpFocus") && !state.cardWarpInfo;
   const cardWarpOverride = hasStaleCardWarpInfo ? { status: "rolling" as const } : {};
+
+  // destinationArrived表示中の到着演出情報(arrivalInfo)が欠けたまま保存された場合の防御。
+  // cardWarpInfoと同じ考え方(GameScreen側はstatus+arrivalInfoの両方が揃って初めて到着演出画面を
+  // 出すため、arrivalInfoが無いと演出を表示する術が無いまま操作不能になる)なのでrollingへ戻す。
+  const hasStaleArrivalInfo = migratedStatus === "destinationArrived" && !state.arrivalInfo;
+  const arrivalOverride = hasStaleArrivalInfo ? { status: "rolling" as const, arrivalInfo: null } : {};
 
   // selectingCardTarget表示中の選択肢情報(targetSelectInfo)が欠けている/空のまま保存された
   // 場合の防御。cardWarpInfoと同じ考え方(選択画面を出す術が無いまま操作不能になるのを防ぐ)。
@@ -90,6 +98,18 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // 依存しない一時通知なので演出が再度出るだけで操作不能にはならない(cardWarpInfo等と違い
     // stale-status防御は不要)。念のためundefined(旧セーブにキー自体が無い場合)だけ吸収する。
     yearEventAnnounceInfo: state.yearEventAnnounceInfo ?? currentState.yearEventAnnounceInfo,
+    // 妨害キャラ(仮称)の所有者IDが、実在するプレイヤーIDを指しているかを検証する。旧セーブ
+    // (このフィールド追加前、キー自体が無い)・不正なID(プレイヤー人数が変わった等)のどちらも
+    // null(未登場)へ安全にフォールバックする。currentYearEventIdと同じ「値そのものを検証して
+    // フォールバックする」方針で、destOk/playersOk(検証失敗でセーブ全体を破棄する)とは異なる。
+    troubleCharacterOwnerId:
+      state.troubleCharacterOwnerId && state.players?.some((p) => p.id === state.troubleCharacterOwnerId)
+        ? state.troubleCharacterOwnerId
+        : null,
+    // troubleCharacterAnnounceInfoはstatusとは独立した一時通知(yearEventAnnounceInfoと同じ設計)
+    // なので、destinationArrived等のようなstatus連動のstale-guardは不要。欠落していても
+    // 単に通知が出ないだけで操作不能にはならない。
+    troubleCharacterAnnounceInfo: state.troubleCharacterAnnounceInfo ?? currentState.troubleCharacterAnnounceInfo,
     netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
     pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
     activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,
@@ -99,5 +119,6 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     ...settlementOverride,
     ...cardWarpOverride,
     ...targetSelectOverride,
+    ...arrivalOverride,
   };
 }

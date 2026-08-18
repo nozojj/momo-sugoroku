@@ -44,6 +44,7 @@ function makePlayer(id: string, ownedPropertyIds: string[]): Player {
     cardIds: [],
     destinationsReached: 0,
     activeDebuffs: [],
+    controlledBy: "human",
   };
 }
 
