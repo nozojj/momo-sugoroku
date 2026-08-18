@@ -40,8 +40,10 @@ export const BUILDING_TYPE_OPTIONS: BuildingType[] = [
 ];
 
 /** 本番アセットへの差し替え用。buildingTypeごとに画像URLを登録すると、
- *  BuildingSpriteはプレースホルダー図形の代わりにその画像を描画する。今は未登録(空)。 */
-export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {};
+ *  BuildingSpriteはプレースホルダー図形の代わりにその画像を描画する。 */
+export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {
+  shop: "/tiles/shop.webp",
+};
 
 const KEYWORD_RULES: [BuildingType, string[]][] = [
   ["hotel", ["ホテル", "旅館", "民宿", "ゲストハウス"]],
