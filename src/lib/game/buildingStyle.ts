@@ -95,10 +95,18 @@ export function resolveBuildingForNode(
   const eligible = node.type === "property" || !!node.isDestinationCandidate;
   if (!eligible && !override) return null;
 
+  const buildingType = override?.buildingType ?? inferBuildingType(node, group);
+  // 主要8駅は駅マス自体(Board.tsxのSTATION_STYLE)で駅らしさを表現するようになったため、
+  // 自動推測で"station"になる場合(=override.buildingTypeを明示していない場合)は
+  // 浮遊する駅舎の建物アイコンを出さない(タイル側のデザインと二重に「駅」を主張させない)。
+  // エディタが個別ノードに明示的にbuildingType:"station"を上書き設定した場合は
+  // 従来どおり表示する(逃げ道は維持する)。
+  if (buildingType === "station" && !override?.buildingType) return null;
+
   const defaultOffset = defaultBuildingOffset(node);
   return {
     nodeId: node.id,
-    buildingType: override?.buildingType ?? inferBuildingType(node, group),
+    buildingType,
     offsetX: override?.offsetX ?? defaultOffset.x,
     offsetY: override?.offsetY ?? defaultOffset.y,
     scale: override?.scale ?? 1,

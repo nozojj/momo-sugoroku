@@ -15,6 +15,27 @@ export const NODE_STYLE: Record<NodeType, { fill: string; stroke: string; icon: 
 /** 実在店舗ランドマークの専用スタイル(架空物件のピンクと区別する金色)。 */
 export const LANDMARK_STYLE = { fill: "#fff8e6", stroke: "#caa23d", labelBg: "#fff8e6" };
 
+/** 主要8駅(isMajorHub)専用のマスデザイン。通常マス(NODE_STYLE.normal)とは別に、
+ *  ホーム(アイボリー)・線路帯・レール・点字ブロック・湘南ブルーの駅名標アクセントの色を
+ *  1箇所にまとめる。地域(鎌倉・江の島など)による差は付けず8駅で完全に共通の配色にする
+ *  (地域差は将来のランドマーク/建物側で表現する方針のため)。 */
+export const STATION_STYLE = {
+  /** ホーム面の塗り(既存のマス本体<rect>のfillに使う) */
+  fill: "#efe6d0",
+  /** ホーム面の輪郭(既存のマス本体<rect>のstrokeに使う) */
+  stroke: "#7a6f56",
+  /** 線路帯(濃いグレー) */
+  track: "#5b5850",
+  /** レール(線路帯の中の細い2本線) */
+  rail: "#c9c2ab",
+  /** 黄色い点字ブロック */
+  tenji: "#f5b921",
+  /** 湘南ブルーの駅名標アクセント(Phase1のsea-gradient最深部と同じ色を再利用) */
+  sign: "#1f6fa8",
+  /** 駅名標の縁取り */
+  signBorder: "#fff8ec",
+};
+
 export const ROAD_STYLE: Record<RoadType, { base: string; top: string; width: number; dash?: string }> = {
   // 国道(紙地図で国道が赤く強調されるのに倣い、ひときわ太い朱色で描く
   national: { base: "#a5381d", top: "#e2692f", width: 20 },
