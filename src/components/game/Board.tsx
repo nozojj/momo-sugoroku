@@ -744,48 +744,10 @@ export function Board({
                     stroke={strokeColor}
                     strokeWidth={node.isMajorHub ? 3.5 : isLandmark ? 3 : 2.5}
                   />
-                  {/* 駅マス専用の意匠(線路帯+レール2本+点字ブロック)。マス本体の角丸(rx=6)から
-                      はみ出さないよう、左右を固定7単位ぶん内側に寄せる(clipPathを使わずに済む
-                      簡便な方法。半径18〜22のどの段階でも角丸(rx=6)より確実に大きい余白になる)。
-                      node-sheen(天面ハイライト)より前に描き、他マスと同じ艶を上から受けさせる。 */}
-                  {isStation && (
-                    <>
-                      <rect
-                        x={cx - (radius - 7)}
-                        y={cy + radius * 0.42}
-                        width={(radius - 7) * 2}
-                        height={radius - radius * 0.42}
-                        fill={STATION_STYLE.track}
-                      />
-                      <line
-                        x1={cx - (radius - 9)}
-                        x2={cx + (radius - 9)}
-                        y1={cy + radius * 0.58}
-                        y2={cy + radius * 0.58}
-                        stroke={STATION_STYLE.rail}
-                        strokeWidth={radius * 0.06}
-                        strokeLinecap="round"
-                      />
-                      <line
-                        x1={cx - (radius - 9)}
-                        x2={cx + (radius - 9)}
-                        y1={cy + radius * 0.84}
-                        y2={cy + radius * 0.84}
-                        stroke={STATION_STYLE.rail}
-                        strokeWidth={radius * 0.06}
-                        strokeLinecap="round"
-                      />
-                      <rect
-                        x={cx - (radius - 7)}
-                        y={cy + radius * 0.3}
-                        width={(radius - 7) * 2}
-                        height={radius * 0.12}
-                        fill={STATION_STYLE.tenji}
-                      />
-                    </>
-                  )}
                   {/* Visual Prototype 1: 天面ハイライト+側面シェードの上掛け。fillColor(所有権・独占の
-                      色分け、既存ロジック)はそのまま、視覚的に一段立体的に見せるだけの追加レイヤー。 */}
+                      色分け、既存ロジック)はそのまま、視覚的に一段立体的に見せるだけの追加レイヤー。
+                      駅マスも含め全マス共通(駅の本番素材は下でこの上に重ねて描くため、素材側の
+                      陰影とnode-sheenの艶が二重にならないよう、画像は必ずこのsheenより後に置く)。 */}
                   <rect
                     x={cx - radius}
                     y={cy - radius}
@@ -795,20 +757,26 @@ export function Board({
                     fill="url(#node-sheen)"
                     pointerEvents="none"
                   />
-                  {/* 湘南ブルーの駅名標アクセント。node-sheenより後(最前面)に置き、艶で色が
-                      濁らないようにする。文字は入れず、色と形だけで「駅名標」を連想させる。 */}
+                  {/* 主要8駅の本番素材(public/tiles/station.webp)。正方形の画像をマス本体と同じ
+                      x/y/width/heightにそのまま敷き込むだけで、8駅とも完全に同じ画像を再利用する
+                      (駅名は既存のnameラベルが別途担当)。node-sheenより後に置くことで、
+                      素材自体が持つ陰影がPhase1の艶で薄まらないようにする。読み込みに失敗した
+                      場合は下のfillColor(STATION_STYLE)がそのまま背景として見える。 */}
                   {isStation && (
-                    <rect
-                      x={cx - radius * 0.45}
-                      y={cy - radius * 1.22}
-                      width={radius * 0.9}
-                      height={radius * 0.32}
-                      rx={radius * 0.1}
-                      fill={STATION_STYLE.sign}
-                      stroke={STATION_STYLE.signBorder}
-                      strokeWidth={radius * 0.03}
-                      pointerEvents="none"
-                    />
+                    <>
+                      <clipPath id={`station-clip-${node.id}`}>
+                        <rect x={cx - radius} y={cy - radius} width={radius * 2} height={radius * 2} rx={6} />
+                      </clipPath>
+                      <image
+                        href="/tiles/station.webp"
+                        x={cx - radius}
+                        y={cy - radius}
+                        width={radius * 2}
+                        height={radius * 2}
+                        clipPath={`url(#station-clip-${node.id})`}
+                        pointerEvents="none"
+                      />
+                    </>
                   )}
                   <text x={cx} y={cy + 4} textAnchor="middle" fontSize={iconSize} fontWeight={700} pointerEvents="none">
                     {icon}
