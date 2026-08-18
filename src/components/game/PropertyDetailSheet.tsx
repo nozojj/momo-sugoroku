@@ -27,8 +27,9 @@ export function PropertyDetailSheet({ def, group, annualRevenue, isMonopoly, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      {/* Visual Prototype 1.5: 物件関連UIの役割色(ピンク、PurchaseModalと統一)を上部アクセントに。 */}
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl dark:bg-slate-800"
+        className="w-full max-w-sm rounded-2xl border-t-4 border-t-pink-300 bg-linear-to-b from-white to-pink-50/30 p-5 text-center shadow-xl dark:border-t-pink-500/50 dark:from-slate-800 dark:to-slate-800/80"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-4xl">{def.icon ?? "🏠"}</p>
@@ -67,7 +68,7 @@ export function PropertyDetailSheet({ def, group, annualRevenue, isMonopoly, onC
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-500 dark:text-slate-200"
+          className="mt-5 w-full rounded-lg border border-pink-900/15 py-2.5 text-sm font-medium text-slate-600 dark:border-pink-100/15 dark:text-slate-200"
         >
           閉じる
         </button>

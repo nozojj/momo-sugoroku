@@ -26,7 +26,7 @@ export function GameHud({
   movementInfo,
 }: GameHudProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1 bg-white/75 px-3 py-2 backdrop-blur-sm dark:bg-slate-900/70 sm:px-4 sm:py-2.5">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1 border-b border-amber-900/10 bg-linear-to-b from-amber-50/90 to-white/75 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-amber-100/10 dark:from-slate-900/85 dark:to-slate-900/70 sm:px-4 sm:py-2.5">
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs sm:text-sm">
           <span className="flex min-w-0 items-center gap-1.5 font-bold text-slate-800 dark:text-white">
@@ -53,7 +53,7 @@ export function GameHud({
           type="button"
           onClick={onOpenDrawer}
           aria-label="メニューを開く"
-          className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white text-lg shadow-sm dark:border-white/10 dark:bg-slate-800 dark:text-white"
+          className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-900/15 bg-amber-50/90 text-lg shadow-sm dark:border-amber-100/10 dark:bg-slate-800 dark:text-white"
         >
           ☰
         </button>

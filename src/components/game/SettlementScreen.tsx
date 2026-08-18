@@ -39,15 +39,19 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
   const yearEvent = getYearEventDef(info.yearEventId);
 
   return (
-    <div className="min-h-dvh w-full overflow-y-auto p-4 pb-8">
+    // Visual Prototype 1.5: 「一年の成果発表」として、通常のマス演出より一段豪華な暖色グラデーション背景。
+    // 情報構造(見出し→アワード→ランキング→チャート→ボタン)は無変更。
+    <div className="min-h-dvh w-full overflow-y-auto bg-linear-to-b from-amber-50 via-orange-50/40 to-white p-4 pb-8 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
       <div className="mx-auto w-full max-w-sm lg:max-w-5xl">
         <div className="pt-6 text-center">
-          <p className="text-4xl">🧾</p>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-400 text-3xl shadow-md dark:from-amber-400/30 dark:to-amber-600/20">
+            🧾
+          </div>
           <h1 className="mt-2 text-lg font-bold text-slate-800 dark:text-white">{info.year}年目 決算</h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">総資産の多い順に表示しています</p>
           {yearEvent && (
             <p
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-300"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-900/15 bg-linear-to-b from-white/90 to-amber-50/70 px-3 py-1 text-xs font-bold text-slate-600 dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50 dark:text-slate-300"
               title={yearEvent.description}
             >
               <span className="text-slate-400 dark:text-slate-500">今年の湘南:</span>
@@ -86,10 +90,12 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
         </div>
 
         <div className="mt-6">
+          {/* Visual Prototype 1.5: WebサイトのCTAではなく「押せるゲームボタン」に見えるよう、
+              下辺を濃色にしたベベル+押下フィードバック(active:translate-y)を付ける。 */}
           <button
             type="button"
             onClick={onContinue}
-            className="w-full rounded-lg bg-slate-800 py-2.5 font-bold text-white dark:bg-white dark:text-slate-900"
+            className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
           >
             {info.isFinalSettlement ? "結果を見る" : "次の年度へ"}
           </button>
@@ -180,8 +186,8 @@ function computeAwards(entries: SettlementEntry[]): Award[] {
 function AwardChip({ award }: { award: Award }) {
   const names = award.winners.map((w) => w.playerName).join("・");
   return (
-    <div className="flex shrink-0 items-center gap-2 rounded-full border border-black/10 bg-white/70 py-1 pl-1 pr-3 dark:border-white/10 dark:bg-slate-800/60 sm:shrink sm:justify-center sm:py-1.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs dark:bg-amber-400/20">
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-amber-900/10 bg-linear-to-b from-white/90 to-amber-50/70 py-1 pl-1 pr-3 shadow-sm dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50 sm:shrink sm:justify-center sm:py-1.5">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-300 text-xs dark:from-amber-400/30 dark:to-amber-500/20">
         {award.icon}
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
@@ -252,13 +258,21 @@ function SettlementRankingRow({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   return (
+    // Visual Prototype 1.5: PlayerHud(Prototype 1)と同じ「プレイヤーカラーの左帯」で
+    // プレイ中の見た目とここを統一。1位だけ暖色グラデーション+強めの影で一段目立たせる。
     <div
-      className={`rounded-xl border p-3 ${
-        rank === 1 ? "border-amber-300 bg-amber-50/60 dark:border-amber-400/40 dark:bg-amber-400/5" : "border-black/10 dark:border-white/10"
+      className={`rounded-xl border p-3 shadow-sm ${
+        rank === 1
+          ? "border-amber-400 bg-linear-to-b from-amber-100 to-amber-50/80 shadow-md dark:border-amber-400/50 dark:from-amber-400/15 dark:to-amber-400/5"
+          : "border-amber-900/10 bg-linear-to-b from-white/95 to-amber-50/40 dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50"
       }`}
+      style={{ borderLeft: `3px solid ${entry.playerColor}` }}
     >
       <div className="flex items-center gap-2">
-        <span className="shrink-0 text-xs font-bold text-slate-400 dark:text-slate-500">{rank}位</span>
+        <span className="shrink-0 text-xs font-bold text-slate-400 dark:text-slate-500">
+          {rank === 1 ? "👑 " : ""}
+          {rank}位
+        </span>
         <RankMoveBadge rankChange={rankChange} />
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.playerColor }} />
         <span className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">{entry.playerName}さん</span>

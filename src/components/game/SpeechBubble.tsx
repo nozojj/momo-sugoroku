@@ -23,7 +23,9 @@ export function SpeechBubble({ line, side, theme }: SpeechBubbleProps) {
   return (
     <div
       key={line.text}
-      className={`animate-arrival-pop relative min-w-0 flex-1 rounded-2xl border-b border-l border-r border-t-4 border-black/10 bg-white p-4 text-base font-bold text-slate-800 shadow-lg dark:border-white/10 dark:bg-slate-800 dark:text-white sm:max-w-[500px] sm:p-5 sm:text-lg ${themeStyle.accentBorderClass}`}
+      // Visual Prototype 1.5: 単色白から暖色グラデーションへ。役割ごとのアクセント色
+      // (themeStyle.accentBorderClass、既存)はそのまま生かし、吹き出し自体に厚み・質感を足すだけ。
+      className={`animate-arrival-pop relative min-w-0 flex-1 rounded-2xl border-b border-l border-r border-t-4 border-amber-900/10 bg-linear-to-b from-white to-amber-50/50 p-4 text-base font-bold text-slate-800 shadow-xl dark:border-amber-100/10 dark:from-slate-800 dark:to-slate-800/80 dark:text-white sm:max-w-[500px] sm:p-5 sm:text-lg ${themeStyle.accentBorderClass}`}
     >
       <p>{line.text}</p>
       {line.highlight && (

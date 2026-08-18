@@ -18,7 +18,8 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800">
+      {/* Visual Prototype 1.5: カード関連UIの役割色(フューシャ)を上部アクセントに統一。 */}
+      <div className="w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-5 shadow-xl dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80">
         <p className="text-xs font-semibold text-fuchsia-500">手札がいっぱいです</p>
         <h2 className="mt-1 text-base font-bold text-slate-800 dark:text-white">
           {info.playerName}さん、カードを1枚選んで捨ててください
@@ -55,7 +56,7 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
                 key={`${cardId}-${i}`}
                 type="button"
                 onClick={() => onDiscardExisting(i)}
-                className="flex flex-col items-center rounded-lg border border-slate-300 p-2 text-center active:scale-95 dark:border-slate-600"
+                className="flex flex-col items-center rounded-lg border border-fuchsia-900/15 bg-linear-to-b from-white to-fuchsia-50/20 p-2 text-center shadow-sm active:scale-95 dark:border-fuchsia-100/15 dark:from-slate-800/60 dark:to-slate-800/40"
               >
                 <span className="text-xl">{def.icon}</span>
                 <span className="mt-0.5 text-xs font-bold text-slate-700 dark:text-slate-200">{def.name}</span>
@@ -82,7 +83,7 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
         <button
           type="button"
           onClick={onKeepCurrentHand}
-          className="mt-4 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-500 dark:text-slate-200"
+          className="mt-4 w-full rounded-lg border border-fuchsia-900/15 py-2.5 text-sm font-medium text-slate-600 dark:border-fuchsia-100/15 dark:text-slate-200"
         >
           今回のカードを見送って、今の手札を維持する
         </button>

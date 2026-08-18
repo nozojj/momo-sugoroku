@@ -36,8 +36,10 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <div className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl bg-white shadow-xl dark:bg-slate-800">
-        <div className="shrink-0 border-b border-black/5 p-5 pb-3 dark:border-white/10">
+      {/* Visual Prototype 1.5: 物件購入=ショップ役割のピンクを引き続きアクセントに使いつつ、
+          単色白から暖色グラデーションへ。情報構造・操作位置は無変更。 */}
+      <div className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl border border-pink-900/10 bg-linear-to-b from-white to-pink-50/40 shadow-xl dark:border-pink-100/10 dark:from-slate-800 dark:to-slate-800/80">
+        <div className="shrink-0 border-b border-pink-900/10 p-5 pb-3 dark:border-pink-100/10">
           <p className="text-xs font-semibold text-pink-500">
             {group?.icon} {group?.name ?? "物件エリア"}
           </p>
@@ -74,7 +76,7 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
                     ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-500/50 dark:bg-emerald-400/10"
                     : isOwnedByOther
                       ? "border-slate-200 bg-slate-50 opacity-70 dark:border-slate-700 dark:bg-slate-900/40"
-                      : "border-slate-200 dark:border-slate-600"
+                      : "border-pink-900/10 bg-linear-to-b from-white to-pink-50/30 dark:border-pink-100/10 dark:from-slate-800/60 dark:to-slate-800/40"
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -115,11 +117,12 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
                 )}
 
                 {!owner && (
+                  // Visual Prototype 1.5: 「押せるゲームボタン」に見えるベベル+押下フィードバック。
                   <button
                     type="button"
                     disabled={!purchasable}
                     onClick={() => purchasable && onBuy(def.id)}
-                    className="mt-2 w-full rounded-lg bg-pink-500 py-2 text-sm font-bold text-white disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
+                    className="mt-2 w-full rounded-lg border-b-4 border-pink-800 bg-linear-to-b from-pink-400 to-pink-600 py-2 text-sm font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:border-pink-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
                   >
                     {canAfford ? "購入する" : "所持金が足りません"}
                   </button>
@@ -129,11 +132,11 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
           })}
         </div>
 
-        <div className="shrink-0 border-t border-black/5 p-4 dark:border-white/10">
+        <div className="shrink-0 border-t border-pink-900/10 p-4 dark:border-pink-100/10">
           <button
             type="button"
             onClick={onFinish}
-            className="w-full rounded-lg bg-slate-800 py-2.5 font-bold text-white dark:bg-white dark:text-slate-900"
+            className="w-full rounded-lg border-b-4 border-slate-950 bg-linear-to-b from-slate-700 to-slate-900 py-2.5 font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 dark:border-slate-400 dark:from-white dark:to-slate-100 dark:text-slate-900"
           >
             購入を終える
           </button>

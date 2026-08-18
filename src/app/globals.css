@@ -40,6 +40,23 @@ body {
   }
 }
 
+/* Visual Prototype 1: 盤面の雰囲気(ヴィネット+うっすらとした光)。bodyの背景と同じ
+   「ライトモード既定+prefers-color-schemeで上書き」の形に揃える。ゲームロジック・
+   マップデータには一切関与しない、見た目だけのオーバーレイ(Board.tsx参照)。 */
+.board-atmosphere {
+  background:
+    radial-gradient(circle at 82% 10%, rgba(255, 244, 214, 0.4), rgba(255, 244, 214, 0) 42%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(120, 88, 40, 0.1) 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .board-atmosphere {
+    background:
+      radial-gradient(circle at 82% 10%, rgba(255, 244, 214, 0.12), rgba(255, 244, 214, 0) 42%),
+      radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.28) 100%);
+  }
+}
+
 @keyframes ping-slow {
   0% {
     transform: scale(0.8);

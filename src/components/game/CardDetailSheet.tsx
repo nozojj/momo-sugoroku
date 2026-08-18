@@ -26,8 +26,10 @@ export function CardDetailSheet({ def, usable, onUse, onClose }: CardDetailSheet
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      {/* Visual Prototype 1.5: カード関連UIの役割色(フューシャ、既存のRARITY_BADGE_CLASS等と
+          同じ色系統)を上部アクセントに。単色白から暖色グラデーションへ、情報構造は無変更。 */}
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl dark:bg-slate-800"
+        className="w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-5 text-center shadow-xl dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-4xl">{def.icon}</p>
@@ -49,7 +51,7 @@ export function CardDetailSheet({ def, usable, onUse, onClose }: CardDetailSheet
             <button
               type="button"
               onClick={onUse}
-              className="mt-5 w-full rounded-lg bg-fuchsia-500 py-2.5 font-bold text-white active:scale-95"
+              className="mt-5 w-full rounded-lg border-b-4 border-fuchsia-800 bg-linear-to-b from-fuchsia-400 to-fuchsia-600 py-2.5 font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0"
             >
               このカードを使う
             </button>
@@ -65,7 +67,7 @@ export function CardDetailSheet({ def, usable, onUse, onClose }: CardDetailSheet
         <button
           type="button"
           onClick={onClose}
-          className="mt-3 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-500 dark:text-slate-200"
+          className="mt-3 w-full rounded-lg border border-fuchsia-900/15 py-2.5 text-sm font-medium text-slate-600 dark:border-fuchsia-100/15 dark:text-slate-200"
         >
           閉じる
         </button>

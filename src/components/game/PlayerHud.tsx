@@ -75,11 +75,15 @@ export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, r
 
   return (
     <div
-      className={`rounded-xl border p-3 transition ${
+      // Visual Prototype 1: 白カード然としたフラットな見た目を減らすため、暖色寄りのグラデーション+
+      // プレイヤーカラーの左帯(ゲームUIらしい「自分の駒の色で識別できる」演出)を追加。
+      // 情報構造(バッジ・数値・並び順)は一切変更しない、コンテナの見た目だけの変更。
+      className={`rounded-xl border p-3 shadow-sm transition ${
         isActive
-          ? "border-amber-400 bg-amber-50/80 shadow-md dark:bg-amber-400/10"
-          : "border-black/10 bg-white/70 dark:bg-slate-800/60"
+          ? "border-amber-400 bg-linear-to-b from-amber-50 to-amber-100/70 shadow-md dark:from-amber-400/15 dark:to-amber-400/5"
+          : "border-amber-900/10 bg-linear-to-b from-white/95 to-amber-50/60 dark:border-amber-100/10 dark:from-slate-800/80 dark:to-slate-800/50"
       }`}
+      style={{ borderLeft: `3px solid ${player.color}` }}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

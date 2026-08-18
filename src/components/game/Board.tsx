@@ -603,6 +603,28 @@ export function Board({
                 <rect width="40" height="16" fill="none" />
                 <rect y="0" width="40" height="7" fill="#c2b978" opacity="0.4" />
               </pattern>
+              {/* Visual Prototype 1: 海の深浅グラデーション+波模様。既存のsea/coastline装飾の
+                  塗りをこのgradientへ差し替えるだけで、装飾データ(points等)には一切触れない。 */}
+              <linearGradient id="sea-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8fdcef" />
+                <stop offset="55%" stopColor="#3fa9dd" />
+                <stop offset="100%" stopColor="#1f6fa8" />
+              </linearGradient>
+              <pattern id="board-waves" width="52" height="20" patternUnits="userSpaceOnUse">
+                <path d="M0,11 Q13,4 26,11 T52,11" fill="none" stroke="#ffffff" strokeWidth="1.6" opacity="0.4" />
+                <path d="M0,17 Q13,10 26,17 T52,17" fill="none" stroke="#ffffff" strokeWidth="1.2" opacity="0.25" />
+              </pattern>
+              {/* 道路に軽い影を付けるための下敷き用ストローク(道路本体の描画とは別レイヤー、
+                  形状データは共有するだけで道路の色分けロジックには触れない)。ぼかしフィルタは
+                  使わず、オフセット+低不透明度だけで表現する(598ノード・1456エッジ規模で
+                  フィルタを毎エッジに掛けるとラスタライズcoストが増えるための性能配慮)。 */}
+              {/* マスを「天面ハイライト+側面シェード」で少し立体的に見せるための上掛けグラデーション。
+                  既存のfillColor(所有権・独占色分け)の上に重ねるだけで、色分けロジックは無変更。 */}
+              <linearGradient id="node-sheen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+                <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.16" />
+              </linearGradient>
             </defs>
 
             {/* 背景装飾 */}
@@ -628,6 +650,11 @@ export function Board({
               const isShortestRouteEdge = showShortestRoute && (shortestPathEdgeKeys?.has(edgeKey) ?? false);
               return (
                 <g key={`${edge.from}-${edge.to}`} opacity={isSelectableEdge ? 1 : 0.92} className={isSelectableEdge ? "animate-pulse-node" : undefined}>
+                  {/* Visual Prototype 1: 道路の下敷き影。ぼかしフィルタは使わず、わずかな下方向オフセット+
+                      低不透明度だけで立体感を出す(建物・車の落ち影と同じ「まっすぐ下」の光源方向)。 */}
+                  <g transform="translate(0, 2.2)" opacity={0.18}>
+                    <path d={d} fill="none" stroke="#241c14" strokeWidth={style.width * 0.9} strokeLinecap="round" />
+                  </g>
                   {isShortestRouteEdge && (
                     <path
                       d={d}
@@ -710,6 +737,17 @@ export function Board({
                     stroke={strokeColor}
                     strokeWidth={node.isMajorHub ? 3.5 : isLandmark ? 3 : 2.5}
                   />
+                  {/* Visual Prototype 1: 天面ハイライト+側面シェードの上掛け。fillColor(所有権・独占の
+                      色分け、既存ロジック)はそのまま、視覚的に一段立体的に見せるだけの追加レイヤー。 */}
+                  <rect
+                    x={cx - radius}
+                    y={cy - radius}
+                    width={radius * 2}
+                    height={radius * 2}
+                    rx={6}
+                    fill="url(#node-sheen)"
+                    pointerEvents="none"
+                  />
                   <text x={cx} y={cy + 4} textAnchor="middle" fontSize={iconSize} fontWeight={700} pointerEvents="none">
                     {icon}
                   </text>
@@ -786,6 +824,10 @@ export function Board({
             })}
           </svg>
         </div>
+        {/* Visual Prototype 1: 盤面外周のヴィネット+うっすらとした光。パン/ズームの変換対象外
+            (viewport基準で常に画面端に効かせる)なので、変換用<div>の外・containerRefの中に置く。
+            操作を一切妨げないpointer-events-noneの見た目だけの層。 */}
+        <div className="board-atmosphere pointer-events-none absolute inset-0" aria-hidden="true" />
       </div>
 
       {debugClickPos && (
@@ -891,10 +933,17 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
     );
   }
   if (deco.kind === "sea") {
-    return deco.edge === "right" ? (
-      <rect x={deco.pos - minX} y={-2000} width={5000} height={6000} fill="#3fa9dd" opacity={0.85} />
-    ) : (
-      <rect x={-2000} y={deco.pos - minY} width={6000} height={5000} fill="#3fa9dd" opacity={0.85} />
+    // Visual Prototype 1: 単色塗り(#3fa9dd)から深浅グラデーション+波模様へ。矩形の位置・サイズ
+    // (装飾データ由来、既存ロジック)は変更せず、fillだけ差し替える。
+    const rectProps =
+      deco.edge === "right"
+        ? { x: deco.pos - minX, y: -2000, width: 5000, height: 6000 }
+        : { x: -2000, y: deco.pos - minY, width: 6000, height: 5000 };
+    return (
+      <g opacity={0.85}>
+        <rect {...rectProps} fill="url(#sea-gradient)" />
+        <rect {...rectProps} fill="url(#board-waves)" opacity={0.5} />
+      </g>
     );
   }
   if (deco.kind === "coastline") {
@@ -907,7 +956,10 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
     const fillD = `${curveD} L${last.x},${farY} L${first.x},${farY} Z`;
     return (
       <g>
-        <path d={fillD} fill="#3fa9dd" opacity={0.85} />
+        <path d={fillD} fill="url(#sea-gradient)" opacity={0.85} />
+        {/* 波模様は塗りつぶし形状(fillD)と全く同じパスを再利用するので、別途clipPathを
+            用意しなくても海の輪郭からはみ出さない。 */}
+        <path d={fillD} fill="url(#board-waves)" opacity={0.45} />
         <path d={curveD} fill="none" stroke="#ffffff" strokeWidth={2} strokeDasharray="2 12" opacity={0.6} />
       </g>
     );

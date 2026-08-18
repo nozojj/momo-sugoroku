@@ -121,14 +121,16 @@ export function GameDrawer({
         aria-hidden="true"
       />
       <div
-        className={`fixed inset-y-0 right-0 z-40 flex w-[85vw] max-w-sm flex-col gap-4 overflow-y-auto bg-slate-50 p-4 shadow-2xl transition-transform duration-300 ease-out dark:bg-slate-900 ${
+        // Visual Prototype 1: SaaS的な単色白/グレーから、暖色寄りのグラデーション+区切り線で
+        // 「ゲームUIのパネル」らしい階層感を追加。開閉・幅・情報構造は一切変更しない。
+        className={`fixed inset-y-0 right-0 z-40 flex w-[85vw] max-w-sm flex-col gap-4 overflow-y-auto bg-linear-to-b from-amber-50/95 via-white to-white p-4 shadow-2xl transition-transform duration-300 ease-out dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label="メニュー"
         aria-hidden={!open}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-amber-900/10 pb-3 dark:border-amber-100/10">
           <h2 className="text-base font-black text-slate-800 dark:text-white">メニュー</h2>
           <button
             type="button"
@@ -140,7 +142,7 @@ export function GameDrawer({
           </button>
         </div>
 
-        <section className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/10 dark:bg-slate-800/60">
+        <section className="rounded-xl border border-amber-900/10 bg-linear-to-b from-white/90 to-amber-50/60 p-3 shadow-sm dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50">
           <p className={labelCls}>現在の目的地</p>
           <p className="mt-0.5 text-sm font-bold text-slate-800 dark:text-white">🎯 {destinationName}</p>
           <div className="mt-2 flex items-center justify-between">
@@ -178,7 +180,7 @@ export function GameDrawer({
           <EventLog log={log} />
         </section>
 
-        <section className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+        <section className="flex flex-col gap-2 border-t border-amber-900/10 pt-3 dark:border-amber-100/10">
           <p className={labelCls}>設定</p>
           <button
             type="button"

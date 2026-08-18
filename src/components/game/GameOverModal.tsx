@@ -34,11 +34,16 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
   const awards = computeFinalAwards(players);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
-      <div className="mx-auto my-6 w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-800 lg:max-w-5xl lg:p-8">
+    // Visual Prototype 1.5: 「遊び切ったご褒美画面」として、GameStateの他画面より明確に一段豪華な
+    // 暖色グラデーションの全画面背景。SettlementScreenより彩度・輝き感を強めて「フィナーレ」感を出す。
+    // 情報構造(タイトル→アワード→ランキング→チャート→ボタン)は無変更。
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-linear-to-b from-amber-200 via-orange-100 to-amber-50 p-4 dark:from-amber-950/50 dark:via-slate-900 dark:to-slate-950">
+      <div className="mx-auto my-6 w-full max-w-sm rounded-2xl border-2 border-amber-300/70 bg-linear-to-b from-white to-amber-50/50 p-5 shadow-2xl dark:border-amber-400/20 dark:from-slate-800 dark:to-slate-800/80 lg:max-w-5xl lg:p-8">
         <div className="text-center">
-          <p className="text-4xl">🏆</p>
-          <h2 className="mt-2 text-xl font-bold text-slate-800 dark:text-white">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-400 text-4xl shadow-lg dark:from-amber-400/40 dark:to-amber-600/30">
+            🏆
+          </div>
+          <h2 className="mt-3 bg-linear-to-r from-amber-600 to-orange-500 bg-clip-text text-xl font-black text-transparent dark:from-amber-300 dark:to-orange-300">
             {isTie ? "引き分け!" : `${winner?.name}さんの勝ち!`}
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{totalYears}年間のプレイが終了しました</p>
@@ -69,7 +74,7 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
           <button
             type="button"
             onClick={onRestart}
-            className="w-full rounded-lg bg-slate-800 py-2.5 font-bold text-white dark:bg-white dark:text-slate-900"
+            className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
           >
             もう一度遊ぶ
           </button>
@@ -157,8 +162,8 @@ function computeFinalAwards(players: Player[]): Award[] {
 function AwardChip({ award }: { award: Award }) {
   const names = award.winners.map((w) => w.name).join("・");
   return (
-    <div className="flex shrink-0 items-center gap-2 rounded-full border border-black/10 bg-slate-50 py-1 pl-1 pr-3 dark:border-white/10 dark:bg-slate-900/40 sm:shrink sm:justify-center sm:py-1.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs dark:bg-amber-400/20">
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-amber-900/10 bg-linear-to-b from-white/90 to-amber-50/70 py-1 pl-1 pr-3 shadow-sm dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50 sm:shrink sm:justify-center sm:py-1.5">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-300 text-xs dark:from-amber-400/30 dark:to-amber-500/20">
         {award.icon}
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
@@ -174,14 +179,21 @@ function RankingCard({ ranked }: { ranked: RankedPlayer }) {
   const monopolyLabels = monopolyLabelsFor(player);
 
   return (
+    // Visual Prototype 1.5: PlayerHud/SettlementScreenと同じ「プレイヤーカラーの左帯」で統一。
     <div
-      className={`rounded-xl border p-3 ${
-        rank === 1 ? "border-amber-300 bg-amber-50/60 dark:border-amber-400/40 dark:bg-amber-400/5" : "border-black/10 dark:border-white/10"
+      className={`rounded-xl border p-3 shadow-sm ${
+        rank === 1
+          ? "border-amber-400 bg-linear-to-b from-amber-100 to-amber-50/80 shadow-md dark:border-amber-400/50 dark:from-amber-400/15 dark:to-amber-400/5"
+          : "border-amber-900/10 bg-linear-to-b from-white/95 to-amber-50/40 dark:border-amber-100/10 dark:from-slate-800/70 dark:to-slate-800/50"
       }`}
+      style={{ borderLeft: `3px solid ${player.color}` }}
     >
       <div className="flex items-center gap-2">
         <span className="flex shrink-0 items-center gap-1">
-          <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{rank}位</span>
+          <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
+            {rank === 1 ? "👑 " : ""}
+            {rank}位
+          </span>
           {tied && (
             <span className="rounded bg-sky-100 px-1 py-0.5 text-[10px] font-bold text-sky-600 dark:bg-sky-400/10 dark:text-sky-300">
               同率

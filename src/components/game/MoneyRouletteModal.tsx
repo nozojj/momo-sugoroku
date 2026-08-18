@@ -65,7 +65,13 @@ export function MoneyRouletteModal({ info, onContinue }: MoneyRouletteModalProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-slate-800">
+      {/* Visual Prototype 1.5: プラス/マイナスの既存アクセント色(sky/rose)を上部アクセントにも
+          反映。単色白から暖色グラデーションへ。 */}
+      <div
+        className={`w-full max-w-sm rounded-2xl border-t-4 bg-linear-to-b from-white to-amber-50/30 p-6 text-center shadow-xl dark:from-slate-800 dark:to-slate-800/80 ${
+          isGain ? "border-t-sky-300 dark:border-t-sky-500/50" : "border-t-rose-300 dark:border-t-rose-500/50"
+        }`}
+      >
         <p className="text-4xl">🎰</p>
         <h2 className="mt-2 text-lg font-bold text-slate-800 dark:text-white">
           {isGain ? "プラスマス" : "マイナスマス"}
