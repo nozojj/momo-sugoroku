@@ -44,6 +44,7 @@ export const BUILDING_TYPE_OPTIONS: BuildingType[] = [
 export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {
   shop: "/tiles/shop.webp",
   restaurant: "/tiles/restaurant.webp",
+  hotel: "/tiles/hotel.webp",
 };
 
 const KEYWORD_RULES: [BuildingType, string[]][] = [
