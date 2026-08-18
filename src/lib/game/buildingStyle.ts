@@ -48,6 +48,24 @@ export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {
   commercial: "/tiles/commercial.webp",
 };
 
+/** landmarkだけは1 buildingType=1画像ではなく、物件グループ(propertyGroup.id)ごとに
+ *  地域性の強い専用素材を割り当てる。未登録のgroupIdはBUILDING_ASSET_URLS.landmark
+ *  (今は未登録=プレースホルダー図形)へ安全にフォールバックする(BuildingSprite側で処理)。 */
+export const LANDMARK_ASSET_URLS: Partial<Record<string, string>> = {
+  grp_enoshima: "/tiles/landmark-enoshima.webp",
+  grp_inamuragasaki: "/tiles/landmark-inamuragasaki.webp",
+};
+
+/** BuildingSpriteが実際に描画する画像URLを解決する。landmarkだけgroupId経由で
+ *  LANDMARK_ASSET_URLSを優先し、未登録ならBUILDING_ASSET_URLS.landmark(現状未登録)へ
+ *  安全にフォールバックする。それ以外のbuildingTypeは従来通りBUILDING_ASSET_URLSのみを見る。 */
+export function resolveBuildingAssetUrl(buildingType: BuildingType, groupId: string | undefined): string | undefined {
+  if (buildingType === "landmark") {
+    return (groupId ? LANDMARK_ASSET_URLS[groupId] : undefined) ?? BUILDING_ASSET_URLS.landmark;
+  }
+  return BUILDING_ASSET_URLS[buildingType];
+}
+
 const KEYWORD_RULES: [BuildingType, string[]][] = [
   ["hotel", ["ホテル", "旅館", "民宿", "ゲストハウス"]],
   ["landmark", ["水族館", "神社", "寺", "灯台", "シーキャンドル", "タワー", "展望", "公園", "資料館", "土産物店"]],

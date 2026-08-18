@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BuildingOverride, MapNode, PropertyGroup } from "@/types/game";
-import { resolveBuildingForNode } from "@/lib/game/buildingStyle";
+import { resolveBuildingForNode, resolveBuildingAssetUrl } from "@/lib/game/buildingStyle";
 
 function makeStationNode(overrides: Partial<MapNode> = {}): MapNode {
   return {
@@ -72,5 +72,35 @@ describe("resolveBuildingForNode(): 他のBuildingTypeは今回の変更で回�
     // (現状の推測ロジック通り)ため、こちらも除外対象になることを確認する。
     const result = resolveBuildingForNode(node, undefined, undefined);
     expect(result).toBeNull();
+  });
+});
+
+describe("resolveBuildingAssetUrl(): landmarkはgroupId経由でエリア別素材を解決する", () => {
+  it("grp_enoshimaは江の島専用素材を返す", () => {
+    expect(resolveBuildingAssetUrl("landmark", "grp_enoshima")).toBe("/tiles/landmark-enoshima.webp");
+  });
+
+  it("grp_inamuragasakiは稲村ヶ崎専用素材を返す", () => {
+    expect(resolveBuildingAssetUrl("landmark", "grp_inamuragasaki")).toBe("/tiles/landmark-inamuragasaki.webp");
+  });
+
+  it("未登録のgroupIdはBUILDING_ASSET_URLS.landmark(現状未登録)にフォールバックしundefinedになる(プレースホルダー表示)", () => {
+    expect(resolveBuildingAssetUrl("landmark", "grp_未来のランドマーク")).toBeUndefined();
+  });
+
+  it("groupIdが無いlandmarkもプレースホルダーにフォールバックする(undefined)", () => {
+    expect(resolveBuildingAssetUrl("landmark", undefined)).toBeUndefined();
+  });
+
+  it("landmark以外のbuildingTypeは従来通りBUILDING_ASSET_URLSのみを見る(groupIdは無視)", () => {
+    expect(resolveBuildingAssetUrl("shop", "grp_enoshima")).toBe("/tiles/shop.webp");
+    expect(resolveBuildingAssetUrl("restaurant", undefined)).toBe("/tiles/restaurant.webp");
+    expect(resolveBuildingAssetUrl("hotel", undefined)).toBe("/tiles/hotel.webp");
+    expect(resolveBuildingAssetUrl("commercial", undefined)).toBe("/tiles/commercial.webp");
+  });
+
+  it("本番素材未登録のbuildingType(house/generic)はundefinedのまま(回帰なし)", () => {
+    expect(resolveBuildingAssetUrl("house", undefined)).toBeUndefined();
+    expect(resolveBuildingAssetUrl("generic", undefined)).toBeUndefined();
   });
 });

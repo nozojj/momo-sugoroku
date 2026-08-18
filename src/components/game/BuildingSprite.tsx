@@ -1,13 +1,16 @@
 "use client";
 
 import type { BuildingType } from "@/types/game";
-import { BUILDING_STYLE, BUILDING_ASSET_URLS } from "@/lib/game/buildingStyle";
+import { BUILDING_STYLE, resolveBuildingAssetUrl } from "@/lib/game/buildingStyle";
 
 interface BuildingSpriteProps {
   /** 建物の足元(接地点)の座標。マス座標 + オフセット済みの最終位置。 */
   cx: number;
   cy: number;
   buildingType: BuildingType;
+  /** landmark専用。物件グループID。LANDMARK_ASSET_URLSから地域別の素材を解決するためだけに使う。
+   *  landmark以外のbuildingTypeでは無視される。 */
+  groupId?: string;
   scale?: number;
   selected?: boolean;
   onClick?: () => void;
@@ -19,11 +22,11 @@ interface BuildingSpriteProps {
  * buildingType に対応する画像URLが BUILDING_ASSET_URLS に登録されれば、
  * プレースホルダー図形の代わりに自動的に<image>へ差し替わる。
  */
-export function BuildingSprite({ cx, cy, buildingType, scale = 1, selected, onClick }: BuildingSpriteProps) {
+export function BuildingSprite({ cx, cy, buildingType, groupId, scale = 1, selected, onClick }: BuildingSpriteProps) {
   const style = BUILDING_STYLE[buildingType];
   const w = style.width * scale;
   const h = style.height * scale;
-  const assetUrl = BUILDING_ASSET_URLS[buildingType];
+  const assetUrl = resolveBuildingAssetUrl(buildingType, groupId);
   const bodyTop = cy - h;
   const roofTop = bodyTop - h * 0.55;
 

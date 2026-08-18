@@ -826,6 +826,7 @@ export function Board({
                     cx={node.x - minX + building.offsetX}
                     cy={node.y - minY + building.offsetY}
                     buildingType={building.buildingType}
+                    groupId={group?.id}
                     scale={building.scale}
                   />
                 );
