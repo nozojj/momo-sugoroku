@@ -813,8 +813,9 @@ export function Board({
               );
             })}
 
-            {/* 建物(マス・道路とは独立した見た目レイヤー。低ズーム時はマスの色分けだけで十分見やすいので間引く) */}
-            {zoom >= ZOOM_DETAIL_THRESHOLD &&
+            {/* 建物(マス・道路とは独立した見た目レイヤー。overview段階はマスの色分けだけで十分見やすいので間引く。
+                移動中は常にdetail扱い(lodTier)にするため、zoomの生値ではなくlodTierで判定する。 */}
+            {lodTier !== "overview" &&
               map.nodes.map((node) => {
                 const group = node.propertyGroupId ? getPropertyGroupDef(node.propertyGroupId) : undefined;
                 const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);

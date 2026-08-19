@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BuildingOverride, MapNode, PropertyGroup } from "@/types/game";
-import { resolveBuildingForNode, resolveBuildingAssetUrl } from "@/lib/game/buildingStyle";
+import { resolveBuildingForNode, resolveBuildingAssetUrl, inferBuildingType } from "@/lib/game/buildingStyle";
+import { getAllPropertyGroupDefs } from "@/data/propertyGroups";
 
 function makeStationNode(overrides: Partial<MapNode> = {}): MapNode {
   return {
@@ -103,4 +104,54 @@ describe("resolveBuildingAssetUrl(): landmarkはgroupId経由でエリア別素�
     expect(resolveBuildingAssetUrl("house", undefined)).toBeUndefined();
     expect(resolveBuildingAssetUrl("generic", undefined)).toBeUndefined();
   });
+});
+
+const dummyPropertyNode: MapNode = {
+  id: "dummy",
+  name: "dummy",
+  type: "property",
+  x: 0,
+  y: 0,
+  connections: [],
+};
+
+describe("inferBuildingType(): KEYWORD_RULESのフォールバック安全性", () => {
+  const node = dummyPropertyNode;
+
+  it("どのキーワードにも一致しない名前は、確信の持てないcommercialではなくgenericへ逃がす", () => {
+    const group: PropertyGroup = { id: "grp_unknown", name: "謎の建物", region: "test" };
+    expect(inferBuildingType(node, group)).toBe("generic");
+  });
+
+  it("「屋」で終わる個人商店名はshopとして拾われる(以前はどのキーワードにも一致せずcommercialへ誤フォールバックしていた)", () => {
+    for (const name of ["八百屋", "花屋", "本屋", "米屋", "金物屋"]) {
+      const group: PropertyGroup = { id: `grp_${name}`, name: `テスト${name}`, region: "test" };
+      expect(inferBuildingType(node, group)).toBe("shop");
+    }
+  });
+
+  it("「定食屋」は「屋」(shop)より先にrestaurantキーワード「定食」で拾われる(優先順位の確認)", () => {
+    const group: PropertyGroup = { id: "grp_teishoku", name: "テスト定食屋", region: "test" };
+    expect(inferBuildingType(node, group)).toBe("restaurant");
+  });
+
+  it("「土産物店」は「店」(shop)より先にlandmarkキーワードとして拾われる(カテゴリの優先順位が並び順通りに機能する)", () => {
+    const group: PropertyGroup = { id: "grp_miyage", name: "テスト土産物店", region: "test" };
+    expect(inferBuildingType(node, group)).toBe("landmark");
+  });
+});
+
+describe("将来: 自動生成物件プール(mapBuilder.tsのpushGeneratedProperty)が復活した場合の分類安全性", () => {
+  it(
+    "本番の物件グループは全てbuildingTypeを明示しており、KEYWORD_RULESへのフォールバックに依存していない。" +
+      "このテストが失敗した場合(=buildingType未設定のグループが出現した場合)、失敗メッセージに列挙される" +
+      "グループ名と推測結果を確認し、誤分類が無いことを確認したうえでbuildingTypeを明示するか、" +
+      "このテストを更新すること。",
+    () => {
+      const groupsWithoutExplicitType = getAllPropertyGroupDefs()
+        .filter((g) => !g.buildingType)
+        .map((g) => ({ name: g.name, wouldInferAs: inferBuildingType(dummyPropertyNode, g) }));
+      expect(groupsWithoutExplicitType).toEqual([]);
+    },
+  );
 });

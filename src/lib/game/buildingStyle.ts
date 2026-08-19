@@ -70,9 +70,12 @@ const KEYWORD_RULES: [BuildingType, string[]][] = [
   ["hotel", ["ホテル", "旅館", "民宿", "ゲストハウス"]],
   ["landmark", ["水族館", "神社", "寺", "灯台", "シーキャンドル", "タワー", "展望", "公園", "資料館", "土産物店"]],
   ["commercial", ["デパート", "ビル", "モール", "ショッピングセンター"]],
-  ["restaurant", ["ラーメン", "居酒屋", "レストラン", "カフェ", "和菓子", "寿司", "焼肉", "カレー", "食堂", "バー", "料理"]],
+  ["restaurant", ["ラーメン", "居酒屋", "レストラン", "カフェ", "和菓子", "寿司", "焼肉", "カレー", "定食", "食堂", "バー", "料理"]],
   ["house", ["住宅", "アパート", "マンション"]],
-  ["shop", ["スーパー", "カラオケ", "ショップ", "マーケット", "雑貨", "店"]],
+  // "屋"は他カテゴリのキーワード(居酒屋・パン屋等)にも含まれる曖昧な語なので、
+  // より具体的な上のカテゴリすべてに一致しなかった場合の最後の受け皿としてのみ機能する
+  // (配列の並び順=判定の優先順なので、この位置にあることで誤って先取りしない)。
+  ["shop", ["スーパー", "カラオケ", "ショップ", "マーケット", "雑貨", "店", "屋"]],
 ];
 
 /** 物件グループの名前やノードの状態から建物タイプを推測する(あくまで既定値。エディタ・グループ側で個別上書き可能)。 */
@@ -82,7 +85,10 @@ export function inferBuildingType(node: MapNode, group: PropertyGroup | undefine
     for (const [type, keywords] of KEYWORD_RULES) {
       if (keywords.some((k) => group.name.includes(k))) return type;
     }
-    return "commercial";
+    // どのキーワードにも一致しない場合、確信の持てる分類ができないので、
+    // 大型商業施設を誤って主張する"commercial"ではなく、控えめな既定表示の"generic"へ逃がす
+    // (BUILDING_ASSET_URLSにgenericの本番素材は未登録のため、常に安全なプレースホルダー図形になる)。
+    return "generic";
   }
   if (node.isDestinationCandidate) return "station";
   return "generic";
