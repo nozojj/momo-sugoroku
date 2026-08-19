@@ -54,6 +54,7 @@ export const BUILDING_ASSET_URLS: Partial<Record<BuildingType, string>> = {
 export const LANDMARK_ASSET_URLS: Partial<Record<string, string>> = {
   grp_enoshima: "/tiles/landmark-enoshima.webp",
   grp_inamuragasaki: "/tiles/landmark-inamuragasaki.webp",
+  grp_samukawa: "/tiles/landmark-samukawa.webp",
 };
 
 /** BuildingSpriteが実際に描画する画像URLを解決する。landmarkだけgroupId経由で

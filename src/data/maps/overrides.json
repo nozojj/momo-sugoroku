@@ -3449,6 +3449,7 @@
     { "nodeId": "hub_fujisawa", "offsetX": 32 },
     { "nodeId": "r_fj_kg_1", "offsetX": 44 },
     { "nodeId": "r_fjrt_ring4_1", "offsetX": -20 },
-    { "nodeId": "r_fj_kg_2", "offsetX": 44, "offsetY": -28 }
+    { "nodeId": "r_fj_kg_2", "offsetX": 44, "offsetY": -28 },
+    { "nodeId": "wp_samukawa_kita", "buildingType": "landmark" }
   ]
 }

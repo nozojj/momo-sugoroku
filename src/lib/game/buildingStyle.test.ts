@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { BuildingOverride, MapNode, PropertyGroup } from "@/types/game";
 import { resolveBuildingForNode, resolveBuildingAssetUrl, inferBuildingType } from "@/lib/game/buildingStyle";
-import { getAllPropertyGroupDefs } from "@/data/propertyGroups";
+import { getAllPropertyGroupDefs, getPropertyGroupDef } from "@/data/propertyGroups";
+import { getMap } from "@/data/maps";
 
 function makeStationNode(overrides: Partial<MapNode> = {}): MapNode {
   return {
@@ -103,6 +104,78 @@ describe("resolveBuildingAssetUrl(): landmarkはgroupId経由でエリア別素�
   it("本番素材未登録のbuildingType(house/generic)はundefinedのまま(回帰なし)", () => {
     expect(resolveBuildingAssetUrl("house", undefined)).toBeUndefined();
     expect(resolveBuildingAssetUrl("generic", undefined)).toBeUndefined();
+  });
+
+  it("grp_samukawaは寒川専用素材を返す(新規)", () => {
+    expect(resolveBuildingAssetUrl("landmark", "grp_samukawa")).toBe("/tiles/landmark-samukawa.webp");
+  });
+
+  it("既存のgrp_enoshima/grp_inamuragasakiの解決結果は寒川追加後も変わらない(回帰なし)", () => {
+    expect(resolveBuildingAssetUrl("landmark", "grp_enoshima")).toBe("/tiles/landmark-enoshima.webp");
+    expect(resolveBuildingAssetUrl("landmark", "grp_inamuragasaki")).toBe("/tiles/landmark-inamuragasaki.webp");
+  });
+});
+
+/**
+ * grp_samukawa: 代表1ノード(寒川ロータリー入口/wp_samukawa_kita)だけをbuildingOverridesで
+ * landmarkへ個別上書きし、グループ自体のbuildingTypeは"shop"のまま維持する設計(案B)。
+ * 「同じ神社が4棟並ぶ」ことを避けるのが目的なので、代表ノード以外の3ノードが
+ * 引き続きshopのままであることを実マップに対して直接検証する。
+ */
+describe("resolveBuildingForNode(): 寒川(grp_samukawa)の代表1ノードのみlandmark化(案B)", () => {
+  const MAP_ID = "shonan-full";
+  const REPRESENTATIVE_NODE_ID = "wp_samukawa_kita"; // 寒川ロータリー入口
+
+  it("代表ノード(寒川ロータリー入口)はbuildingOverridesによりlandmarkとして解決される", () => {
+    const map = getMap(MAP_ID);
+    const node = map.nodes.find((n) => n.id === REPRESENTATIVE_NODE_ID);
+    expect(node, `node "${REPRESENTATIVE_NODE_ID}" が実マップに存在しない`).toBeDefined();
+    expect(node!.propertyGroupId).toBe("grp_samukawa");
+
+    const group = getPropertyGroupDef(node!.propertyGroupId!);
+    const override = map.buildingOverrides?.find((o) => o.nodeId === REPRESENTATIVE_NODE_ID);
+    expect(override?.buildingType).toBe("landmark");
+
+    const resolved = resolveBuildingForNode(node!, group, override);
+    expect(resolved).not.toBeNull();
+    expect(resolved?.buildingType).toBe("landmark");
+  });
+
+  it("残り3ノード(寒川北通り/寒川大通り/寒川通り)はoverride無しでshopのまま(4棟並ばないことの保証)", () => {
+    const map = getMap(MAP_ID);
+    const samukawaNodes = map.nodes.filter((n) => n.propertyGroupId === "grp_samukawa");
+    expect(samukawaNodes.length).toBe(4); // 代表1件+残り3件、想定件数から変わっていないことも確認
+
+    const otherNodes = samukawaNodes.filter((n) => n.id !== REPRESENTATIVE_NODE_ID);
+    expect(otherNodes.length).toBe(3);
+
+    const group = getPropertyGroupDef("grp_samukawa");
+    expect(group?.buildingType, "grp_samukawaのbuildingTypeはshopのまま変更しない設計").toBe("shop");
+
+    for (const node of otherNodes) {
+      const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);
+      expect(override, `${node.id}(${node.name})に意図しないbuildingOverrideが付いている`).toBeUndefined();
+
+      const resolved = resolveBuildingForNode(node, group, override);
+      expect(resolved?.buildingType, `${node.id}(${node.name})がlandmarkになってしまっている`).toBe("shop");
+    }
+  });
+
+  it("grp_samukawa内でlandmarkとして解決されるノードは代表1件だけ(反復表示されないことの直接確認)", () => {
+    const map = getMap(MAP_ID);
+    const group = getPropertyGroupDef("grp_samukawa");
+    const samukawaNodes = map.nodes.filter((n) => n.propertyGroupId === "grp_samukawa");
+
+    const landmarkNodeIds = samukawaNodes
+      .map((n) => {
+        const override = map.buildingOverrides?.find((o) => o.nodeId === n.id);
+        const resolved = resolveBuildingForNode(n, group, override);
+        return { id: n.id, buildingType: resolved?.buildingType };
+      })
+      .filter((r) => r.buildingType === "landmark")
+      .map((r) => r.id);
+
+    expect(landmarkNodeIds).toEqual([REPRESENTATIVE_NODE_ID]);
   });
 });
 
