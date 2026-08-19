@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { getNode } from "@/lib/game/mapGraph";
+import { EVENT_NODE_REGION_MAP, REGIONAL_EVENT_POOLS } from "@/data/events";
 import { freshGame, placePlayerAt, mockSingleDiceFace, advanceUntilAt, driveToLandingToward } from "./gameStore.testHelpers";
 
 const MAP_ID = "shonan-full";
@@ -277,6 +278,34 @@ describe("マス効果: 通過では発動せず、停止したときだけ発�
       expect(s.log.length).toBeGreaterThan(logLenBeforeRoll); // イベントログが追加されている
       expect(s.status).toBe("rolling"); // 着地処理後、正常に次のターンへ進んでいる
       expect(s.turn).toBe(startTurn + 1); // 1人プレイなので毎ターンturnが進む
+    });
+  });
+
+  describe("地域イベント: 鎌倉のイベントマス (event): kmlp_se", () => {
+    // kmlp_s(4方向分岐) → kmlp_se(event、EVENT_NODE_REGION_MAPでkamakuraに登録済み)
+    const START = "kmlp_s";
+    const TARGET = "kmlp_se";
+
+    it("前提: 対象ノードのtypeがeventであり、EVENT_NODE_REGION_MAPでkamakuraに登録されている", () => {
+      expect(getNode(getMap(MAP_ID), TARGET).type).toBe("event");
+      expect(EVENT_NODE_REGION_MAP[TARGET]).toBe("kamakura");
+    });
+
+    it("停止時: 鎌倉地域プール(event_kamakura_*)のいずれかのメッセージがログへ追加される", () => {
+      placePlayerAt(START, UNRELATED_DESTINATION);
+      const logLenBeforeRoll = useGameStore.getState().log.length;
+      const kamakuraMessages = new Set(REGIONAL_EVENT_POOLS.kamakura!.map((e) => e.message));
+
+      mockSingleDiceFace(1); // 距離1、ちょうどTARGETで止まる
+      useGameStore.getState().rollDice();
+      driveToLandingToward(TARGET);
+
+      const s = useGameStore.getState();
+      const newLogMessages = s.log.slice(logLenBeforeRoll).map((entry) => entry.message);
+      const matched = newLogMessages.some((msg) => [...kamakuraMessages].some((m) => msg.includes(m)));
+      expect(matched, `鎌倉地域プールのメッセージが見つからない。実際のログ: ${JSON.stringify(newLogMessages)}`).toBe(
+        true,
+      );
     });
   });
 });

@@ -2,7 +2,7 @@ import type { GameState, MapData, MapNode, MoneyEventDef, MoneyRouletteInfo, Nod
 import { getPropertiesInGroup } from "@/data/properties";
 import { getPropertyGroupDef } from "@/data/propertyGroups";
 import { getDrawableCards } from "@/data/cards";
-import { moneyEventPool, localEventPool, drawFromPool } from "@/data/events";
+import { moneyEventPool, drawFromPool, eventPoolForNode } from "@/data/events";
 import { getCalendar } from "@/lib/game/engine";
 import { seasonalBaseAmount, generateRouletteCandidates, drawRouletteResult } from "@/lib/game/moneyRoulette";
 import { drawWeightedCard } from "@/lib/game/cardDraw";
@@ -75,7 +75,7 @@ export const LANDING_HANDLERS: Partial<Record<NodeType, LandingHandler>> = {
   money: (ctx) => moneyOutcome(moneyEventPool, ctx),
   moneyGain: (ctx) => moneyRouletteOutcome("moneyGain", ctx),
   moneyLoss: (ctx) => moneyRouletteOutcome("moneyLoss", ctx),
-  event: (ctx) => moneyOutcome(localEventPool, ctx),
+  event: (ctx) => moneyOutcome(eventPoolForNode(ctx.node.id), ctx),
 
   card: (ctx) => {
     const def = drawWeightedCard(getDrawableCards());
