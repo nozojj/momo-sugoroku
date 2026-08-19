@@ -50,6 +50,31 @@ function makeBranchMap(): MapData {
   return { id: "test-branch", name: "test-branch", nodes, startNodeId: "n0" };
 }
 
+/**
+ * c0 - c1 - c2 - ... - c{length-1}(=dest) という一本道の直線マップ。
+ * NEARBY_WARP_DISTANCE_THRESHOLD(20)/ANYWHERE_WARP_DISTANCE_THRESHOLD(40)の境界値テスト用に、
+ * makeBranchMap()(距離2までしか作れない)とは別に用意する。cIndex番のノードからdestまでの
+ * 距離は必ず (length - 1 - cIndex) になる。
+ */
+function makeChainMap(length: number): MapData {
+  function node(id: string, connections: string[]): MapNode {
+    return { id, name: id, type: "normal", x: 0, y: 0, connections: connections.map((to) => ({ to, roadType: "main" })) };
+  }
+  const nodes: MapNode[] = [];
+  for (let i = 0; i < length; i++) {
+    const connections: string[] = [];
+    if (i > 0) connections.push(`c${i - 1}`);
+    if (i < length - 1) connections.push(`c${i + 1}`);
+    nodes.push(node(`c${i}`, connections));
+  }
+  return { id: "test-chain", name: "test-chain", nodes, startNodeId: "c0" };
+}
+const CHAIN_LENGTH = 50; // c0〜c49、dest=c49。cIndexからdestまでの距離 = 49 - cIndex
+const CHAIN_DEST = `c${CHAIN_LENGTH - 1}`;
+function chainNodeAtDistance(distance: number): string {
+  return `c${CHAIN_LENGTH - 1 - distance}`;
+}
+
 function basePreRollState(players: Player[], destinationNodeId = "dest"): CpuPreRollContext["state"] {
   return { pendingDoubleMove: false, pendingDiceCount: 1, players, destinationNodeId };
 }
@@ -106,6 +131,82 @@ describe("decidePreRoll()", () => {
     const state = basePreRollState([player]);
     const decision = defaultCpuStrategy.decidePreRoll({ state, map, player });
     expect(decision).toEqual({ type: "roll" });
+  });
+
+  describe("地元ぶっとびカード(nearby)・ぶっとびカード(anywhere)", () => {
+    const chainMap = makeChainMap(CHAIN_LENGTH);
+
+    it("nearby: 距離19(NEARBY_WARP_DISTANCE_THRESHOLD未満)では使わずロールする", () => {
+      const player = makePlayer({ id: "p1", currentNodeId: chainNodeAtDistance(19), cardIds: ["card_warp_nearby"] });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "roll" });
+    });
+
+    it("nearby: 距離20(NEARBY_WARP_DISTANCE_THRESHOLDちょうど)では使う", () => {
+      const player = makePlayer({ id: "p1", currentNodeId: chainNodeAtDistance(20), cardIds: ["card_warp_nearby"] });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "useCard", cardId: "card_warp_nearby" });
+    });
+
+    it("anywhere: 距離39(ANYWHERE_WARP_DISTANCE_THRESHOLD未満)では使わずロールする", () => {
+      const player = makePlayer({ id: "p1", currentNodeId: chainNodeAtDistance(39), cardIds: ["card_warp_anywhere"] });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "roll" });
+    });
+
+    it("anywhere: 距離40(ANYWHERE_WARP_DISTANCE_THRESHOLDちょうど)では使う", () => {
+      const player = makePlayer({ id: "p1", currentNodeId: chainNodeAtDistance(40), cardIds: ["card_warp_anywhere"] });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "useCard", cardId: "card_warp_anywhere" });
+    });
+
+    it("両方の閾値を超える距離で両方所持している場合、より下振れが小さいnearbyを優先する", () => {
+      const player = makePlayer({
+        id: "p1",
+        currentNodeId: chainNodeAtDistance(45),
+        cardIds: ["card_warp_anywhere", "card_warp_nearby"],
+      });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "useCard", cardId: "card_warp_nearby" });
+    });
+
+    it("より確実な目的地ワープカードを同時に持っていれば、距離が遠くてもnearby/anywhereより優先される", () => {
+      const player = makePlayer({
+        id: "p1",
+        currentNodeId: chainNodeAtDistance(45),
+        cardIds: ["card_warp_nearby", "card_warp_anywhere", "card_warp_destination"],
+      });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "useCard", cardId: "card_warp_destination" });
+    });
+
+    it("より確実な駅指定ワープカードを同時に持っていれば、距離がnearbyの閾値を超えていてもそちらが優先される", () => {
+      const player = makePlayer({
+        id: "p1",
+        currentNodeId: chainNodeAtDistance(20),
+        cardIds: ["card_warp_nearby", "card_warp_select_station"],
+      });
+      const state = basePreRollState([player], CHAIN_DEST);
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "useCard", cardId: "card_warp_select_station" });
+    });
+
+    it("既にダイス修飾効果が予約済みなら、距離が遠くてもnearby/anywhereは使わずロールする", () => {
+      const player = makePlayer({
+        id: "p1",
+        currentNodeId: chainNodeAtDistance(45),
+        cardIds: ["card_warp_nearby", "card_warp_anywhere"],
+      });
+      const state: CpuPreRollContext["state"] = { ...basePreRollState([player], CHAIN_DEST), pendingDoubleMove: true };
+      const decision = defaultCpuStrategy.decidePreRoll({ state, map: chainMap, player });
+      expect(decision).toEqual({ type: "roll" });
+    });
   });
 
   it("手札に使えるカードが無ければロールする", () => {

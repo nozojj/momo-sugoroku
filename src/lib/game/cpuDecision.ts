@@ -63,8 +63,28 @@ export interface CpuPreRollContext {
 export type CpuPreRollDecision = { type: "useCard"; cardId: string } | { type: "roll" };
 
 /** カード判断・分岐選択の判断で「目的地からどれだけ離れているか」を判定する目安のしきい値。
- *  これ以上離れているときだけ、行き先指定系カードを積極的に使う(近い時に無駄遣いしない)。 */
+ *  これ以上離れているときだけ、行き先指定系カードを積極的に使う(近い時に無駄遣いしない)。
+ *  station/region(選んだ場所へ確実に進める)専用のしきい値で、下記のnearby/anywhere
+ *  (結果がランダムで外れる可能性があるカード)には流用しない。 */
 const FAR_FROM_DESTINATION_THRESHOLD = 4;
+
+/**
+ * 地元ぶっとびカード(warp:nearby)・ぶっとびカード(warp:anywhere)専用のしきい値。
+ * どちらも結果が完全にランダムで、目的地へ近づく保証が無い(anywhereはむしろ遠ざかる可能性すらある)
+ * ため、FAR_FROM_DESTINATION_THRESHOLD(station/region用、確実に進めるカード用)とは別に、
+ * 実マップ(shonan-full、598ノード×8目的地候補=4776ペア)の実測距離分布を基にそれぞれ設定する:
+ *   中央値21・p75=31・p90=43・最大67、8目的地ごとの平均距離は18.1(藤沢)〜38.1(江の島)。
+ * - nearby: distance>=20(全体の約55.6%が該当)。「そこそこ遠いときの、下振れが小さい賭け」。
+ *   半径250px圏内という限定的な対象範囲(anywhereほど遠くへは飛ばない)なので、station/region
+ *   より低いハードルで気軽に使ってよい。
+ * - anywhere: distance>=40(全体の約13.5%が該当)。「かなり遠いときだけの最後の手段」。
+ *   8目的地の平均距離の最大値(江の島38.1)を上回る水準にすることで、どの目的地であっても
+ *   「anywhereで得られる期待距離より今の方が確実に悪い」と言える状況でしか発動しないようにする。
+ * アクセスの良い目的地(藤沢等)ではほぼ発動せず、アクセスの悪い目的地(江の島等)でのみ
+ * 実質的に機能する、という地理的な偏りは意図した挙動(行きにくい目的地ほど賭けに頼る)。
+ */
+const NEARBY_WARP_DISTANCE_THRESHOLD = 20;
+const ANYWHERE_WARP_DISTANCE_THRESHOLD = 40;
 
 /** CPUが物件購入・投資系カードに使ってよい所持金の下限(万円)。これを割り込む使い方はしない。 */
 export const CPU_MONEY_RESERVE = 300;
@@ -110,6 +130,22 @@ function decidePreRoll({ state, map, player }: CpuPreRollContext): CpuPreRollDec
     if (isFar) {
       if (cardIds.includes("card_warp_select_station")) return { type: "useCard", cardId: "card_warp_select_station" };
       if (cardIds.includes("card_warp_select_region")) return { type: "useCard", cardId: "card_warp_select_region" };
+    }
+
+    // 6.5. 地元ぶっとびカード: 駅指定/エリア指定ほど確実ではない(結果がランダムな)賭けなので、
+    //      より確実なそれらのカードを持っていない場合の代替として使う。
+    const isFarEnoughForNearbyWarp =
+      distanceToDestination === null || distanceToDestination >= NEARBY_WARP_DISTANCE_THRESHOLD;
+    if (isFarEnoughForNearbyWarp && cardIds.includes("card_warp_nearby")) {
+      return { type: "useCard", cardId: "card_warp_nearby" };
+    }
+
+    // 6.6. ぶっとびカード: マップ全体が対象で、目的地からさらに遠ざかる可能性すらある最大の賭け。
+    //      地元ぶっとびカードより高いハードルを課し、「本当に手詰まりなときだけの最後の手段」にする。
+    const isFarEnoughForAnywhereWarp =
+      distanceToDestination === null || distanceToDestination >= ANYWHERE_WARP_DISTANCE_THRESHOLD;
+    if (isFarEnoughForAnywhereWarp && cardIds.includes("card_warp_anywhere")) {
+      return { type: "useCard", cardId: "card_warp_anywhere" };
     }
 
     // 7. 狙い撃ち物件ワープカード: 今すぐ買える未所有物件があるときだけ、投資目的で使う。
