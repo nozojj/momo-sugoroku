@@ -107,10 +107,99 @@ export const EVENT_NODE_REGION_MAP: Partial<Record<string, EventRegionId>> = {
  * localEventPoolへフォールバックする。段階的に1地域ずつここへエントリを足すだけで拡張でき、
  * eventPoolForNode()・landingEffects.tsの呼び出し元は一切変更不要。
  *
- * 第1段階: 鎌倉・江の島のみ実装。藤沢/茅ヶ崎/平塚/寒川はEVENT_NODE_REGION_MAPには
- * 登録済みだが、このプールが無いためlocalEventPoolへフォールバックする。
+ * 第1段階: 鎌倉・江の島を実装。第2段階(本エントリ)で藤沢/茅ヶ崎/平塚/寒川も追加し、
+ * EVENT_NODE_REGION_MAPに登場する全地域のプールが揃った。地域自体が未登録のノード
+ * (判定不能3件など)は引き続きlocalEventPoolへフォールバックする。
  */
 export const REGIONAL_EVENT_POOLS: Partial<Record<EventRegionId, MoneyEventDef[]>> = {
+  fujisawa: [
+    {
+      id: "event_fujisawa_shukuba",
+      message: "旧東海道藤沢宿エリアの「藤沢宿まつり」で露店が賑わい、臨時収入があった",
+      amount: 100,
+    },
+    {
+      id: "event_fujisawa_sakura",
+      message: "引地川親水公園の桜並木が満開で、花見客向けの出店が繁盛した",
+      amount: 80,
+    },
+    {
+      id: "event_fujisawa_enoden_crossing",
+      message: "石上駅付近の江ノ電の踏切で足止めを食らい、予定が狂った",
+      amount: -50,
+    },
+    {
+      id: "event_fujisawa_yugyoji_slope",
+      message: "遊行寺の急坂でタイヤがバーストし修理代がかさんだ",
+      amount: -70,
+    },
+  ],
+  chigasaki: [
+    {
+      id: "event_chigasaki_southern",
+      message: "サザンオールスターズゆかりのサザン通りが観光客で賑わい商売繁盛",
+      amount: 110,
+    },
+    {
+      id: "event_chigasaki_eboshi",
+      message: "烏帽子岩(えぼし岩)を撮る観光客向けに土産が売れた",
+      amount: 80,
+    },
+    {
+      id: "event_chigasaki_route1",
+      message: "茅ヶ崎付近の国道1号が大渋滞、ガソリン代を無駄にした",
+      amount: -60,
+    },
+    {
+      id: "event_chigasaki_pine",
+      message: "茅ヶ崎海岸の松林保全協力金を求められ、つい寄付してしまった",
+      amount: -40,
+    },
+  ],
+  hiratsuka: [
+    {
+      id: "event_hiratsuka_tanabata",
+      message: "湘南ひらつか七夕まつりで屋台が大盛況、思わぬ売上に",
+      amount: 140,
+    },
+    {
+      id: "event_hiratsuka_beniya",
+      message: "紅谷町商店街のポイント還元キャンペーンでお得に買い物",
+      amount: 50,
+    },
+    {
+      id: "event_hiratsuka_bellmare",
+      message: "湘南ベルマーレのホームゲームで競技場周辺が大渋滞、時間を無駄にした",
+      amount: -40,
+    },
+    {
+      id: "event_hiratsuka_hanamizu_river",
+      message: "花水川の増水で迂回を強いられ、時間とお金を無駄にした",
+      amount: -50,
+    },
+  ],
+  samukawa: [
+    {
+      id: "event_samukawa_jinja",
+      message: "八方除で有名な寒川神社への参拝客で周辺が賑わった",
+      amount: 120,
+    },
+    {
+      id: "event_samukawa_mekujiri_river",
+      message: "目久尻川沿いのサイクリングロード利用者に飲み物が売れた",
+      amount: 70,
+    },
+    {
+      id: "event_samukawa_kenodo",
+      message: "圏央道の寒川北IC付近で渋滞に巻き込まれ、ガソリン代を無駄にした",
+      amount: -50,
+    },
+    {
+      id: "event_samukawa_sagami_river",
+      message: "相模川の増水で河川敷が使えず、予定していた商売が流れた",
+      amount: -60,
+    },
+  ],
   kamakura: [
     {
       id: "event_kamakura_daibutsu",

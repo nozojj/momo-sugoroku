@@ -38,14 +38,10 @@ describe("eventPoolForNode(): フォールバック", () => {
     }
   });
 
-  it("地域は判明しているがREGIONAL_EVENT_POOLSにまだそのエントリが無い地域(段階導入中)もlocalEventPoolへフォールバックする", () => {
-    // 藤沢/茅ヶ崎/平塚/寒川はEVENT_NODE_REGION_MAPには登録済みだが、
-    // 第1段階(鎌倉・江の島のみ)では意図的にREGIONAL_EVENT_POOLSへ未収録。
-    const notYetImplementedNodeIds = ["r_rk_fj_2", "cgsp_sw", "r_tm_hr_5", "r_sm_tm_6"];
-    for (const nodeId of notYetImplementedNodeIds) {
-      expect(EVENT_NODE_REGION_MAP[nodeId]).toBeDefined(); // 地域自体は登録されている
-      expect(REGIONAL_EVENT_POOLS[EVENT_NODE_REGION_MAP[nodeId]!]).toBeUndefined(); // プールは未実装
-      expect(eventPoolForNode(nodeId)).toBe(localEventPool);
+  it("段階2完了により、EVENT_NODE_REGION_MAPに登場する全地域にREGIONAL_EVENT_POOLSのエントリがある(『地域はあるがプール未実装』経路は現状exercisableではない)", () => {
+    const usedRegionIds = new Set(Object.values(EVENT_NODE_REGION_MAP));
+    for (const regionId of usedRegionIds) {
+      expect(REGIONAL_EVENT_POOLS[regionId!], `${regionId}のプールが未実装`).toBeDefined();
     }
   });
 
@@ -93,6 +89,30 @@ describe("eventPoolForNode(): 地域間の分離(取り違え防止)", () => {
       for (const entry of pool) {
         expect(kamakuraIds.has(entry.id)).toBe(false);
         expect(entry.id.startsWith("event_enoshima_")).toBe(true);
+      }
+    }
+  });
+
+  it("全地域: 各地域のeventノードは自地域プールのみを返し、他地域のidを一切含まない(段階2で追加した藤沢/茅ヶ崎/平塚/寒川を含む)", () => {
+    for (const [regionId, ownPool] of Object.entries(REGIONAL_EVENT_POOLS)) {
+      const nodeIds = Object.entries(EVENT_NODE_REGION_MAP)
+        .filter(([, region]) => region === regionId)
+        .map(([id]) => id);
+      expect(nodeIds.length, `${regionId}に該当するノードが無い`).toBeGreaterThan(0);
+
+      const otherIds = new Set(
+        Object.entries(REGIONAL_EVENT_POOLS)
+          .filter(([id]) => id !== regionId)
+          .flatMap(([, pool]) => pool!.map((e) => e.id)),
+      );
+
+      for (const nodeId of nodeIds) {
+        const pool = eventPoolForNode(nodeId);
+        expect(pool).toBe(ownPool);
+        for (const entry of pool) {
+          expect(otherIds.has(entry.id)).toBe(false);
+          expect(entry.id.startsWith(`event_${regionId}_`)).toBe(true);
+        }
       }
     }
   });
