@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RouteOption, VehicleMode } from "@/types/game";
-import { NODE_STYLE, ROAD_STYLE, LANDMARK_STYLE, STATION_STYLE, NODE_RADIUS, MAJOR_HUB_RADIUS, getClusterOffset, straightRoadPath } from "@/lib/game/mapStyle";
+import type { GameStatus, MapData, MapDecoration, Player, PropertyDef, RoadType, RouteOption, VehicleMode } from "@/types/game";
+import {
+  NODE_STYLE,
+  ROAD_STYLE,
+  LANDMARK_STYLE,
+  STATION_STYLE,
+  NODE_RADIUS,
+  MAJOR_HUB_RADIUS,
+  getClusterOffset,
+  straightRoadPath,
+  dominantRoadType,
+} from "@/lib/game/mapStyle";
 import { shortestPath } from "@/lib/game/mapGraph";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
@@ -183,6 +193,26 @@ export function Board({
       }
     }
     return { width: w, height: h, edges: edgeList };
+  }, [map]);
+
+  /** 交差点接合パッチ(Phase3)の対象一覧。degree(接続数)3以上、かつ接続道路に
+   *  main/coastal/nationalのいずれかを含む交差点だけに絞る(residential同士の
+   *  住宅街の角は対象外)。パッチの色は新しい色を作らず、接続道路の中で最優先の
+   *  roadType(dominantRoadType)のbase/top色をそのまま使うことで、パッチ単体が
+   *  「別色の丸いシール」に見えず、道路の舗装がそのまま交差点まで続いて見えるようにする。
+   *  半径は接続道路の最大幅から算出し、丸い線端(strokeLinecap)どうしの隙間だけを
+   *  埋める控えめなサイズに留める(交差点を目立たせるのが目的ではない)。 */
+  const intersectionPatches = useMemo(() => {
+    const significant = new Set<RoadType>(["main", "coastal", "national"]);
+    const patches: { id: string; x: number; y: number; radius: number; roadType: RoadType }[] = [];
+    for (const node of map.nodes) {
+      if (node.connections.length < 3) continue;
+      const types = node.connections.map((c) => c.roadType);
+      if (!types.some((t) => significant.has(t))) continue;
+      const maxWidth = Math.max(...node.connections.map((c) => ROAD_STYLE[c.roadType].width));
+      patches.push({ id: node.id, x: node.x, y: node.y, radius: maxWidth / 2 + 3, roadType: dominantRoadType(types) });
+    }
+    return patches;
   }, [map]);
 
   const minX = Math.min(...map.nodes.map((n) => n.x)) - PADDING;
@@ -685,6 +715,22 @@ export function Board({
               );
             })}
 
+            {/* 交差点接合パッチ(Phase3)。道路(直前)より前面・マス(直後)より背面に置くことで、
+                「マスの下に舗装が広がっている」ように見せる。overview帯では建物と同じ条件で
+                間引き、俯瞰の道路網の骨格を邪魔しない(要素数の節約も兼ねる)。 */}
+            {lodTier !== "overview" &&
+              intersectionPatches.map((patch) => {
+                const style = ROAD_STYLE[patch.roadType];
+                const cx = patch.x - minX;
+                const cy = patch.y - minY;
+                return (
+                  <g key={`patch-${patch.id}`}>
+                    <circle cx={cx} cy={cy} r={patch.radius} fill={style.base} />
+                    <circle cx={cx} cy={cy} r={patch.radius * 0.72} fill={style.top} />
+                  </g>
+                );
+              })}
+
             {/* マス */}
             {map.nodes.map((node) => {
               const style = NODE_STYLE[node.type];
@@ -1029,6 +1075,20 @@ function Decoration({ deco, minX, minY }: { deco: MapDecoration; minX: number; m
     const farY = 6000;
     const fillD = `${curveD} L${last.x},${farY} L${first.x},${farY} Z`;
     return <path d={fillD} fill="#efdfae" />;
+  }
+  if (deco.kind === "rotaryMedian") {
+    // 駅ハブを中心とした環状路(ロータリー)の、駅ノードとリングのあいだの空白に敷く
+    // 控えめな植栽帯。residentialの道路色(緑系)と揃え、新しい色を増やさない。
+    // decorations配列(道路より前のレイヤー)で描くため、ゲートのスポーク道路はこの上に
+    // 自然に重なる。
+    const cx = deco.cx - minX;
+    const cy = deco.cy - minY;
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={deco.radius} fill="#6fbf73" opacity={0.28} filter="url(#board-soft)" />
+        <circle cx={cx} cy={cy} r={deco.radius} fill="none" stroke="#4f9d55" strokeWidth={1.5} opacity={0.4} strokeDasharray="3 5" />
+      </g>
+    );
   }
   return null;
 }

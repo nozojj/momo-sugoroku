@@ -36,6 +36,22 @@ export const ROAD_STYLE: Record<RoadType, { base: string; top: string; width: nu
 export const NODE_RADIUS = 10;
 export const MAJOR_HUB_RADIUS = 18;
 
+/** 交差点接合パッチ(Board.tsx)で「その交差点を代表する道路」を1つ選ぶための優先順位。
+ *  national > coastal/main(同格) > residential > shortcut。新しい色を作らず、
+ *  代表roadTypeのbase/top色をそのままパッチに使うことで、道路の舗装がそのまま
+ *  交差点まで続いて見えるようにする(パッチ単体を目立たせるのが目的ではない)。 */
+const ROAD_TYPE_PRIORITY: RoadType[] = ["national", "main", "coastal", "residential", "shortcut"];
+
+/** 交差点に接続する道路種別の一覧から、パッチに使う代表roadTypeを1つ選ぶ。
+ *  ROAD_TYPE_PRIORITY の先頭に近いものを優先する(national最優先、以下同格グループ内は
+ *  配列の並び順で決定的に決まるだけで優劣の意味は無い)。 */
+export function dominantRoadType(types: RoadType[]): RoadType {
+  for (const candidate of ROAD_TYPE_PRIORITY) {
+    if (types.includes(candidate)) return candidate;
+  }
+  return types[0] ?? "residential";
+}
+
 /** 同じマスに複数の車が重なるときの散らし配置(最大4台まで想定)。 */
 export function getClusterOffset(indexInCluster: number, clusterSize: number): { dx: number; dy: number } {
   if (clusterSize <= 1) return { dx: 0, dy: 0 };

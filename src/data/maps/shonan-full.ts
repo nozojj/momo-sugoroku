@@ -724,6 +724,19 @@ const decorations: MapDecoration[] = [
   // 重ね順を確認済み。roads/nodes/buildings/labelsはBoard.tsx側でdecorations全体より
   // 常に後に描画されるため、この位置でもそれらより前面に出ることはない)。
   { kind: "parkBlob", cx: 1080, cy: 910, rx: 45, ry: 30 },
+
+  // ------------------------------------------------------------------
+  // Phase3「ロータリー中央帯の装飾」。駅そのものが中心にあり半径55以上のロータリー
+  // (smallLoop呼び出し)5件だけを対象にする。半径25〜40の小さな衛星の輪(江の島参道・
+  // 北鎌倉小路・寒川ロータリー等)と湘南台(ロータリーではない)は対象外。
+  // 中央帯の半径は「リング半径(min(radiusX,radiusY))の半分」を目安に、駅ノード
+  // (MAJOR_HUB_RADIUS=18)より大きく・リング上のマスには届かない値にしている。
+  // ------------------------------------------------------------------
+  { kind: "rotaryMedian", cx: 1080, cy: 650, radius: 32 }, // 藤沢ロータリー(radiusX80/radiusY65)
+  { kind: "rotaryMedian", cx: 770, cy: 700, radius: 35 }, // 辻堂ロータリー(radiusX70/radiusY80)
+  { kind: "rotaryMedian", cx: 420, cy: 756, radius: 36 }, // 茅ヶ崎ロータリー(radiusX80/radiusY72)
+  { kind: "rotaryMedian", cx: 0, cy: 700, radius: 35 }, // 平塚ロータリー(radiusX85/radiusY70)
+  { kind: "rotaryMedian", cx: 1565, cy: 802, radius: 27 }, // 鎌倉ロータリー(radiusX55/radiusY75)
 ];
 
 // ============================================================

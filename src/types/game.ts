@@ -72,7 +72,11 @@ export type MapDecoration =
    * forest=森、farmland=農地、hills=丘陵。parkBlobと同じ楕円形だが、種類ごとに
    * 色・質感を変える。道路配置には影響しない(空白を埋めるための地形であって、
    * 道路がこの上を通ってもよい/避けてもよい、あくまで背景)。 */
-  | { kind: "terrain"; variant: "forest" | "farmland" | "hills"; cx: number; cy: number; rx: number; ry: number; rotation?: number };
+  | { kind: "terrain"; variant: "forest" | "farmland" | "hills"; cx: number; cy: number; rx: number; ry: number; rotation?: number }
+  /** 駅ハブを中心とした環状路(ロータリー)の、駅ノードとリングのあいだの空白に敷く
+   * 控えめな中央帯(植栽帯)。半径はリング半径より十分小さく、駅ノード自体は覆わない。
+   * ゲートのスポーク道路(道路レイヤー、decorationsより後に描画)はこの上に自然に重なる。 */
+  | { kind: "rotaryMedian"; cx: number; cy: number; radius: number };
 
 /**
  * 建物の種類。マス(MapNode)とは完全に分離した見た目だけの分類で、
