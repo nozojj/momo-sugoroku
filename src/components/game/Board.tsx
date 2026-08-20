@@ -141,6 +141,16 @@ export function Board({
   const [dragging, setDragging] = useState(false);
   const [debugClickPos, setDebugClickPos] = useState<{ x: number; y: number } | null>(null);
   const isMobile = useIsMobileViewport();
+  /** isMobileの最新値を常に参照するためのref。destinationFocus/cardWarpFocusの終了処理は
+   *  マウント時にsetTimeoutで予約され、その時点のisMobile(remount直後は一瞬false)を
+   *  クロージャで固定してしまう。setTimeoutのコールバックは後から再生成されないため、
+   *  isMobile stateを直接見るとマウント直後の古い値のまま呼ばれてしまい、スマホ復帰後に
+   *  PC用のfit-to-mapズームへ戻ってしまう(P0バグの原因)。refならタイマー発火時点の
+   *  最新値を読めるので、カメラ計算系の関数(getIdleCamera等)は必ずこちらを使う。 */
+  const isMobileRef = useRef(isMobile);
+  useEffect(() => {
+    isMobileRef.current = isMobile;
+  }, [isMobile]);
   /** falseの間はプレイヤー移動によるカメラ追従を止める(ユーザーが手動でマップを動かした場合)。 */
   const autoFollowRef = useRef(true);
   /** trueの間はCSSトランジションを無効化し、pan/zoomの変更を即座に反映する(destinationFocusのタップスキップ用)。 */
@@ -208,7 +218,7 @@ export function Board({
    *  スマホは全体を見渡すことよりマス・道路・プレイヤーの視認性を優先した固定ズームで
    *  現在プレイヤー周辺を映す。 */
   function getIdleCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
-    if (isMobile) {
+    if (isMobileRef.current) {
       const z = clampZoom(MOBILE_INITIAL_ZOOM);
       const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
       return {
@@ -226,7 +236,7 @@ export function Board({
    *  destinationFocus(次の目的地)・cardWarpFocus(ワープ先)のどちらもこれを使う:
    *  「対象ノードを中心に、通常より寄ったズームで見せる」という演出の本体はここに1つだけ持つ。 */
   function getNodeFocusCamera(rect: DOMRect, targetNodeId: string | null): { zoom: number; pan: { x: number; y: number } } {
-    const z = clampZoom(isMobile ? MOBILE_DESTINATION_ZOOM : DESKTOP_DESTINATION_ZOOM);
+    const z = clampZoom(isMobileRef.current ? MOBILE_DESTINATION_ZOOM : DESKTOP_DESTINATION_ZOOM);
     const node = targetNodeId ? nodeById.get(targetNodeId) : undefined;
     return {
       zoom: z,
@@ -251,7 +261,7 @@ export function Board({
   /** 移動中(サイコロを振った後〜着地まで、分岐選択中も含む)のズーム/パン。現在プレイヤーを中心に、
    *  通常表示より寄ったズームで映す。 */
   function getMovementCamera(rect: DOMRect): { zoom: number; pan: { x: number; y: number } } {
-    const z = clampZoom(isMobile ? MOBILE_MOVEMENT_ZOOM : DESKTOP_MOVEMENT_ZOOM);
+    const z = clampZoom(isMobileRef.current ? MOBILE_MOVEMENT_ZOOM : DESKTOP_MOVEMENT_ZOOM);
     const node = nodeById.get(currentPlayer?.currentNodeId ?? map.startNodeId);
     return {
       zoom: z,
@@ -868,14 +878,23 @@ export function Board({
         </div>
       )}
 
-      <div className="absolute right-3 bottom-3 flex flex-col gap-1.5">
+      {/* ホームインジケーター/右エッジのセーフエリアぶん最小オフセットを確保する(PCではenv()が
+          0なのでright-3/bottom-3と同じ位置)。gap-2はスマホでのタップ領域拡大(44px)に合わせて
+          隣接ボタン同士の誤タップを減らすための間隔で、smではgap-1.5(既存値)に戻す。 */}
+      <div
+        className="absolute flex flex-col gap-2 sm:gap-1.5"
+        style={{
+          right: "max(0.75rem, env(safe-area-inset-right, 0px))",
+          bottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+        }}
+      >
         <button
           type="button"
           onClick={() => {
             autoFollowRef.current = false;
             setZoom((z) => clampZoom(z + 0.15));
           }}
-          className="h-9 w-9 rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white sm:h-9 sm:w-9"
           aria-label="拡大"
         >
           +
@@ -886,7 +905,7 @@ export function Board({
             autoFollowRef.current = false;
             setZoom((z) => clampZoom(z - 0.15));
           }}
-          className="h-9 w-9 rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow border border-black/10 text-lg font-bold dark:bg-slate-700 dark:text-white sm:h-9 sm:w-9"
           aria-label="縮小"
         >
           −
@@ -894,7 +913,7 @@ export function Board({
         <button
           type="button"
           onClick={recenterOnCurrentPlayer}
-          className="h-9 w-9 rounded-full bg-white/90 shadow border border-black/10 text-base dark:bg-slate-700 dark:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow border border-black/10 text-base dark:bg-slate-700 dark:text-white sm:h-9 sm:w-9"
           aria-label="現在地に戻る"
           title="現在地に戻る"
         >

@@ -85,15 +85,20 @@ export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, r
       }`}
       style={{ borderLeft: `3px solid ${player.color}` }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* ヘッダー行: 以前は右側に「同率n位」バッジ+総資産の金額を並べていたため、390px幅では
+          右側のshrink-0ブロックが幅を独占し、名前(truncate)にほぼ余白が残らず1文字しか
+          見えなくなっていた(P1バグ)。総資産は下の統計行(既にflex-wrapで折り返す)へ移し、
+          右側はコンパクトな順位バッジだけにすることで名前の表示幅を確保する。
+          nameコンテナにflex-1を付け、極端に長い名前+バッジが重なった場合の保険としてtruncateを維持する。 */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs"
             style={{ backgroundColor: player.color }}
           >
             {player.carIcon}
           </span>
-          <span className="truncate font-bold">{player.name}</span>
+          <span className="min-w-0 truncate font-bold">{player.name}</span>
           {isActive && <span className="shrink-0 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-white">手番</span>}
           {hasTroubleCharacter && (
             <span
@@ -104,16 +109,14 @@ export function PlayerHud({ player, isActive, canUseCard, hasTroubleCharacter, r
             </span>
           )}
         </div>
-        <span className="flex shrink-0 items-center gap-1.5">
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${rankBadgeClass}`}>{rankLabel}</span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">総資産 {formatMoney(netWorth(player))}</span>
-        </span>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${rankBadgeClass}`}>{rankLabel}</span>
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span>💰 {formatMoney(player.money)}</span>
         <span>🏠 {player.ownedPropertyIds.length}件</span>
         <span>🎯 {player.destinationsReached}回到着</span>
+        <span className="text-slate-500 dark:text-slate-400">💴 総資産 {formatMoney(netWorth(player))}</span>
       </div>
 
       {badges.length > 0 && (

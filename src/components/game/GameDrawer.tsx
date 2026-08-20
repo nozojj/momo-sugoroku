@@ -123,7 +123,9 @@ export function GameDrawer({
       <div
         // Visual Prototype 1: SaaS的な単色白/グレーから、暖色寄りのグラデーション+区切り線で
         // 「ゲームUIのパネル」らしい階層感を追加。開閉・幅・情報構造は一切変更しない。
-        className={`fixed inset-y-0 right-0 z-40 flex w-[85vw] max-w-sm flex-col gap-4 overflow-y-auto bg-linear-to-b from-amber-50/95 via-white to-white p-4 shadow-2xl transition-transform duration-300 ease-out dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 ${
+        // 右端に固定されたパネルなので、ノッチ/Dynamic Island(上)とホームインジケーター(下)、
+        // 右エッジのセーフエリアを最小余白として確保する(PCではenv()が0なので既存のp-4のまま)。
+        className={`fixed inset-y-0 right-0 z-40 flex w-[85vw] max-w-sm flex-col gap-4 overflow-y-auto bg-linear-to-b from-amber-50/95 via-white to-white pt-[max(1rem,env(safe-area-inset-top,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-4 shadow-2xl transition-transform duration-300 ease-out dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
@@ -136,7 +138,7 @@ export function GameDrawer({
             type="button"
             onClick={handleClose}
             aria-label="閉じる"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 sm:h-8 sm:w-8"
           >
             ✕
           </button>

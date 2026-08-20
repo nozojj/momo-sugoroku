@@ -26,7 +26,12 @@ export function GameHud({
   movementInfo,
 }: GameHudProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1 border-b border-amber-900/10 bg-linear-to-b from-amber-50/90 to-white/75 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-amber-100/10 dark:from-slate-900/85 dark:to-slate-900/70 sm:px-4 sm:py-2.5">
+    <div
+      // ノッチ/Dynamic Island(上)とホームインジケーター寄りの左右エッジを想定し、
+      // env(safe-area-inset-*)を最小余白として確保する。PCではenv()が0なのでmax()の
+      // 結果が既存の値と一致し、レイアウトは変わらない。
+      className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-1 border-b border-amber-900/10 bg-linear-to-b from-amber-50/90 to-white/75 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] shadow-sm backdrop-blur-sm dark:border-amber-100/10 dark:from-slate-900/85 dark:to-slate-900/70 sm:pt-[max(0.625rem,env(safe-area-inset-top,0px))] sm:pr-[max(1rem,env(safe-area-inset-right,0px))] sm:pb-2.5 sm:pl-[max(1rem,env(safe-area-inset-left,0px))]"
+    >
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs sm:text-sm">
           <span className="flex min-w-0 items-center gap-1.5 font-bold text-slate-800 dark:text-white">
@@ -53,7 +58,7 @@ export function GameHud({
           type="button"
           onClick={onOpenDrawer}
           aria-label="メニューを開く"
-          className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-900/15 bg-amber-50/90 text-lg shadow-sm dark:border-amber-100/10 dark:bg-slate-800 dark:text-white"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-900/15 bg-amber-50/90 text-lg shadow-sm dark:border-amber-100/10 dark:bg-slate-800 dark:text-white sm:h-9 sm:w-9"
         >
           ☰
         </button>

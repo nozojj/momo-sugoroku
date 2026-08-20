@@ -219,7 +219,9 @@ export function GameScreen() {
         />
       )}
 
-      <div className="fixed bottom-5 left-1/2 z-20 -translate-x-1/2 sm:bottom-6">
+      {/* ホームインジケーターに埋もれないよう、env(safe-area-inset-bottom)を基準位置へ加算する。
+          PCではenv()が0なので従来のbottom-5/6と同じ位置になる。 */}
+      <div className="fixed left-1/2 z-20 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:bottom-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         <Dice
           diceResult={status === "moving" ? diceResult : null}
           diceFaces={status === "moving" ? diceFaces : null}
