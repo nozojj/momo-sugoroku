@@ -803,7 +803,12 @@ export function Board({
                       🎯
                     </text>
                   )}
-                  {(node.isDestinationCandidate || node.type === "property" || node.isMajorHub) && (
+                  {/* overview帯(俯瞰・全体表示)では主要8駅名だけを残し、それ以外のマス名は間引く。
+                      俯瞰で全マス名を出すと文字が団子状に重なり、道路網の骨格自体が読みにくくなっていた
+                      (2026-08-20 盤面ビジュアル監査より)。lodTierはズーム値とisMovingPhaseだけで決まる
+                      既存の純粋関数の結果なので、normal/movement/destinationFocusの表示・ズーム値・
+                      LOD閾値には一切影響しない。 */}
+                  {(node.isMajorHub || (lodTier !== "overview" && (node.isDestinationCandidate || node.type === "property"))) && (
                     <text
                       x={cx}
                       y={cy + radius + 13}
