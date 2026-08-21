@@ -14,6 +14,7 @@ import {
   dominantRoadType,
 } from "@/lib/game/mapStyle";
 import { shortestPath } from "@/lib/game/mapGraph";
+import { resolveVisibleLabelIds, type LabelCandidate } from "@/lib/game/boardLabels";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { isRegionMonopolized } from "@/lib/game/propertyOwnership";
@@ -307,6 +308,22 @@ export function Board({
   const lodIconSize = LOD_ICON_SIZE[lodTier];
   const wasMovingPhaseRef = useRef(false);
 
+  /** マス名ラベルの間引き(Phase5)。駅・目的地候補(priority 0)は常に表示し、物件(priority 1)は
+   *  座標だけから決定的に間引く(boardLabels.ts参照)。overview帯はそもそも駅以外ラベルを出さない
+   *  既存仕様のままなので、物件は候補にすら含めない(間引き計算のコストも省ける)。 */
+  const visibleLabelIds = useMemo(() => {
+    const candidates: LabelCandidate[] = [];
+    for (const node of map.nodes) {
+      const isStationTierLabel = node.isMajorHub || node.isDestinationCandidate;
+      if (isStationTierLabel) {
+        candidates.push({ id: node.id, x: node.x, y: node.y, priority: 0 });
+      } else if (lodTier !== "overview" && node.type === "property") {
+        candidates.push({ id: node.id, x: node.x, y: node.y, priority: 1 });
+      }
+    }
+    return resolveVisibleLabelIds(candidates);
+  }, [map, lodTier]);
+
   // 初回表示、および isMobile が切り替わった瞬間の通常カメラ。
   useEffect(() => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -591,6 +608,20 @@ export function Board({
     setPan(p);
   }
 
+  /** P5-1: 「🎯 目的地を見る」ボタン用。destinationFocus演出が使っているgetDestinationFocusCamera
+   *  (中身はgetNodeFocusCameraの薄いラッパー)をそのまま呼ぶだけで、新しいカメラ計算は増やさない。
+   *  GameState・ゲーム進行には一切触れない、表示上のパン/ズームだけの操作。recenterOnCurrentPlayer
+   *  と違いautoFollowRef.currentは有効化しない(+/−ズームボタンと同じく、ユーザーが手動で見ている
+   *  間はプレイヤー追従を再開させない)。 */
+  function focusOnDestination() {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    autoFollowRef.current = false;
+    const { zoom: z, pan: p } = getDestinationFocusCamera(rect);
+    setZoom(z);
+    setPan(p);
+  }
+
   return (
     <div className="relative h-full w-full">
       <div
@@ -742,10 +773,19 @@ export function Board({
               // 崩さずにこの下にstation分岐を差し込める。鎌倉・江の島等の地域差はここでは付けない
               // (8駅で完全に共通のSTATION_STYLEを使う。地域差は将来のランドマーク/建物側で表現する)。
               const isStation = node.isMajorHub;
+              const groupOwnerHex = groupOwnerColor(groupProperties, players);
               const fillColor = isLandmark
                 ? LANDMARK_STYLE.fill
-                : (groupOwnerColor(groupProperties, players) ?? (isStation ? STATION_STYLE.fill : style.fill));
-              const strokeColor = isLandmark ? LANDMARK_STYLE.stroke : isStation ? STATION_STYLE.stroke : style.stroke;
+                : (groupOwnerHex ?? (isStation ? STATION_STYLE.fill : style.fill));
+              // P5-3: ランドマークのfillは「実在ランドマークである」という意味を守るため独占時も
+              // 金色のまま変えない(所有者色に置き換えない)。その代わりstrokeを独占時だけ所有者色に
+              // 差し替えることで、「ランドマークであること」(fill)と「独占されていること」(stroke)を
+              // 同時に読み取れるようにする(非独占時は従来通りLANDMARK_STYLE.strokeの金枠)。
+              const strokeColor = isLandmark
+                ? (groupOwnerHex ?? LANDMARK_STYLE.stroke)
+                : isStation
+                  ? STATION_STYLE.stroke
+                  : style.stroke;
               // 地域(region)を1人で完全独占しているプレイヤー(いなければundefined)。グループ単位の
               // 色分け(fillColor、既存・無改修)とは別レイヤーとして、そのプレイヤーの色でリングを
               // 重ねるだけ(地域独占の方がグループ独占より稀少なので、視覚的に一段強い表現にする)。
@@ -799,12 +839,18 @@ export function Board({
                       <circle cx={cx} cy={cy} r={radius + 9} fill="none" stroke="#f5a623" strokeWidth={3} />
                     </>
                   )}
+                  {/* P5-4: r+4〜+7の近接リング(ランドマーク/地域独占/選択可能)は、半径10〜12のマスに
+                      対して3〜4px間隔でしか離れておらず、同時に出ると輪郭が潰れて読み取れなくなる
+                      (Phase5 Proposal参照)。「今プレイヤーが操作するために必要な情報」を最優先にし、
+                      選択可能 > 所有/独占情報(地域独占) > 装飾的なランドマーク表現の順で排他表示する
+                      (下位のリングを非表示にしても、ランドマークの金fill/地域独占の情報自体は他の
+                      経路で失われない。選択可能な間だけ一時的に隠れるだけで、選択が終われば元に戻る)。 */}
                   {isSelectable && <circle cx={cx} cy={cy} r={radius + 6} fill="#fde68a" opacity={0.55} className="animate-pulse-node" />}
-                  {isLandmark && <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#caa23d" strokeWidth={1.5} opacity={0.6} />}
-                  {/* 地域完全独占リング。fillColor(グループ単位、既存)の上にプレイヤー色の点線リングを
-                      重ねるだけで、既存の色分けロジックには一切触れない。 */}
-                  {regionOwner && (
+                  {!isSelectable && regionOwner && (
                     <circle cx={cx} cy={cy} r={radius + 7} fill="none" stroke={regionOwner.color} strokeWidth={3} strokeDasharray="4 3" opacity={0.9} />
+                  )}
+                  {!isSelectable && !regionOwner && isLandmark && (
+                    <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#caa23d" strokeWidth={1.5} opacity={0.6} />
                   )}
                   <rect
                     x={cx - radius}
@@ -869,8 +915,10 @@ export function Board({
                       俯瞰で全マス名を出すと文字が団子状に重なり、道路網の骨格自体が読みにくくなっていた
                       (2026-08-20 盤面ビジュアル監査より)。lodTierはズーム値とisMovingPhaseだけで決まる
                       既存の純粋関数の結果なので、normal/movement/destinationFocusの表示・ズーム値・
-                      LOD閾値には一切影響しない。 */}
-                  {(node.isMajorHub || (lodTier !== "overview" && (node.isDestinationCandidate || node.type === "property"))) && (
+                      LOD閾値には一切影響しない。normal/movement帯では、さらにvisibleLabelIds(Phase5、
+                      boardLabels.ts)が藤沢ロータリー・鎌倉小路等の密集区画で近接するラベル同士の
+                      重なりを間引く。駅・目的地候補は常にvisibleLabelIdsに含まれる(間引かれない)。 */}
+                  {visibleLabelIds.has(node.id) && (
                     <text
                       x={cx}
                       y={cy + radius + 13}
@@ -985,6 +1033,18 @@ export function Board({
           title="現在地に戻る"
         >
           🚗
+        </button>
+        {/* P5-1: 目的地は常に主要8駅のどれかで盤面全体は広いため、モバイルの通常カメラ(現在地中心の
+            固定ズーム)では目的地が画面外にあることが多い。「現在地に戻る」と対になる形でここに置き、
+            focusOnDestination()(destinationFocus演出と同じgetNodeFocusCameraを再利用)を呼ぶだけ。 */}
+        <button
+          type="button"
+          onClick={focusOnDestination}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow border border-black/10 text-base dark:bg-slate-700 dark:text-white sm:h-9 sm:w-9"
+          aria-label="目的地を見る"
+          title="目的地を見る"
+        >
+          🎯
         </button>
       </div>
     </div>
