@@ -95,9 +95,16 @@ export function inferBuildingType(node: MapNode, group: PropertyGroup | undefine
   return "generic";
 }
 
-/** 建物の既定オフセット。道路・マスを隠さないよう、ノードの少し上に配置する。 */
-export function defaultBuildingOffset(node: MapNode): { x: number; y: number } {
-  const radius = node.isMajorHub ? MAJOR_HUB_RADIUS : NODE_RADIUS;
+/** 建物の既定オフセット。道路・マスを隠さないよう、ノードの少し上に配置する。
+ *  radiiを渡すと、その半径(呼び出し側の現在のLOD半径)を使って計算する。省略時は
+ *  従来通りNODE_RADIUS/MAJOR_HUB_RADIUS(overview相当の固定値)を使うため、
+ *  radiiを渡さない既存の呼び出し元(/editor等)の挙動は変わらない。 */
+export function defaultBuildingOffset(
+  node: MapNode,
+  radii?: { node: number; hub: number },
+): { x: number; y: number } {
+  const r = radii ?? { node: NODE_RADIUS, hub: MAJOR_HUB_RADIUS };
+  const radius = node.isMajorHub ? r.hub : r.node;
   return { x: 0, y: -(radius + 24) };
 }
 
@@ -120,6 +127,7 @@ export function resolveBuildingForNode(
   node: MapNode,
   group: PropertyGroup | undefined,
   override: BuildingOverride | undefined,
+  radii?: { node: number; hub: number },
 ): ResolvedBuilding | null {
   if (override?.hidden) return null;
   const eligible = node.type === "property" || !!node.isDestinationCandidate;
@@ -133,7 +141,7 @@ export function resolveBuildingForNode(
   // 従来どおり表示する(逃げ道は維持する)。
   if (buildingType === "station" && !override?.buildingType) return null;
 
-  const defaultOffset = defaultBuildingOffset(node);
+  const defaultOffset = defaultBuildingOffset(node, radii);
   return {
     nodeId: node.id,
     buildingType,

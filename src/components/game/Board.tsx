@@ -661,9 +661,9 @@ export function Board({
               {/* マスを「天面ハイライト+側面シェード」で少し立体的に見せるための上掛けグラデーション。
                   既存のfillColor(所有権・独占色分け)の上に重ねるだけで、色分けロジックは無変更。 */}
               <linearGradient id="node-sheen" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
                 <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
-                <stop offset="100%" stopColor="#000000" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.24" />
               </linearGradient>
             </defs>
 
@@ -760,6 +760,22 @@ export function Board({
               const cy = node.y - minY;
               return (
                 <g key={node.id} onClick={() => isSelectable && onSelectRoute(node.id)} style={{ cursor: isSelectable ? "pointer" : "default" }}>
+                  {/* Phase4: マスの接地影。ぼかしフィルタは使わず、わずかな下方向オフセット+低不透明度だけで
+                      「地面に接している」感を出す(道路の下敷き影と同じ考え方)。pointerEventsをnoneにして
+                      クリック/選択判定(このgのonClick)には一切影響させない。overview帯では598マス分の
+                      追加要素をレンダリングするコストに見合わないため間引く。 */}
+                  {lodTier !== "overview" && (
+                    <rect
+                      x={cx - radius}
+                      y={cy - radius + 1.8}
+                      width={radius * 2}
+                      height={radius * 2}
+                      rx={6}
+                      fill="#1a1208"
+                      opacity={0.16}
+                      pointerEvents="none"
+                    />
+                  )}
                   {node.isMajorHub && <circle cx={cx} cy={cy} r={radius + 20} fill="#fff8e6" opacity={0.5} filter="url(#board-soft)" />}
                   {/* 目的地カメラ演出(destinationFocus)中だけ表示する「今だけ強調」の光彩。
                       盤面全体は暗くせず、目的地マス周辺だけに効果を留める。 */}
@@ -880,7 +896,7 @@ export function Board({
               map.nodes.map((node) => {
                 const group = node.propertyGroupId ? getPropertyGroupDef(node.propertyGroupId) : undefined;
                 const override = map.buildingOverrides?.find((o) => o.nodeId === node.id);
-                const building = resolveBuildingForNode(node, group, override);
+                const building = resolveBuildingForNode(node, group, override, { node: lodRadius.node, hub: lodRadius.hub });
                 if (!building) return null;
                 return (
                   <BuildingSprite
