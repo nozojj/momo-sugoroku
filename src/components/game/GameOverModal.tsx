@@ -6,7 +6,11 @@ import { rankPlayers, type RankedPlayer } from "@/lib/game/engine";
 import { propertyDefs } from "@/data/properties";
 import { propertyGroupDefs } from "@/data/propertyGroups";
 import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { NetWorthTrendChart } from "./NetWorthTrendChart";
+import { CharacterSprite } from "./CharacterSprite";
+import { AnnouncerEffectLayer } from "./AnnouncerEffectLayer";
 
 interface GameOverModalProps {
   players: Player[];
@@ -32,6 +36,8 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
   const winner = players.find((p) => p.id === winnerIds[0]);
   const ranked = rankPlayers(players);
   const awards = computeFinalAwards(players);
+  const reduceMotion = usePrefersReducedMotion();
+  const isMobile = useIsMobileViewport();
 
   return (
     // Visual Prototype 1.5: 「遊び切ったご褒美画面」として、GameStateの他画面より明確に一段豪華な
@@ -40,8 +46,18 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
     <div className="fixed inset-0 z-50 overflow-y-auto bg-linear-to-b from-amber-200 via-orange-100 to-amber-50 p-4 dark:from-amber-950/50 dark:via-slate-900 dark:to-slate-950">
       <div className="mx-auto my-6 w-full max-w-sm rounded-2xl border-2 border-amber-300/70 bg-linear-to-b from-white to-amber-50/50 p-5 shadow-2xl dark:border-amber-400/20 dark:from-slate-800 dark:to-slate-800/80 lg:max-w-5xl lg:p-8">
         <div className="text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-400 text-4xl shadow-lg dark:from-amber-400/40 dark:to-amber-600/30">
-            🏆
+          {/* P9-2: 到着演出(DestinationCelebrationScreen)と同じ組み合わせ(CharacterSprite+
+              AnnouncerEffectLayer)をトロフィー脇に絶対配置で添え、「フィナーレ」感を出す。
+              relativeラッパーはトロフィーと同じw-fitで内容にフィットさせ、ランキングカード等
+              下の情報レイアウトの幅・高さには一切影響しない。reduced-motion時はDestination
+              CelebrationScreenと同じく粒子演出(AnnouncerEffectLayer)だけを非表示にし、
+              キャラクター自体(静止画)は変わらず表示して「勝者である」情報を保つ。 */}
+          <div className="relative mx-auto flex w-fit items-end justify-center gap-1">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-b from-amber-200 to-amber-400 text-4xl shadow-lg dark:from-amber-400/40 dark:to-amber-600/30">
+              🏆
+            </div>
+            <CharacterSprite characterId="navi" expression="happy" className="h-16 w-16 sm:h-20 sm:w-20" />
+            {!reduceMotion && <AnnouncerEffectLayer effect={{ confetti: true, sparkle: true }} mobile={isMobile} />}
           </div>
           <h2 className="mt-3 bg-linear-to-r from-amber-600 to-orange-500 bg-clip-text text-xl font-black text-transparent dark:from-amber-300 dark:to-orange-300">
             {isTie ? "引き分け!" : `${winner?.name}さんの勝ち!`}

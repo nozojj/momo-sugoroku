@@ -69,9 +69,13 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
               purchasable && monopolyAttainable && remainingForMonopoly.length === 1 && remainingForMonopoly[0].id === def.id;
 
             return (
+              // P9-4: isOwnedBySelfがfalse→trueに変わった瞬間だけkeyを変えて再マウントさせ、
+              // CardDrawModal/MoneyRouletteModalと同じ「確定演出」パターン(animate-arrival-pop)を
+              // 一度だけ再生する。新規keyframesは追加せず、既存のreduced-motion無効化リスト
+              // (globals.css)にanimate-arrival-popが含まれているため個別対応は不要。
               <div
-                key={def.id}
-                className={`rounded-xl border p-3 ${
+                key={`${def.id}-${isOwnedBySelf}`}
+                className={`rounded-xl border p-3 ${isOwnedBySelf ? "animate-arrival-pop " : ""}${
                   isOwnedBySelf
                     ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-500/50 dark:bg-emerald-400/10"
                     : isOwnedByOther

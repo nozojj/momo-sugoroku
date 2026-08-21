@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PlayerController } from "@/types/game";
 import { MAX_PLAYERS, MIN_PLAYERS, PLAYER_COLORS, CAR_ICONS, YEAR_OPTIONS, DEFAULT_TOTAL_YEARS } from "@/lib/game/engine";
+import { CharacterSprite } from "./CharacterSprite";
 
 interface StartScreenProps {
   onStart: (names: string[], totalYears: number, controlledBy: PlayerController[]) => void;
@@ -37,13 +38,19 @@ export function StartScreen({ onStart }: StartScreenProps) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">湘南すごろく</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">車で走る、湘南エリアの桃鉄風すごろく(MVP)</p>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-7 p-6">
+      {/* P9-1: 既存のnavi素材(CharacterSprite)を「表紙」の顔として添え、タイトルは
+          GameOverModalの勝者見出しと同じamberグラデーション文字にして開始/終了画面の
+          見た目を対にする。背景(globals.cssのshonan.svg)は変更しない。 */}
+      <div className="flex flex-col items-center gap-2 text-center">
+        <CharacterSprite characterId="navi" expression="happy" className="h-16 w-16 sm:h-20 sm:w-20" />
+        <h1 className="bg-linear-to-r from-amber-600 to-orange-500 bg-clip-text text-4xl font-black tracking-tight text-transparent dark:from-amber-300 dark:to-orange-300">
+          湘南すごろく
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">車で走る、湘南エリアの桃鉄風すごろく</p>
       </div>
 
-      <div className="w-full max-w-xs rounded-2xl border border-black/10 bg-white/80 p-5 shadow-sm dark:bg-slate-800/70">
+      <div className="w-full max-w-xs rounded-2xl border-t-4 border-t-amber-300 bg-linear-to-b from-white to-amber-50/30 p-5 shadow-xl dark:border-t-amber-500/50 dark:from-slate-800 dark:to-slate-800/80">
         <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">人数を選択</h2>
         <div className="mb-4 grid grid-cols-3 gap-2">
           {PLAYER_COUNT_OPTIONS.map((count) => (
