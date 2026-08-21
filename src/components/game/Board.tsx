@@ -13,8 +13,8 @@ import {
   straightRoadPath,
   dominantRoadType,
 } from "@/lib/game/mapStyle";
-import { shortestPath } from "@/lib/game/mapGraph";
 import { resolveVisibleLabelIds, type LabelCandidate } from "@/lib/game/boardLabels";
+import { edgeKey, recentTrailEdgeKeys, selectableEdgeKeys } from "@/lib/game/boardEdgeHighlight";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { isRegionMonopolized } from "@/lib/game/propertyOwnership";
@@ -39,10 +39,6 @@ interface BoardProps {
   onCardWarpFocusComplete?: () => void;
   /** 急行系カード使用中に一時的に切り替わる車の見た目。currentPlayerIndexの駒にのみ適用する。 */
   activeVehicleMode: VehicleMode | null;
-  /** 現在地→目的地の最短ルートを道路上に発光表示するか。既定true。
-   *  将来「最短ルート表示 ON/OFF」設定を追加する際は、呼び出し側(GameScreen.tsx)で
-   *  この値をstate/設定から渡すだけでよく、Board.tsx側の変更は不要な設計にしている。 */
-  showShortestRoute?: boolean;
 }
 
 const PADDING = 80;
@@ -142,7 +138,6 @@ export function Board({
   cardWarpTargetNodeId = null,
   onCardWarpFocusComplete,
   activeVehicleMode,
-  showShortestRoute = true,
 }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
@@ -222,23 +217,10 @@ export function Board({
   const selectableIds = new Set(routeOptions.map((o) => o.nodeId));
   const currentPlayer = players[currentPlayerIndex];
 
-  /** 現在地→目的地の最短ルート案内(表示専用)。GameStateには保存せず、その場でBFSするだけ。
-   *  到着済み(現在地===目的地)のときはnullにして発光を出さない。 */
-  const shortestPathNodeIds = useMemo(() => {
-    if (!currentPlayer || currentPlayer.currentNodeId === destinationNodeId) return null;
-    return shortestPath(map, currentPlayer.currentNodeId, destinationNodeId, currentPlayer.cardIds);
-  }, [map, currentPlayer?.currentNodeId, destinationNodeId, currentPlayer?.cardIds]);
-
-  /** shortestPathNodeIdsの隣接ノード対を、edges(道路)の重複排除キーと同じ形式("from|to"をsort)で
-   *  Set化したもの。道路描画側はこのSetにキーが含まれるかだけを見ればよい。 */
-  const shortestPathEdgeKeys = useMemo(() => {
-    if (!shortestPathNodeIds || shortestPathNodeIds.length < 2) return null;
-    const keys = new Set<string>();
-    for (let i = 0; i < shortestPathNodeIds.length - 1; i++) {
-      keys.add([shortestPathNodeIds[i], shortestPathNodeIds[i + 1]].sort().join("|"));
-    }
-    return keys;
-  }, [shortestPathNodeIds]);
+  /** P6-1: 現在地→選択可能な次マスへ続くedgeのキー集合。routeOptions(既存のselectableIdsと
+   *  同じ情報源)だけから導出する薄い計算で、要素数は分岐先の本数(最大4=mapのdegree上限)しか
+   *  無いため、shortestPathEdgeKeys(旧実装)のような重いuseMemoは不要。 */
+  const selectableEdgeKeySet = selectableEdgeKeys(currentPlayer?.currentNodeId, routeOptions);
 
   function clampZoom(z: number) {
     // マップが広がった分、全体を1画面に収めるズームが0.2を下回る場合があるため下限を緩めている
@@ -307,6 +289,16 @@ export function Board({
   const lodRadius = LOD_RADIUS[lodTier];
   const lodIconSize = LOD_ICON_SIZE[lodTier];
   const wasMovingPhaseRef = useRef(false);
+
+  /** P6-3: 直前に通過したedgeの短時間トレイル。currentPlayer.moveHistory(今回のロールで
+   *  通ったnodeId列、rollDice()のたびにリセットされる既存フィールド)を読むだけで、
+   *  moveHistory自体の意味・保存タイミング・他のロジックには一切触れない(表示専用の読み取り)。
+   *  isMovingPhaseでない間(着地後の演出・購入確認・手番待ち等)は常に空集合にすることで、
+   *  「移動中または通過直後の短時間だけ」を保証し、次の手番まで盤面に残り続けることを防ぐ。 */
+  const trailEdgeKeySet = useMemo(() => {
+    if (!isMovingPhase || !currentPlayer) return new Set<string>();
+    return recentTrailEdgeKeys(currentPlayer.moveHistory);
+  }, [isMovingPhase, currentPlayer?.moveHistory]);
 
   /** マス名ラベルの間引き(Phase5)。駅・目的地候補(priority 0)は常に表示し、物件(priority 1)は
    *  座標だけから決定的に間引く(boardLabels.ts参照)。overview帯はそもそも駅以外ラベルを出さない
@@ -647,7 +639,8 @@ export function Board({
               <filter id="board-soft" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="16" />
               </filter>
-              {/* 最短ルート発光用。board-soft(ハブの丸い後光向け)より弱く、細い道路に合わせたぼかし。 */}
+              {/* 道路edgeの発光用(P6-1選択可能edge・P6-3通過済みトレイル共通)。board-soft(ハブの
+                  丸い後光向け)より弱く、細い道路に合わせたぼかし。 */}
               <filter id="road-glow-soft" x="-60%" y="-60%" width="220%" height="220%">
                 <feGaussianBlur stdDeviation="2.5" />
               </filter>
@@ -713,28 +706,46 @@ export function Board({
               const x2 = to.x - minX;
               const y2 = to.y - minY;
               const d = straightRoadPath(x1, y1, x2, y2);
-              const isSelectableEdge =
-                routeOptions.length > 0 &&
-                ((from.id === currentPlayer?.currentNodeId && selectableIds.has(to.id)) ||
-                  (to.id === currentPlayer?.currentNodeId && selectableIds.has(from.id)));
-              const edgeKey = [edge.from, edge.to].sort().join("|");
-              const isShortestRouteEdge = showShortestRoute && (shortestPathEdgeKeys?.has(edgeKey) ?? false);
+              const edgeMapKey = edgeKey(edge.from, edge.to);
+              const isSelectableEdge = selectableEdgeKeySet.has(edgeMapKey);
+              const isTrailEdge = trailEdgeKeySet.has(edgeMapKey);
               return (
-                <g key={`${edge.from}-${edge.to}`} opacity={isSelectableEdge ? 1 : 0.92} className={isSelectableEdge ? "animate-pulse-node" : undefined}>
+                <g key={`${edge.from}-${edge.to}`} opacity={isSelectableEdge ? 1 : 0.92}>
                   {/* Visual Prototype 1: 道路の下敷き影。ぼかしフィルタは使わず、わずかな下方向オフセット+
                       低不透明度だけで立体感を出す(建物・車の落ち影と同じ「まっすぐ下」の光源方向)。 */}
                   <g transform="translate(0, 2.2)" opacity={0.18}>
                     <path d={d} fill="none" stroke="#241c14" strokeWidth={style.width * 0.9} strokeLinecap="round" />
                   </g>
-                  {isShortestRouteEdge && (
+                  {/* P6-3: 直前に通過したedgeの短時間トレイル。選択可能edge(下記)より優先度を下げる
+                      ため、彩度・不透明度とも控えめにし、色相も選択可能edge(暖色系アンバー)とは
+                      はっきり別の寒色系にして混同しないようにする。アニメーションは付けない
+                      (moveHistoryの窓がスライドすることで自然に消えるため、常時点滅させる必要が無い)。 */}
+                  {isTrailEdge && (
                     <path
                       d={d}
                       fill="none"
-                      stroke="#ffcc33"
-                      strokeOpacity={0.7}
-                      strokeWidth={style.width + 14}
+                      stroke="#7dd3fc"
+                      strokeOpacity={0.4}
+                      strokeWidth={style.width + 5}
                       strokeLinecap="round"
                       filter="url(#road-glow-soft)"
+                    />
+                  )}
+                  {/* P6-1: 選択可能edge(現在地→選択可能な次マス)のハイライト。道路面(base/top)より
+                      奥、影より手前に重ねるだけの追加レイヤーで、既存のroad-glow-soft(旧・最短ルート
+                      グローと同じフィルタ)を再利用する。色・アニメーション(animate-pulse-node)とも
+                      選択可能マスのリング(#fde68a、Board.tsx内の別箇所)と揃え、「マスの強調→そこへ
+                      続く道の強調」が一続きに見えるようにする。 */}
+                  {isSelectableEdge && (
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="#ffd166"
+                      strokeOpacity={0.75}
+                      strokeWidth={style.width + 8}
+                      strokeLinecap="round"
+                      filter="url(#road-glow-soft)"
+                      className="animate-pulse-node"
                     />
                   )}
                   <path d={d} fill="none" stroke={style.base} strokeWidth={style.width} strokeLinecap="round" />
@@ -830,9 +841,8 @@ export function Board({
                   )}
                   {/* 通常時(destinationFocus中でない)の目的地マス案内。ソフトグロー(面)+静止リング(輪郭)の
                       2層で構成し、常時ループするアニメーションは使わない(上品な強調に留める)。
-                      色は最短ルート発光(#ffcc33)と揃えて、道路の発光が目的地マスまで自然に
-                      つながって見えるようにしている。destinationFocus中はこちらを消し、
-                      既存の到着演出(上のspotlight-glow等)だけを主役にする。 */}
+                      destinationFocus中はこちらを消し、既存の到着演出(上のspotlight-glow等)だけを
+                      主役にする。 */}
                   {isDestination && !isDestinationFocus && (
                     <>
                       <circle cx={cx} cy={cy} r={radius + 16} fill="#ffcc33" opacity={0.35} filter="url(#destination-glow-soft)" />
