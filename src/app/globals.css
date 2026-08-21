@@ -297,7 +297,11 @@ body {
   .animate-confetti-fall,
   .animate-spotlight-glow,
   .animate-spotlight-pop,
-  .animate-vehicle-transform-flash {
+  .animate-vehicle-transform-flash,
+  /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
+     止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
+     「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */
+  .animate-pulse-node {
     animation: none !important;
   }
 }

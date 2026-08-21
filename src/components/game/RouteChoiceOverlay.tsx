@@ -107,10 +107,13 @@ export function RouteChoiceOverlay({
           分岐点です。進む道を選んでください(地図をタップしてもOK)
         </p>
         {backNodeId && backNodeName && (
+          // P7-3: 盤面側の「戻る」候補(トレイルと同じ生成り色、Board.tsx)との対応が分かる程度に、
+          // 左端だけごく薄いクリーム色のアクセントを添える。方向ボタン(border-amber-300、下記)より
+          // 明らかに控えめな彩度に留め、これが「前進候補」ではないことが一目で分かるようにする。
           <button
             type="button"
             onClick={onStepBack}
-            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm active:scale-95 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-200"
+            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 border-l-4 border-l-amber-100 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm active:scale-95 dark:border-slate-500 dark:border-l-amber-100/40 dark:bg-slate-800 dark:text-slate-200"
           >
             <span className="text-base font-black leading-none">← 戻る</span>
             <span className="text-[10px] font-medium opacity-80">({backNodeName}へ)</span>

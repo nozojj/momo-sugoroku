@@ -14,7 +14,7 @@ import {
   dominantRoadType,
 } from "@/lib/game/mapStyle";
 import { resolveVisibleLabelIds, type LabelCandidate } from "@/lib/game/boardLabels";
-import { edgeKey, recentTrailEdgeKeys, selectableEdgeKeys } from "@/lib/game/boardEdgeHighlight";
+import { backEdgeKey, edgeKey, recentTrailEdgeKeys, selectableEdgeKeys } from "@/lib/game/boardEdgeHighlight";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
 import { isRegionMonopolized } from "@/lib/game/propertyOwnership";
@@ -294,11 +294,21 @@ export function Board({
    *  通ったnodeId列、rollDice()のたびにリセットされる既存フィールド)を読むだけで、
    *  moveHistory自体の意味・保存タイミング・他のロジックには一切触れない(表示専用の読み取り)。
    *  isMovingPhaseでない間(着地後の演出・購入確認・手番待ち等)は常に空集合にすることで、
-   *  「移動中または通過直後の短時間だけ」を保証し、次の手番まで盤面に残り続けることを防ぐ。 */
+   *  「移動中または通過直後の短時間だけ」を保証し、次の手番まで盤面に残り続けることを防ぐ。
+   *  P7-3: 分岐選択中(selectingRoute)は「戻る」候補のedge(backEdgeKey)もこの集合に合流させ、
+   *  トレイルと全く同じ静的・控えめな見た目で表示する(「戻る」専用の新しい装飾は作らない)。
+   *  値としては戻り先=直前に通った道なのでトレイルの末尾セグメントと常に一致するが、将来
+   *  TRAIL_MAX_SEGMENTSを変えても「戻る」表示だけは壊れないよう、算出自体は独立させている。 */
   const trailEdgeKeySet = useMemo(() => {
     if (!isMovingPhase || !currentPlayer) return new Set<string>();
-    return recentTrailEdgeKeys(currentPlayer.moveHistory);
-  }, [isMovingPhase, currentPlayer?.moveHistory]);
+    const keys = recentTrailEdgeKeys(currentPlayer.moveHistory);
+    if (status === "selectingRoute" && currentPlayer.moveHistory.length >= 2) {
+      const backNodeId = currentPlayer.moveHistory[currentPlayer.moveHistory.length - 2];
+      const back = backEdgeKey(currentPlayer.currentNodeId, backNodeId);
+      if (back) keys.add(back);
+    }
+    return keys;
+  }, [isMovingPhase, status, currentPlayer?.moveHistory, currentPlayer?.currentNodeId]);
 
   /** マス名ラベルの間引き(Phase5)。駅・目的地候補(priority 0)は常に表示し、物件(priority 1)は
    *  座標だけから決定的に間引く(boardLabels.ts参照)。overview帯はそもそも駅以外ラベルを出さない
@@ -329,10 +339,16 @@ export function Board({
 
   // サイコロを振った瞬間(移動フェーズ開始)にプレイヤー中心へズームイン、
   // 着地して移動フェーズが終わった瞬間に通常表示へズームアウトする。
+  // P7-1: 以前はクリーンアップで`wasMovingPhaseRef.current`を実行前の値へ巻き戻していたが、
+  // これが原因で着地(true→false)の瞬間に限って壊れていた: 直前(ロール開始時)の
+  // クリーンアップが「着地」用のこの本体が走る直前に発火し、refをfalseへ巻き戻して
+  // しまうため、`previousPhase`が常にfalseと誤読され、アイドルカメラへ戻す分岐が
+  // 発火しなかった(destinationFocus/cardWarpFocus用の類似エフェクトは「開始」側だけを
+  // 見る片側判定のため、この問題を持たない)。refの更新はエフェクト本体の末尾1箇所だけに
+  // 一本化し、クリーンアップでの巻き戻しは行わない。Strict Modeの開発時二重実行(同じ
+  // isMovingPhase値で本体が2回走る場合)でも、2回目はrefが既に最新値になっているため
+  // 条件式が自然にfalseになり、カメラを不要に再設定することはない。
   useEffect(() => {
-    // クリーンアップでrefを実行前の値に戻す: React Strict Modeの開発時二重実行
-    // (mount→cleanup→再mount)でも、2回目の実行が「前回すでに遷移済み」と
-    // 誤認して何もしない(結果としてズームが古いままになる)のを防ぐため。
     const previousPhase = wasMovingPhaseRef.current;
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect && rect.width > 0 && rect.height > 0) {
@@ -349,9 +365,6 @@ export function Board({
       }
     }
     wasMovingPhaseRef.current = isMovingPhase;
-    return () => {
-      wasMovingPhaseRef.current = previousPhase;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMovingPhase]);
 
@@ -716,20 +729,19 @@ export function Board({
                   <g transform="translate(0, 2.2)" opacity={0.18}>
                     <path d={d} fill="none" stroke="#241c14" strokeWidth={style.width * 0.9} strokeLinecap="round" />
                   </g>
-                  {/* P6-3: 直前に通過したedgeの短時間トレイル。選択可能edge(下記)より優先度を下げる
-                      ため、彩度・不透明度とも控えめにし、色相も選択可能edge(暖色系アンバー)とは
-                      はっきり別の寒色系にして混同しないようにする。アニメーションは付けない
-                      (moveHistoryの窓がスライドすることで自然に消えるため、常時点滅させる必要が無い)。 */}
+                  {/* P6-3/P7-3: 直前に通過したedge、および分岐選択中の「戻る」候補の短時間表示。
+                      選択可能edge(下記)より優先度を下げるため、アニメーションは付けず静的にする。
+                      P7-4: 当初の水色(#7dd3fc)はcoastal道路(青系)で埋もれることが実機確認された
+                      ため、特定の道路色に依存しない中立色へ変更した。blur(発光)は追加せず、
+                      「濃い縁取り(暗)+明るい芯(生成り色)」の2層で定義する古典的な地図記号の手法で、
+                      national(赤)/main(灰)/coastal(青)/residential(緑)/shortcut(紫)いずれの
+                      道路色に対しても、外側の暗い縁取りが明るい道路面との対比を、内側の明るい芯が
+                      暗い道路面との対比を、それぞれ別に担うことで安定した視認性を確保する。 */}
                   {isTrailEdge && (
-                    <path
-                      d={d}
-                      fill="none"
-                      stroke="#7dd3fc"
-                      strokeOpacity={0.4}
-                      strokeWidth={style.width + 5}
-                      strokeLinecap="round"
-                      filter="url(#road-glow-soft)"
-                    />
+                    <>
+                      <path d={d} fill="none" stroke="#2b2410" strokeOpacity={0.4} strokeWidth={style.width + 7} strokeLinecap="round" />
+                      <path d={d} fill="none" stroke="#fbf3dd" strokeOpacity={0.92} strokeWidth={style.width + 3} strokeLinecap="round" />
+                    </>
                   )}
                   {/* P6-1: 選択可能edge(現在地→選択可能な次マス)のハイライト。道路面(base/top)より
                       奥、影より手前に重ねるだけの追加レイヤーで、既存のroad-glow-soft(旧・最短ルート

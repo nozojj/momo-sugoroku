@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { edgeKey, recentTrailEdgeKeys, selectableEdgeKeys, TRAIL_MAX_SEGMENTS } from "@/lib/game/boardEdgeHighlight";
+import { backEdgeKey, edgeKey, recentTrailEdgeKeys, selectableEdgeKeys, TRAIL_MAX_SEGMENTS } from "@/lib/game/boardEdgeHighlight";
 
 describe("edgeKey", () => {
   it("同じ2ノードなら順序に関わらず同じキーになる", () => {
@@ -89,5 +89,31 @@ describe("recentTrailEdgeKeys", () => {
     const keys = recentTrailEdgeKeys(["n1", "n2", "n3", "n4"], 1);
     expect(keys.size).toBe(1);
     expect(keys.has(edgeKey("n3", "n4"))).toBe(true);
+  });
+});
+
+describe("backEdgeKey", () => {
+  it("現在地とbackNodeIdからedgeキーを返す", () => {
+    expect(backEdgeKey("n2", "n1")).toBe(edgeKey("n1", "n2"));
+  });
+
+  it("currentNodeIdが無ければnullを返す", () => {
+    expect(backEdgeKey(undefined, "n1")).toBeNull();
+  });
+
+  it("backNodeIdがnullなら(戻れない=移動開始地点)nullを返す", () => {
+    expect(backEdgeKey("n1", null)).toBeNull();
+  });
+
+  it("backNodeIdがundefinedでもnullを返す", () => {
+    expect(backEdgeKey("n1", undefined)).toBeNull();
+  });
+
+  it("戻り値はrecentTrailEdgeKeys()の末尾セグメントと一致する(意味的な整合性)", () => {
+    const moveHistory = ["n1", "n2", "n3"];
+    const back = backEdgeKey(moveHistory[moveHistory.length - 1], moveHistory[moveHistory.length - 2]);
+    const trail = recentTrailEdgeKeys(moveHistory);
+    expect(back).not.toBeNull();
+    expect(trail.has(back!)).toBe(true);
   });
 });
