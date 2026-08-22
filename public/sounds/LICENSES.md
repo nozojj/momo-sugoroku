@@ -17,6 +17,9 @@
 | `roulette_tick.wav` | P10-4-1 (2026-08-22) | 矩形波の単発ブリップ(1800Hz)、26ms。最短約30ms間隔で再トリガーされるため、自己打ち切りが気にならないよう意図的に極短にしている |
 | `money_gain.wav` | P10-4-1 (2026-08-22) | 矩形波の上昇アルペジオ(C5→E5→G5→C6)、335ms |
 | `money_loss.wav` | P10-4-1 (2026-08-22) | ごく短いノイズonset+三角波の下降スイープ(600→280Hz)、328ms |
+| `card_get.wav` | P10-4-2 (2026-08-22) | 三角波2音のベル風チャイム(A5→D6)、295ms。money_gain(矩形波4音アルペジオ)・card_use・property_buyと聞き分けやすいよう波形自体を変えている |
+| `card_use.wav` | P10-4-2 (2026-08-22) | ノイズクリック+矩形波の上昇スイープ(500→900Hz)、226ms。「発動」の勢いを出すため上昇方向にした(step_moveは下降スイープで区別) |
+| `property_buy.wav` | P10-4-2 (2026-08-22) | ノイズクリック(レジ/コイン投入)+矩形波2音(C6→G6、後の音ほど高く)、212ms |
 
 ## 出所・ライセンス確認不可(置き換え予定)
 
@@ -24,6 +27,6 @@
 |---|---|
 | `monopoly_group.mp3` | 2026-08-13追加時点で入手元・ライセンスの記録が一切残っておらず、リポジトリ内(コミットメッセージ・README・ファイルメタデータ)のいずれからも確認できなかった(P10-4調査時点)。**Phase10/P10-4-3で正式に置き換える**。それまでの間、暫定的にリポジトリに残置されているが新規の公開・配布判断の根拠にはしない。 |
 
-## CC0素材で補完する予定のもの(P10-4-2以降)
+## CC0素材で補完する予定のもの(P10-4-3以降)
 
-`card_get`/`card_use`/`property_buy`/`monopoly_region`/`destination_arrive`/`destination_reveal`/`game_over_fanfare`は未着手。導入時はKenney.nl(CC0)を優先し、本ファイルに入手元URL・ライセンス種別・取得日を追記する。
+`monopoly_region`/`destination_arrive`/`destination_reveal`/`game_over_fanfare`は未着手。導入時はKenney.nl(CC0)を優先し、本ファイルに入手元URL・ライセンス種別・取得日を追記する(`card_get`/`card_use`/`property_buy`はP10-4-2で手続き的生成により対応済み)。

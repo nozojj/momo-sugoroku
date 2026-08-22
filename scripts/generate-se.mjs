@@ -1,17 +1,21 @@
-// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1)。
+// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2で拡張)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、高頻度SE(dice_roll/step_move/roulette_tick)と
-// money_gain/money_lossを、外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。
-// 波形合成(矩形波/三角波+ホワイトノイズ、線形アタック+指数ディケイのエンベロープ)のみで、
-// 外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
-// public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため権利上の懸念なし)。
+// 目的: 「出所不明の音源は使わない」方針のもと、高頻度SE(dice_roll/step_move/roulette_tick)、
+// money_gain/money_loss、card_get/card_use/property_buyを、外部素材に一切依存せずこの
+// スクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波+ホワイトノイズ、線形アタック+
+// 指数ディケイのエンベロープ)のみで、外部ライブラリ・サンプル音源は使用していない。
+// ライセンス上の扱いは public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため
+// 権利上の懸念なし)。
 //
 // 実行方法: `node scripts/generate-se.mjs`
-// 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss}.wav
-//        (44.1kHz, 16bit, mono PCM WAV)
+// 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
+//        card_get,card_use,property_buy}.wav (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
+// P10-4-1で作成した5音(dice_roll/step_move/roulette_tick/money_gain/money_loss)の定義・
+// 生成コードは今回一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-2で
+// SHA256ハッシュ比較により確認済み)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -161,6 +165,39 @@ const SOUND_DEFS = {
     concat([
       renderNoise({ durationMs: 8, peak: 0.22, decayExp: 10, seed: 7 }), // 小さな「コトッ」onset
       renderTone({ waveform: "triangle", freqStart: 600, freqEnd: 280, durationMs: 320, peak: 0.32, attackMs: 2, decayExp: 4 }),
+    ]),
+
+  // Phase10/P10-4-2: card_get/card_use/property_buyの3音は互いに聞き分けやすいよう、
+  // 波形・音の作りそのものを変えている(card_get=三角波の2音ベル、card_use=矩形波の単発
+  // 上昇スイープ、property_buy=ノイズクリック+矩形波の2音コイン)。money_gain(上昇4音
+  // アルペジオ)とも混同しないよう、card_getは音数・波形の両方を変えて差別化した。
+
+  // card_get: カードを獲得した嬉しさが伝わる短いベル風チャイム。三角波(money_gainの矩形波
+  // アルペジオより柔らかい音色)で2音、後の音を長めに伸ばして「キラッ」とした余韻を残す。
+  card_get: () =>
+    concat([
+      renderTone({ waveform: "triangle", freqStart: 880, durationMs: 90, peak: 0.38, attackMs: 1, decayExp: 3 }), // A5
+      silence(15),
+      renderTone({ waveform: "triangle", freqStart: 1174.66, durationMs: 190, peak: 0.4, attackMs: 1, decayExp: 2.5 }), // D6(伸ばして着地)
+    ]),
+
+  // card_use: カードを発動した瞬間の短い「ズシャッ」という発動音。矩形波の急な上昇スイープ+
+  // 頭のノイズクリックで、card_get(ベル)・money_gain(アルペジオ)のどちらとも違う質感にする。
+  card_use: () =>
+    concat([
+      renderNoise({ durationMs: 6, peak: 0.2, decayExp: 8, seed: 3 }),
+      renderTone({ waveform: "square", freqStart: 500, freqEnd: 900, durationMs: 220, peak: 0.38, attackMs: 1, decayExp: 3.5 }),
+    ]),
+
+  // property_buy: 物件購入確定のレジ/コイン音。頭の小さなノイズクリック(レジのキー/コイン
+  // 投入音)+矩形波2音(コインが弾む音、後の音ほど高く短く)。
+  property_buy: () =>
+    concat([
+      renderNoise({ durationMs: 10, peak: 0.3, decayExp: 9, seed: 5 }),
+      silence(8),
+      renderTone({ waveform: "square", freqStart: 1046.5, durationMs: 60, peak: 0.35, attackMs: 1, decayExp: 5 }), // C6
+      silence(4),
+      renderTone({ waveform: "square", freqStart: 1568, durationMs: 130, peak: 0.4, attackMs: 1, decayExp: 4 }), // G6(高く着地)
     ]),
 };
 
