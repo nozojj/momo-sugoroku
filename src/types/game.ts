@@ -429,6 +429,20 @@ export interface MoneyRouletteInfo {
   candidates: number[];
 }
 
+/** money/eventマス(LandingOutcome.kind: "money")着地の非ブロッキング通知(Phase9B/P9-3)。
+ *  monopolyAchievementと同じく特定のstatusに紐付かない一時通知で、GameStatusは増やさない。
+ *  ターン進行はresolveLanding()側で今まで通り同期的に進む(この情報はそれを"後から追いかけて"
+ *  短く見せるだけ)。amountの符号でkind(moneyGain/moneyLoss)を決め、UI側の色分け(sky/rose、
+ *  MoneyRouletteModalと同じ配色)に使う。 */
+export interface LandingResultInfo {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  kind: "moneyGain" | "moneyLoss";
+  amount: number;
+  message: string;
+}
+
 /** status: "cardDraw" のときに表示する抽選演出の内容。確定済みのcardIdを持つ(まだplayer.cardIdsには未反映)。 */
 export interface CardDrawInfo {
   playerId: string;
@@ -569,6 +583,11 @@ export interface GameState {
   /** 直近の購入で独占(グループ/地域)を達成した場合の通知。MonopolyToastが表示し終えたら
    *  dismissMonopolyAchievement()でnullに戻る。statusの遷移やターン進行には影響しない。 */
   monopolyAchievement: MonopolyAchievement | null;
+  /** money/eventマス着地の非ブロッキング通知(Phase9B/P9-3)。LandingResultToastが表示し終えたら
+   *  dismissLandingResult()でnullに戻る。monopolyAchievementと同じくstatusの遷移やターン進行
+   *  には一切影響しない。リロード時に古い通知が再表示されないよう、persistMigration.tsの
+   *  mergeGameState()で無条件にnullへ戻す(1セッション内でのみ意味を持つ表示専用情報のため)。 */
+  landingResultInfo: LandingResultInfo | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
   /** cardWarpAnnounce/cardWarpFocus状態のときに表示するワープ演出の内容 */

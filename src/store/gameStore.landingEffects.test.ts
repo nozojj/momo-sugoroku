@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { getNode } from "@/lib/game/mapGraph";
+import { resolveLandingOutcome } from "@/lib/game/landingEffects";
 import { EVENT_NODE_REGION_MAP, REGIONAL_EVENT_POOLS } from "@/data/events";
 import { freshGame, placePlayerAt, mockSingleDiceFace, advanceUntilAt, driveToLandingToward } from "./gameStore.testHelpers";
 
@@ -278,6 +279,105 @@ describe("マス効果: 通過では発動せず、停止したときだけ発�
       expect(s.log.length).toBeGreaterThan(logLenBeforeRoll); // イベントログが追加されている
       expect(s.status).toBe("rolling"); // 着地処理後、正常に次のターンへ進んでいる
       expect(s.turn).toBe(startTurn + 1); // 1人プレイなので毎ターンturnが進む
+    });
+
+    describe("landingResultInfo(Phase9B/P9-3): 非ブロッキング通知の内容とターン進行への影響", () => {
+      // rollDice()が消費する最初のMath.random()だけdice=1相当の値に固定し(TARGETでちょうど
+      // 停止させるため)、後続の呼び出し(event pool抽選)を個別に固定することで、プラス側・
+      // マイナス側それぞれの実データ(実際にeventPoolForNode()が返す文言・金額)を再現する。
+      it("プラス側: landingResultInfoがkind:moneyGainで、金額・メッセージが実際のmoney変化と一致し、ターンは即座に次へ進む", () => {
+        placePlayerAt(START, UNRELATED_DESTINATION);
+        const startMoney = useGameStore.getState().players[0].money;
+        const startTurn = useGameStore.getState().turn;
+        const player = useGameStore.getState().players[0];
+
+        vi.spyOn(Math, "random").mockReturnValueOnce((1 - 0.5) / 6).mockReturnValue(0.05);
+        useGameStore.getState().rollDice();
+        driveToLandingToward(TARGET);
+
+        const s = useGameStore.getState();
+        const delta = s.players[0].money - startMoney;
+        expect(delta).toBeGreaterThan(0);
+        expect(s.landingResultInfo).toMatchObject({
+          playerId: player.id,
+          playerName: player.name,
+          playerColor: player.color,
+          kind: "moneyGain",
+          amount: delta,
+        });
+        expect(s.landingResultInfo?.message).toContain(`+${delta}万円`);
+        // 制御フロー(resolveLanding→finishLandingAndEndTurn→endTurn)は変更していないため、
+        // 通知が乗っていてもターンは今まで通り即座に次のプレイヤーのrollingへ進んでいる。
+        expect(s.status).toBe("rolling");
+        expect(s.turn).toBe(startTurn + 1);
+      });
+
+      it("マイナス側: landingResultInfoがkind:moneyLossで、金額・メッセージが実際のmoney変化と一致し、ターンは即座に次へ進む", () => {
+        placePlayerAt(START, UNRELATED_DESTINATION);
+        const startMoney = useGameStore.getState().players[0].money;
+        const startTurn = useGameStore.getState().turn;
+        const player = useGameStore.getState().players[0];
+
+        vi.spyOn(Math, "random").mockReturnValueOnce((1 - 0.5) / 6).mockReturnValue(0.75);
+        useGameStore.getState().rollDice();
+        driveToLandingToward(TARGET);
+
+        const s = useGameStore.getState();
+        const delta = s.players[0].money - startMoney;
+        expect(delta).toBeLessThan(0);
+        expect(s.landingResultInfo).toMatchObject({
+          playerId: player.id,
+          playerName: player.name,
+          playerColor: player.color,
+          kind: "moneyLoss",
+          amount: delta,
+        });
+        expect(s.landingResultInfo?.message).toContain(`${delta}万円`);
+        expect(s.status).toBe("rolling");
+        expect(s.turn).toBe(startTurn + 1);
+      });
+
+      it("dismissLandingResult()を呼ぶとnullに戻る(他の状態には影響しない)", () => {
+        placePlayerAt(START, UNRELATED_DESTINATION);
+        vi.spyOn(Math, "random").mockReturnValueOnce((1 - 0.5) / 6).mockReturnValue(0.05);
+        useGameStore.getState().rollDice();
+        driveToLandingToward(TARGET);
+
+        expect(useGameStore.getState().landingResultInfo).not.toBeNull();
+        const statusBefore = useGameStore.getState().status;
+        const turnBefore = useGameStore.getState().turn;
+
+        useGameStore.getState().dismissLandingResult();
+
+        const s = useGameStore.getState();
+        expect(s.landingResultInfo).toBeNull();
+        expect(s.status).toBe(statusBefore);
+        expect(s.turn).toBe(turnBefore);
+      });
+    });
+  });
+
+  describe("NodeType「money」(¥)の着地結果", () => {
+    // ¥タイプは現時点のshonan-fullマップには1件も配置されていない(データ生成側の未使用型)。
+    // resolveLanding()の"money"分岐はLandingOutcome.kindだけを見てNodeType自体は区別しないため、
+    // ここではresolveLandingOutcome()を直接呼ぶ関数レベルのテストで「¥タイプもeventタイプと
+    // 同じkind:"money"を返す(=同じコードパスでlandingResultInfoが正しく載る)」ことだけを保証する。
+    it("resolveLandingOutcome()にNodeType money のノードを渡すと、eventと同じkind:\"money\"を返す", () => {
+      freshGame();
+      placePlayerAt("r_kg_ks_1", UNRELATED_DESTINATION);
+      const state = useGameStore.getState();
+      const map = getMap(MAP_ID);
+      const player = state.players[0];
+      const baseNode = getNode(map, "r_kg_ks_1");
+      const moneyNode = { ...baseNode, type: "money" as const };
+
+      const outcome = resolveLandingOutcome({ state, map, node: moneyNode, player });
+
+      expect(outcome.kind).toBe("money");
+      if (outcome.kind === "money") {
+        expect(typeof outcome.amount).toBe("number");
+        expect(outcome.amount).not.toBe(0); // 湘南イベントは正負どちらも0にはならない(既存仕様)
+      }
     });
   });
 

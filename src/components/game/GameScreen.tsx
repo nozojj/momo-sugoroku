@@ -22,6 +22,7 @@ import { CardOverflowModal } from "./CardOverflowModal";
 import { SettlementIntroAnnouncer } from "./SettlementIntroAnnouncer";
 import { SettlementScreen } from "./SettlementScreen";
 import { MonopolyToast } from "./MonopolyToast";
+import { LandingResultToast } from "./LandingResultToast";
 import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
 import { YearEventAnnounceModal } from "./YearEventAnnounceModal";
 import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
@@ -49,6 +50,7 @@ export function GameScreen() {
   const routeOptions = useGameStore((s) => s.routeOptions);
   const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
   const monopolyAchievement = useGameStore((s) => s.monopolyAchievement);
+  const landingResultInfo = useGameStore((s) => s.landingResultInfo);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const cardWarpInfo = useGameStore((s) => s.cardWarpInfo);
   const targetSelectInfo = useGameStore((s) => s.targetSelectInfo);
@@ -73,6 +75,7 @@ export function GameScreen() {
   const buyProperty = useGameStore((s) => s.buyProperty);
   const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
   const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
+  const dismissLandingResult = useGameStore((s) => s.dismissLandingResult);
   const dismissYearEventAnnounce = useGameStore((s) => s.dismissYearEventAnnounce);
   const dismissTroubleCharacterAnnounce = useGameStore((s) => s.dismissTroubleCharacterAnnounce);
   const useCard = useGameStore((s) => s.useCard);
@@ -333,6 +336,11 @@ export function GameScreen() {
       {monopolyAchievement && monopolyAchievement.kind === "region" && (
         <MonopolyAnnounceModal achievement={monopolyAchievement} onDismiss={dismissMonopolyAchievement} />
       )}
+
+      {/* money/eventマス着地の非ブロッキング通知(Phase9B/P9-3)。monopolyAchievementと同じく
+          statusには依存しない。LandingResultToast側でMonopolyToastとは別のtop位置に固定配置し、
+          偶発的な同時表示でも重ならないようにしている。 */}
+      {landingResultInfo && <LandingResultToast info={landingResultInfo} onDismiss={dismissLandingResult} />}
 
       {/* 年度イベント(「今年の湘南」)の告知。monopolyAchievementと同じくstatusには依存しない
           一時通知で、新しいGameStatusは増やさない。ゲーム開始時(1年目)・決算後に新年度へ

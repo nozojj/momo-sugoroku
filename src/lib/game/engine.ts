@@ -154,6 +154,7 @@ export function createInitialState(
     routeOptions: [],
     pendingPropertyGroupId: null,
     monopolyAchievement: null,
+    landingResultInfo: null,
     arrivalInfo: null,
     cardWarpInfo: null,
     targetSelectInfo: null,

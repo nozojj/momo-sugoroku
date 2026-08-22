@@ -87,6 +87,12 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     ...state,
     status: migratedStatus,
     ...(players ? { players } : {}),
+    // landingResultInfo(Phase9B/P9-3の非ブロッキング結果通知)は1セッション内でのみ意味を持つ
+    // 表示専用の情報で、「リロード直後は何も通知していない」が常に正しい。旧セーブに無い/
+    // 表示中に保存された、どちらのケースもここで無条件にnullへ戻す(monopolyAchievement等の
+    // 他の一時通知と違い、readmeのstale-guardパターン(hasStaleXxx)のような条件判定は不要:
+    // このフィールドが「復元すべき状態」を持つことは一度も無い)。
+    landingResultInfo: null,
     // 旧セーブにキー自体が無ければcurrentState(IDLE_STATE由来)の既定値がそのまま使われる。
     // currentYearEventIdは単純な??ではなくgetYearEventDef()で存在確認までする: 将来
     // yearEventDefsのidをリネーム/削除した場合でも、旧セーブが指す消えたidをそのまま

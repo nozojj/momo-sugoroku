@@ -55,6 +55,7 @@ const IDLE_STATE: GameState = {
   routeOptions: [],
   pendingPropertyGroupId: null,
   monopolyAchievement: null,
+  landingResultInfo: null,
   arrivalInfo: null,
   cardWarpInfo: null,
   targetSelectInfo: null,
@@ -90,6 +91,9 @@ export interface GameStore extends GameState {
   finishPropertyShopping: () => void;
   /** MonopolyToastの表示が終わった(自動タイムアウト)ときに呼び、通知状態をクリアする */
   dismissMonopolyAchievement: () => void;
+  /** LandingResultToastの表示が終わった(自動タイムアウト)ときに呼び、通知状態をクリアする。
+   *  monopolyAchievementと同じく、statusの遷移やターン進行には一切関与しない。 */
+  dismissLandingResult: () => void;
   /** YearEventAnnounceModal(「今年の湘南」演出)の表示が終わったときに呼び、通知状態をクリアする */
   dismissYearEventAnnounce: () => void;
   /** TroubleCharacterAnnounceModal(妨害キャラの登場/交代/悪さ通知)の表示が終わったときに呼び、
@@ -398,7 +402,23 @@ export const useGameStore = create<GameStore>()(
         switch (outcome.kind) {
           case "money": {
             const players = updatePlayer(state.players, player.id, (p) => ({ ...p, money: p.money + outcome.amount }));
-            set({ players, status: "resolvingEvent", log: pushLog(state, outcome.message) });
+            // Phase9B/P9-3: ターン進行(この直後のfinishLandingAndEndTurn()による同期的な
+            // endTurn())は一切変えず、非ブロッキングの結果通知(landingResultInfo)だけを
+            // 追加で乗せる。MonopolyToastと同じ「statusに依存しない一時通知」パターンで、
+            // LandingResultToast側の自動タイマーがdismissLandingResult()を呼ぶまで表示され続ける。
+            set({
+              players,
+              status: "resolvingEvent",
+              landingResultInfo: {
+                playerId: player.id,
+                playerName: player.name,
+                playerColor: player.color,
+                kind: outcome.amount >= 0 ? "moneyGain" : "moneyLoss",
+                amount: outcome.amount,
+                message: outcome.message,
+              },
+              log: pushLog(state, outcome.message),
+            });
             finishLandingAndEndTurn();
             return;
           }
@@ -836,6 +856,8 @@ export const useGameStore = create<GameStore>()(
         },
 
         dismissMonopolyAchievement: () => set({ monopolyAchievement: null }),
+
+        dismissLandingResult: () => set({ landingResultInfo: null }),
 
         dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
 
