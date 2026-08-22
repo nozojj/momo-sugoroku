@@ -283,6 +283,7 @@ export function GameScreen() {
           player={currentPlayer}
           players={players}
           currentYearEventId={currentYearEventId}
+          monopolyAchievement={monopolyAchievement}
           onBuy={isCurrentHuman ? buyProperty : () => {}}
           onFinish={isCurrentHuman ? finishPropertyShopping : () => {}}
         />

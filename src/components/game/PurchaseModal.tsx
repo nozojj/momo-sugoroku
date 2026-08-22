@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Player } from "@/types/game";
+import type { MonopolyAchievement, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
 import { getPropertyGroupDef, propertyGroupDefs } from "@/data/propertyGroups";
@@ -18,11 +18,24 @@ interface PurchaseModalProps {
   /** 現在の年度イベント(「今年の湘南」)id。購入判断に使えるよう、想定年間収益に
    *  そのジャンルの倍率を反映する。省略/未解決時は倍率1(補正なし)として扱う。 */
   currentYearEventId?: string;
+  /** 直近のbuyProperty()呼び出しが独占(グループ/地域)を達成していればその内容、していなければ
+   *  null(gameStore.tsのmonopolyAchievementをそのまま渡すだけで、ここでは変更・dismissしない)。
+   *  Phase10/P10-4-5: property_buyとmonopoly_group/monopoly_regionの同時発火を避けるためだけに
+   *  参照する。 */
+  monopolyAchievement: MonopolyAchievement | null;
   onBuy: (propertyId: string) => void;
   onFinish: () => void;
 }
 
-export function PurchaseModal({ groupId, player, players, currentYearEventId, onBuy, onFinish }: PurchaseModalProps) {
+export function PurchaseModal({
+  groupId,
+  player,
+  players,
+  currentYearEventId,
+  monopolyAchievement,
+  onBuy,
+  onFinish,
+}: PurchaseModalProps) {
   // Phase10/P10-2: このセッション(status:"purchaseOffer"のマウント〜アンマウント)開始時点の
   // 所有件数を基準に、増えた瞬間だけproperty_buyを鳴らす。onBuyのonClickはCPU向けに無効化
   // されているが(GameScreen.tsx)、CPUのbuyProperty()直接呼び出しもplayer.ownedPropertyIdsには
@@ -30,13 +43,24 @@ export function PurchaseModal({ groupId, player, players, currentYearEventId, on
   // まとめ買いした場合、Reactの自動バッチングで1回の再レンダーに複数件の増加がまとまりうるが、
   // 意図的に1回のチャイムにまとめる(連続再生しても同一tick内のplaySE重複防止で2回目以降は
   // 無音になるだけで実害が小さいため、購入件数ぶん分けて鳴らす複雑さを避けた)。
+  //
+  // Phase10/P10-4-5: monopolyAchievementが同時に真の場合はproperty_buyを鳴らさない。
+  // buyProperty()(gameStore.ts)はownedPropertyIdsとmonopolyAchievementを同一のset()で
+  // 更新するため、この2つは常に同じレンダーで一緒に変化する。monopolyAchievementは
+  // buyProperty()の呼び出しごとに毎回上書きされる使い捨ての値(達成しなければ必ずnullに
+  // 戻る)なので、「直前の購入が独占を達成したか」をこのレンダー時点の値だけで正しく判定でき、
+  // 過去の独占トーストが残っていることによる誤抑制は起こらない。
   const prevOwnedCountRef = useRef(player.ownedPropertyIds.length);
   useEffect(() => {
     if (player.ownedPropertyIds.length > prevOwnedCountRef.current) {
-      playSE("property_buy");
+      if (monopolyAchievement === null) {
+        playSE("property_buy");
+      }
+      // monopolyAchievementが非nullの場合は、MonopolyToast/MonopolyAnnounceModal側が
+      // monopoly_group/monopoly_regionを鳴らすため、ここでは何もしない。
     }
     prevOwnedCountRef.current = player.ownedPropertyIds.length;
-  }, [player.ownedPropertyIds.length]);
+  }, [player.ownedPropertyIds.length, monopolyAchievement]);
 
   const group = getPropertyGroupDef(groupId);
   const properties = getPropertiesInGroup(groupId);
