@@ -6,6 +6,7 @@ import type { CharacterLine } from "@/types/characterAnnouncer";
 import { CHARACTER_ANNOUNCER_TIMING } from "@/lib/game/characterAnnouncerTiming";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { playSE } from "@/lib/audio/soundManager";
 import { CharacterSprite } from "./CharacterSprite";
 import { SpeechBubble } from "./SpeechBubble";
 import { AnnouncerEffectLayer } from "./AnnouncerEffectLayer";
@@ -96,6 +97,13 @@ export function DestinationCelebrationScreen({
   const [lineIndex, setLineIndex] = useState(0);
   const linesCompletedRef = useRef(false);
 
+  // Phase10/P10-2: 到着した瞬間(マウント時)に1回だけ。このコンポーネントはarrivalInfoが
+  // 非nullの間だけGameScreen側でマウントされ続ける(=到着のたびに新規マウントされる)ため、
+  // MonopolyToastと同じ「マウントeffect本体で直接呼ぶ」パターンで十分。
+  useEffect(() => {
+    playSE("destination_arrive");
+  }, []);
+
   const spinStepCount = reduceMotion ? REDUCED_SPIN_STEP_COUNT : SPIN_STEP_COUNT;
   const spinDurationMs = reduceMotion ? REDUCED_SPIN_DURATION_MS : SPIN_DURATION_MS;
   const revealHoldMs = reduceMotion ? REDUCED_REVEAL_HOLD_MS : REVEAL_HOLD_MS;
@@ -128,20 +136,29 @@ export function DestinationCelebrationScreen({
   // スピン中: 次の目へ切り替える(減速するintervalsに沿って進む)。最後の1歩に達したら
   // spinStepの更新とphase遷移を同じコールバック内で行い(Reactが1レンダーにまとめてくれる)、
   // 「確定名がspin表示のまま一瞬映ってからrevealに切り替わる」ようなチラつきを避ける。
+  // Phase10/P10-2: 通常tickはroulette_tickを鳴らすが、最終tick(reveal直前)では鳴らさない。
+  // この直後にreveal effect側でdestination_revealを鳴らすため、両方が同時に重なるのを避ける。
   useEffect(() => {
     if (phase !== "spin") return;
     if (spinStep >= spinSequence.length - 1) return;
     const timer = window.setTimeout(() => {
       const next = spinStep + 1;
       setSpinStep(next);
-      if (next >= spinSequence.length - 1) setPhase("reveal");
+      if (next >= spinSequence.length - 1) {
+        setPhase("reveal");
+      } else {
+        playSE("roulette_tick");
+      }
     }, spinIntervals[spinStep]);
     return () => window.clearTimeout(timer);
   }, [phase, spinStep, spinSequence.length, spinIntervals]);
 
   // reveal: 確定地名をrevealHoldMsだけ強調表示してから、自動でspeakフェーズへ進む。
+  // destination_revealはここで鳴らす: 自動進行(上のspin effect)・タップスキップ(handleClickの
+  // spin分岐)のどちらの経路でphaseが"reveal"になっても、この1箇所で確実に1回だけ発火する。
   useEffect(() => {
     if (phase !== "reveal") return;
+    playSE("destination_reveal");
     const timer = window.setTimeout(() => setPhase("speak"), revealHoldMs);
     return () => window.clearTimeout(timer);
   }, [phase, revealHoldMs]);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { getPropertiesInGroup, propertyDefs } from "@/data/properties";
@@ -8,6 +9,7 @@ import { getPropertyOwner, ownershipTier } from "@/lib/game/propertyOwnership";
 import { calculateAnnualRevenue } from "@/lib/game/propertyRevenue";
 import { PROPERTY_GENRE_BADGE_CLASS, PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
 import { getYearEventDef, yearEventGenreMultiplier } from "@/lib/game/yearEvent";
+import { playSE } from "@/lib/audio/soundManager";
 
 interface PurchaseModalProps {
   groupId: string;
@@ -21,6 +23,21 @@ interface PurchaseModalProps {
 }
 
 export function PurchaseModal({ groupId, player, players, currentYearEventId, onBuy, onFinish }: PurchaseModalProps) {
+  // Phase10/P10-2: このセッション(status:"purchaseOffer"のマウント〜アンマウント)開始時点の
+  // 所有件数を基準に、増えた瞬間だけproperty_buyを鳴らす。onBuyのonClickはCPU向けに無効化
+  // されているが(GameScreen.tsx)、CPUのbuyProperty()直接呼び出しもplayer.ownedPropertyIdsには
+  // 反映されるため、この差分検知だけでCPU/人間どちらの購入も拾える。CPUが1ターンで複数件
+  // まとめ買いした場合、Reactの自動バッチングで1回の再レンダーに複数件の増加がまとまりうるが、
+  // 意図的に1回のチャイムにまとめる(連続再生しても同一tick内のplaySE重複防止で2回目以降は
+  // 無音になるだけで実害が小さいため、購入件数ぶん分けて鳴らす複雑さを避けた)。
+  const prevOwnedCountRef = useRef(player.ownedPropertyIds.length);
+  useEffect(() => {
+    if (player.ownedPropertyIds.length > prevOwnedCountRef.current) {
+      playSE("property_buy");
+    }
+    prevOwnedCountRef.current = player.ownedPropertyIds.length;
+  }, [player.ownedPropertyIds.length]);
+
   const group = getPropertyGroupDef(groupId);
   const properties = getPropertiesInGroup(groupId);
   const yearEvent = getYearEventDef(currentYearEventId);

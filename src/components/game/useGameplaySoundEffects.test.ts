@@ -189,4 +189,92 @@ describe("useGameplaySoundEffects", () => {
       expect(playSEMock).toHaveBeenCalledWith("step_move");
     });
   });
+
+  describe("card_use", () => {
+    function currentPlayer() {
+      return useGameStore.getState().players[useGameStore.getState().currentPlayerIndex];
+    }
+
+    it("同一プレイヤーのcardIds.lengthが減った瞬間に1回だけ呼ばれる", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p = { ...currentPlayer(), cardIds: ["card_a", "card_b"] };
+      setState({ players: [p] });
+      playSEMock.mockClear();
+
+      setState({ players: [{ ...p, cardIds: ["card_a"] }] }); // useCard()の即時消費相当
+
+      expect(playSEMock).toHaveBeenCalledTimes(1);
+      expect(playSEMock).toHaveBeenCalledWith("card_use");
+    });
+
+    it("カードドロー(増加)では呼ばれない", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p = { ...currentPlayer(), cardIds: ["card_a"] };
+      setState({ players: [p] });
+      playSEMock.mockClear();
+
+      setState({ players: [{ ...p, cardIds: ["card_a", "card_b"] }] });
+
+      expect(playSEMock).not.toHaveBeenCalledWith("card_use");
+    });
+
+    it("cardOverflow整理での入れ替え(同数のまま内容だけ変わる)では呼ばれない", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p = { ...currentPlayer(), cardIds: ["card_a", "card_b"] };
+      setState({ players: [p] });
+      playSEMock.mockClear();
+
+      setState({ players: [{ ...p, cardIds: ["card_new", "card_b"] }] }); // resolveCardOverflow()の入れ替え相当
+
+      expect(playSEMock).not.toHaveBeenCalledWith("card_use");
+    });
+
+    it("targetSelect系のように、useCard()直後ではなくconfirmTargetSelection()相当の遅延した1手で減っても検知される", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p = { ...currentPlayer(), cardIds: ["card_warp"] };
+      // useCard()相当: この時点ではまだcardIdsは変化しない(status:selectingCardTargetへ遷移するだけ)。
+      setState({ players: [p], status: "selectingCardTarget" });
+      playSEMock.mockClear();
+
+      // confirmTargetSelection()相当: ここで初めて消費される。
+      setState({ players: [{ ...p, cardIds: [] }], status: "resolvingEvent" });
+
+      expect(playSEMock).toHaveBeenCalledTimes(1);
+      expect(playSEMock).toHaveBeenCalledWith("card_use");
+    });
+
+    it("cancelTargetSelection()相当(cardIdsが変化しないまま選択待ちが終わる)では呼ばれない", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p = { ...currentPlayer(), cardIds: ["card_warp"] };
+      setState({ players: [p], status: "selectingCardTarget" });
+      playSEMock.mockClear();
+
+      setState({ players: [{ ...p }], status: "rolling" }); // cardIds不変のままキャンセル
+
+      expect(playSEMock).not.toHaveBeenCalledWith("card_use");
+    });
+
+    it("プレイヤー交代でcardIds.lengthが減って見えても誤発火しない(プレイヤーIDが変わるため)", () => {
+      renderHook(() => useGameplaySoundEffects());
+      const p1 = { ...currentPlayer(), cardIds: ["a"] }; // プレイヤー1は残り1枚
+
+      setState({ players: [p1] });
+      playSEMock.mockClear();
+
+      // advanceToNextTurn()相当: プレイヤー交代。交代先プレイヤー2の手持ちを、あえて
+      // プレイヤー1より少なく(0枚)設定し、最悪ケース(単純な長さ比較だと誤検知しうる状況)を再現する。
+      const p2 = { ...p1, id: "p2", name: "P2", cardIds: [] };
+      setState({ players: [p1, p2], currentPlayerIndex: 1, status: "rolling" });
+
+      expect(playSEMock).not.toHaveBeenCalledWith("card_use");
+
+      // プレイヤー2が本当にカードを引いて(増加)から使う(減少)一連の流れは正しく検知される。
+      setState({ players: [p1, { ...p2, cardIds: ["b"] }] });
+      playSEMock.mockClear();
+      setState({ players: [p1, { ...p2, cardIds: [] }] });
+
+      expect(playSEMock).toHaveBeenCalledTimes(1);
+      expect(playSEMock).toHaveBeenCalledWith("card_use");
+    });
+  });
 });

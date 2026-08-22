@@ -14,9 +14,16 @@
 // 実験で確認した。そのため、小刻み(50ms刻み)にポーリングしながら進める方式を採用し、
 // 「いつ呼ばれたか」ではなく「最終的にちょうど1回だけ呼ばれたか」を検証する。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
+import { playSE } from "@/lib/audio/soundManager";
 import { CardDrawModal } from "./CardDrawModal";
 import type { CardDrawInfo } from "@/types/game";
+
+vi.mock("@/lib/audio/soundManager", () => ({
+  playSE: vi.fn(),
+}));
+
+const playSEMock = vi.mocked(playSE);
 
 const COMMON_CARD_ID = "card_dice_again"; // rarity: common
 const RARE_CARD_ID = "card_double_move"; // rarity: rare
@@ -60,10 +67,12 @@ async function pollUntilCalled(onContinue: ReturnType<typeof vi.fn>, maxMs: numb
 
 describe("CardDrawModal: onContinueが1回だけ呼ばれること(優先度1)", () => {
   beforeEach(() => {
+    playSEMock.mockClear();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -114,10 +123,12 @@ describe("CardDrawModal: onContinueが1回だけ呼ばれること(優先度1)",
 
 describe("CardDrawModal: 親からの再レンダーでタイマーがリセットされないこと(優先度2)", () => {
   beforeEach(() => {
+    playSEMock.mockClear();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -172,5 +183,50 @@ describe("CardDrawModal: 親からの再レンダーでタイマーがリセッ�
       await vi.advanceTimersByTimeAsync(5000);
     });
     expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("CardDrawModal: 効果音(Phase10/P10-2)", () => {
+  beforeEach(() => {
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("common: 確定までroulette_tickが複数回、card_getが最後に1回だけ、かつ重複しない", async () => {
+    const onContinue = vi.fn();
+    render(<CardDrawModal info={buildInfo(COMMON_CARD_ID)} onContinue={onContinue} />);
+
+    await pollUntilCalled(onContinue, 5000);
+
+    const calls = playSEMock.mock.calls.map((c) => c[0]);
+    expect(calls.length).toBeGreaterThan(1);
+    expect(calls.filter((id) => id === "card_get")).toHaveLength(1);
+    expect(calls.filter((id) => id === "roulette_tick")).toHaveLength(calls.length - 1);
+    expect(calls[calls.length - 1]).toBe("card_get"); // 最後に鳴るのは確定音で、roulette_tickとは同時に重ならない
+  });
+
+  it("rare: card_getはスピン確定時点で鳴り、その後のCharacterAnnouncer演出中には追加で鳴らない", async () => {
+    const onContinue = vi.fn();
+    render(<CardDrawModal info={buildInfo(RARE_CARD_ID)} onContinue={onContinue} />);
+
+    // スピン確定(card_get)は、CharacterAnnouncerを経由した最終的なonContinueより先に起こる。
+    let elapsed = 0;
+    while (elapsed < 10000 && !playSEMock.mock.calls.some((c) => c[0] === "card_get")) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(POLL_STEP_MS);
+      });
+      elapsed += POLL_STEP_MS;
+    }
+    expect(playSEMock.mock.calls.filter((c) => c[0] === "card_get")).toHaveLength(1);
+    expect(onContinue).not.toHaveBeenCalled(); // まだCharacterAnnouncer演出中
+
+    await pollUntilCalled(onContinue, 10000);
+    // CharacterAnnouncer演出中に追加でcard_get/roulette_tickが鳴っていないこと。
+    expect(playSEMock.mock.calls.filter((c) => c[0] === "card_get")).toHaveLength(1);
   });
 });

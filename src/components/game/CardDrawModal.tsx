@@ -5,6 +5,7 @@ import type { CardDef, CardDrawInfo } from "@/types/game";
 import type { CharacterAnnouncement } from "@/types/characterAnnouncer";
 import { getCardDef, getDrawableCards } from "@/data/cards";
 import { CARD_CATEGORY_BADGE_CLASS, CARD_CATEGORY_LABEL, RARITY_BADGE_CLASS, RARITY_LABEL, cardCategoryOf } from "@/lib/game/cardDisplay";
+import { playSE } from "@/lib/audio/soundManager";
 import { CharacterAnnouncer } from "./CharacterAnnouncer";
 
 interface CardDrawModalProps {
@@ -66,9 +67,16 @@ export function CardDrawModal({ info, onContinue }: CardDrawModalProps) {
   const settled = !spinning;
   const shown = sequence[step];
 
+  // Phase10/P10-2: 通常tickはroulette_tick、最終tick(確定カードが見える瞬間)はcard_getを
+  // 鳴らす。MoneyRouletteModalと同じ理由で、両方が同時に重なるのを避けるため同じコールバック内で
+  // 排他的に選ぶ(rarity分岐によるCharacterAnnouncerの有無には関係なく、確定した瞬間に必ず1回)。
   useEffect(() => {
     if (step >= sequence.length - 1) return;
-    const timer = window.setTimeout(() => setStep((s) => s + 1), intervals[step]);
+    const timer = window.setTimeout(() => {
+      const next = step + 1;
+      playSE(next >= sequence.length - 1 ? "card_get" : "roulette_tick");
+      setStep(next);
+    }, intervals[step]);
     return () => window.clearTimeout(timer);
   }, [step, sequence.length, intervals]);
 

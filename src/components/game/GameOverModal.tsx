@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import type { NetWorthHistoryEntry, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { rankPlayers, type RankedPlayer } from "@/lib/game/engine";
@@ -8,6 +9,7 @@ import { propertyGroupDefs } from "@/data/propertyGroups";
 import { isGroupMonopolized, isRegionMonopolized } from "@/lib/game/propertyOwnership";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
+import { playSE } from "@/lib/audio/soundManager";
 import { NetWorthTrendChart } from "./NetWorthTrendChart";
 import { CharacterSprite } from "./CharacterSprite";
 import { AnnouncerEffectLayer } from "./AnnouncerEffectLayer";
@@ -38,6 +40,12 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
   const awards = computeFinalAwards(players);
   const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsMobileViewport();
+
+  // Phase10/P10-2: ゲーム終了画面はstatus:"finished"で1回しかマウントされないため、
+  // マウント時に1回だけ鳴らせば十分。
+  useEffect(() => {
+    playSE("game_over_fanfare");
+  }, []);
 
   return (
     // Visual Prototype 1.5: 「遊び切ったご褒美画面」として、GameStateの他画面より明確に一段豪華な

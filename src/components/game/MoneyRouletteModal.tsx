@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MoneyRouletteInfo } from "@/types/game";
 import { formatMoneyDelta } from "@/lib/format";
+import { playSE } from "@/lib/audio/soundManager";
 
 interface MoneyRouletteModalProps {
   info: MoneyRouletteInfo;
@@ -44,11 +45,19 @@ export function MoneyRouletteModal({ info, onContinue }: MoneyRouletteModalProps
   const settled = !spinning;
 
   // スピン中: 次の目へ切り替える(減速するintervalsに沿って進む)。
+  // Phase10/P10-2: 通常tickはroulette_tick、最終tick(確定額が見える瞬間)はmoney_gain/lossを
+  // 鳴らす。同じコールバック内で計算して1回だけ再生することで、両方が同時に重なるのを避ける
+  // (LandingResultToastで使っているIDと共通: どちらも「お金が増減した」という同じ意味のため
+  // 新規IDは追加しない。着地イベント自体は"money"/"moneyRoulette"で排他のため二重発火経路もない)。
   useEffect(() => {
     if (step >= sequence.length - 1) return;
-    const timer = window.setTimeout(() => setStep((s) => s + 1), intervals[step]);
+    const timer = window.setTimeout(() => {
+      const next = step + 1;
+      playSE(next >= sequence.length - 1 ? (isGain ? "money_gain" : "money_loss") : "roulette_tick");
+      setStep(next);
+    }, intervals[step]);
     return () => window.clearTimeout(timer);
-  }, [step, sequence.length, intervals]);
+  }, [step, sequence.length, intervals, isGain]);
 
   // 確定後: 強調表示をHOLD_DURATION_MSだけ見せてから自動で次へ進む。
   // firedRefで二重発火を防ぐ(cleanupでの取り消しに加え、念のための保険)。
