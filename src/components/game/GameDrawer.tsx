@@ -14,6 +14,7 @@ import { PlayerHud } from "./PlayerHud";
 import { EventLog } from "./EventLog";
 import { CardDetailSheet } from "./CardDetailSheet";
 import { PropertyDetailSheet } from "./PropertyDetailSheet";
+import { AudioSettingsPanel } from "./AudioSettingsPanel";
 
 interface GameDrawerProps {
   open: boolean;
@@ -182,8 +183,9 @@ export function GameDrawer({
           <EventLog log={log} />
         </section>
 
-        <section className="flex flex-col gap-2 border-t border-amber-900/10 pt-3 dark:border-amber-100/10">
+        <section className="flex flex-col gap-3 border-t border-amber-900/10 pt-3 dark:border-amber-100/10">
           <p className={labelCls}>設定</p>
+          <AudioSettingsPanel />
           <button
             type="button"
             onClick={onReset}
