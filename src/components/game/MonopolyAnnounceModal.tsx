@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import type { MonopolyAchievement } from "@/types/game";
 import type { CharacterAnnouncement } from "@/types/characterAnnouncer";
+import { playSE } from "@/lib/audio/soundManager";
 import { CharacterAnnouncer } from "./CharacterAnnouncer";
 
 interface MonopolyAnnounceModalProps {
@@ -36,5 +38,12 @@ function buildAnnouncement(achievement: MonopolyAchievement): CharacterAnnouncem
 }
 
 export function MonopolyAnnounceModal({ achievement, onDismiss }: MonopolyAnnounceModalProps) {
+  // Phase10/P10-1: MonopolyToast.tsx(kind:"group"用、monopoly_group)と対になる効果音。
+  // GameScreen.tsx側でkind:"region"のときだけ条件付きレンダーされる(=マウント/アンマウントで
+  // 管理される)ため、マウントのたびに1回だけ発火すればよい。
+  useEffect(() => {
+    playSE("monopoly_region");
+  }, [achievement]);
+
   return <CharacterAnnouncer announcement={buildAnnouncement(achievement)} onComplete={onDismiss} />;
 }

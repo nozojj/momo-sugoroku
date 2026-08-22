@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { LandingResultInfo } from "@/types/game";
+import { playSE } from "@/lib/audio/soundManager";
 
 interface LandingResultToastProps {
   info: LandingResultInfo;
@@ -15,7 +16,8 @@ const AUTO_DISMISS_MS = 1700;
 /**
  * money/eventマス(LandingOutcome.kind: "money")着地の非ブロッキング通知(Phase9B/P9-3)。
  * MonopolyToast.tsxと同じ設計(自走して自動で消える、操作をブロックしない、
- * CharacterAnnouncer/confetti/効果音は使わない)を踏襲する。効果音の接続はPhase 10で行う。
+ * CharacterAnnouncer/confettiは使わない)を踏襲する。効果音(money_gain/money_loss)は
+ * Phase10/P10-1でMonopolyToast.tsxと同じ「マウントeffect本体で直接playSE()」パターンにより接続した。
  *
  * MonopolyToastと同じtop-14ではなく1段下(top-28)に固定配置する: 両者はstatusに依存しない
  * 独立した一時通知同士のため、購入直後の独占達成トースト表示中に別プレイヤーがmoney/eventマスへ
@@ -24,6 +26,7 @@ const AUTO_DISMISS_MS = 1700;
  */
 export function LandingResultToast({ info, onDismiss }: LandingResultToastProps) {
   useEffect(() => {
+    playSE(info.kind === "moneyGain" ? "money_gain" : "money_loss");
     const timer = window.setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

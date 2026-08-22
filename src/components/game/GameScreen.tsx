@@ -29,6 +29,7 @@ import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
 import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 import { useCpuAutoplay } from "./useCpuAutoplay";
+import { useGameplaySoundEffects } from "./useGameplaySoundEffects";
 
 const STEP_ANIMATION_MS = 460;
 
@@ -100,6 +101,10 @@ export function GameScreen() {
 
   // CPUプレイヤーの意思決定・実行(rollDice等の既存アクションを呼ぶだけ)。
   useCpuAutoplay();
+
+  // dice_roll/step_moveの効果音(Phase10/P10-1)。gameStore.tsからは呼ばず、状態の変化を
+  // 監視して副作用だけ起こす薄いフックに分離している(詳細はuseGameplaySoundEffects.ts参照)。
+  useGameplaySoundEffects();
 
   // マス移動を1歩ずつアニメーションしながら自動で進める
   useEffect(() => {
