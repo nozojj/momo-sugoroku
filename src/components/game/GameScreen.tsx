@@ -30,6 +30,7 @@ import { GameOverModal } from "./GameOverModal";
 import { StartScreen } from "./StartScreen";
 import { useCpuAutoplay } from "./useCpuAutoplay";
 import { useGameplaySoundEffects } from "./useGameplaySoundEffects";
+import { useBgmController } from "./useBgmController";
 
 const STEP_ANIMATION_MS = 460;
 
@@ -105,6 +106,11 @@ export function GameScreen() {
   // dice_roll/step_moveの効果音(Phase10/P10-1)。gameStore.tsからは呼ばず、状態の変化を
   // 監視して副作用だけ起こす薄いフックに分離している(詳細はuseGameplaySoundEffects.ts参照)。
   useGameplaySoundEffects();
+
+  // BGMシーン切り替え(Phase11/P11-1)。useGameplaySoundEffects()と同じく、早期return
+  // (waiting/settlement/destinationArrived)より前で呼ぶことで、画面差し替えをまたいでも
+  // このフック自体は生存し続ける(詳細はuseBgmController.ts参照)。
+  useBgmController();
 
   // マス移動を1歩ずつアニメーションしながら自動で進める
   useEffect(() => {
