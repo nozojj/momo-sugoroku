@@ -8,6 +8,7 @@ import { getPropertyDef } from "@/data/properties";
 import { PROPERTY_GENRE_ICON, PROPERTY_GENRE_LABEL, propertyGenreOf } from "@/lib/game/propertyDisplay";
 import { getYearEventDef } from "@/lib/game/yearEvent";
 import type { YearEventDef } from "@/types/game";
+import { playSE } from "@/lib/audio/soundManager";
 import { NetWorthTrendChart } from "./NetWorthTrendChart";
 
 interface SettlementScreenProps {
@@ -94,7 +95,15 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
               下辺を濃色にしたベベル+押下フィードバック(active:translate-y)を付ける。 */}
           <button
             type="button"
-            onClick={onContinue}
+            onClick={() => {
+              // Phase10/P10-4-4: 年またぎの確定操作にui_selectを鳴らす。ただし最終決算
+              // (「結果を見る」)は、このクリックの直後にstatus:"finished"へ進み
+              // GameOverModalのgame_over_fanfareが続けて鳴るため、SEが近接しないようここでは
+              // 鳴らさない(game_over_fanfareだけを聞かせる)。SettlementScreenはCPUの自動操作
+              // 経路が存在しない(常に人間がクリックする)ため、CPU向けの状態差分検知は不要。
+              if (!info.isFinalSettlement) playSE("ui_select");
+              onContinue();
+            }}
             className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
           >
             {info.isFinalSettlement ? "結果を見る" : "次の年度へ"}

@@ -1,22 +1,22 @@
-// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3で拡張)。
+// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、高頻度SE(dice_roll/step_move/roulette_tick)、
-// money_gain/money_loss、card_get/card_use/property_buy、monopoly_group/monopoly_region、
-// destination_arrive/destination_revealを、外部素材に一切依存せずこのスクリプトだけで
-// 再現可能な形で生成する。波形合成(矩形波/三角波+ホワイトノイズ、線形アタック+指数ディケイの
-// エンベロープ、複数音を重ねる和音合成)のみで、外部ライブラリ・サンプル音源は使用していない。
-// ライセンス上の扱いは public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため
-// 権利上の懸念なし)。
+// 目的: 「出所不明の音源は使わない」方針のもと、全14種のSE(高頻度SE、money系、card/property系、
+// monopoly系、destination系、game_over_fanfare、ui_select)を、外部素材に一切依存せずこの
+// スクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+ホワイトノイズ、
+// 線形アタック+指数ディケイのエンベロープ、複数音を重ねる和音合成)のみで、外部ライブラリ・
+// サンプル音源は使用していない。ライセンス上の扱いは public/sounds/LICENSES.md を参照
+// (自作・パラメータ手続き生成のため権利上の懸念なし)。
 //
 // 実行方法: `node scripts/generate-se.mjs`
 // 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
 //        card_get,card_use,property_buy,monopoly_group,monopoly_region,
-//        destination_arrive,destination_reveal}.wav (44.1kHz, 16bit, mono PCM WAV)
+//        destination_arrive,destination_reveal,game_over_fanfare,ui_select}.wav
+//        (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
-// P10-4-1/P10-4-2で作成した既存8音の定義・生成コードは今回も一切変更していない
-// (再実行してもバイト単位で同一の出力になることをP10-4-3でもSHA256ハッシュ比較により確認済み)。
+// P10-4-1/P10-4-2/P10-4-3で作成した既存12音の定義・生成コードは今回も一切変更していない
+// (再実行してもバイト単位で同一の出力になることをP10-4-4でもSHA256ハッシュ比較により確認済み)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,10 @@ function samplesFor(durationMs) {
 const WAVE = {
   square: (phase) => (phase < 0.5 ? 1 : -1),
   triangle: (phase) => (phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase),
+  // Phase10/P10-4-4: ui_select専用に追加。既存12音はsquare/triangleのみを使っているため、
+  // 正弦波(倍音が最も少なく素っ気ない音色)を使うのはui_selectだけになる。これにより
+  // 波形そのものでゲームイベント音(SOUND_DEFS内の他の全SE)と汎用UI音を区別できる。
+  sine: (phase) => Math.sin(2 * Math.PI * phase),
 };
 
 /**
@@ -287,6 +291,50 @@ const SOUND_DEFS = {
       silence(5),
       renderTone({ waveform: "square", freqStart: 1318.51, durationMs: 85, peak: 0.42, attackMs: 1, decayExp: 4 }), // E6
     ]),
+
+  // Phase10/P10-4-4: ゲーム全体で最も豪華なフィナーレSE。既存の最上位(monopoly_regionの2声・
+  // 864ms)をさらに上回るよう、「音域の広さ(G4という全SE中最も低い音から開始)」「声部数
+  // (3声)」「尺(最長)」の3点で差をつける。呼びかけ(G4-C5-E5-G5-C6)→1オクターブ上の
+  // エコー(C6-E6-G6-C7)→C7+G6+E6の3声和音フィナーレ、という構成。呼びかけ・エコーは
+  // monopoly系と同じ矩形波、フィナーレだけ矩形波+三角波2声を追加して最も厚みのある終わり方にする。
+  game_over_fanfare: () =>
+    concat([
+      // 呼びかけ: オクターブ/4度/3度の跳躍主体(money_gainの順次上行アルペジオ、monopolyの
+      // 同音連打型リズムのどちらとも違う、幅広い跳躍で「壮大さ」を出す)。
+      renderTone({ waveform: "square", freqStart: 392, durationMs: 90, peak: 0.44, attackMs: 1, decayExp: 5 }), // G4
+      silence(10),
+      renderTone({ waveform: "square", freqStart: 523.25, durationMs: 90, peak: 0.44, attackMs: 1, decayExp: 5 }), // C5
+      silence(10),
+      renderTone({ waveform: "square", freqStart: 659.25, durationMs: 90, peak: 0.45, attackMs: 1, decayExp: 5 }), // E5
+      silence(10),
+      renderTone({ waveform: "square", freqStart: 784, durationMs: 110, peak: 0.46, attackMs: 1, decayExp: 4.5 }), // G5
+      silence(15),
+      renderTone({ waveform: "square", freqStart: 1046.5, durationMs: 130, peak: 0.47, attackMs: 1, decayExp: 4 }), // C6
+      silence(20),
+      // エコー: 1オクターブ上で同じ形を速く繰り返す。
+      renderTone({ waveform: "square", freqStart: 1046.5, durationMs: 60, peak: 0.44, attackMs: 1, decayExp: 5 }), // C6
+      silence(8),
+      renderTone({ waveform: "square", freqStart: 1318.51, durationMs: 60, peak: 0.45, attackMs: 1, decayExp: 5 }), // E6
+      silence(8),
+      renderTone({ waveform: "square", freqStart: 1567.98, durationMs: 60, peak: 0.46, attackMs: 1, decayExp: 5 }), // G6
+      silence(8),
+      renderTone({ waveform: "square", freqStart: 2093, durationMs: 90, peak: 0.48, attackMs: 1, decayExp: 4 }), // C7
+      silence(20),
+      // フィナーレ: C7(矩形波)+G6+E6(三角波)の3声和音。monopoly_regionの2声(各0.4→実測
+      // 合成後ピーク0.777)より声部が1つ多いため、各声のpeakをやや抑えて(0.27前後)合成後の
+      // クリッピングを避ける(実測はP10-4-4のクリッピング確認で検証)。
+      mix([
+        renderTone({ waveform: "square", freqStart: 2093, durationMs: 600, peak: 0.27, attackMs: 1, decayExp: 2 }), // C7
+        renderTone({ waveform: "triangle", freqStart: 1567.98, durationMs: 600, peak: 0.27, attackMs: 1, decayExp: 2 }), // G6
+        renderTone({ waveform: "triangle", freqStart: 1318.51, durationMs: 600, peak: 0.27, attackMs: 1, decayExp: 2 }), // E6
+      ]),
+    ]),
+
+  // Phase10/P10-4-4: ui_selectは汎用UIの決定/クリック音。既存12音のどのSEとも波形が
+  // 異なる正弦波の単音のみ(スイープ・ノイズなし)にすることで、ゲームイベント音と
+  // 明確に一線を画す最もシンプルな音にしている。1200Hzは既存の音階(C/D/E/G/A音)から
+  // あえて外した、電子的な「ビープ」寄りの周波数。
+  ui_select: () => renderTone({ waveform: "sine", freqStart: 1200, durationMs: 130, peak: 0.3, attackMs: 2, decayExp: 4.5 }),
 };
 
 let totalBytes = 0;

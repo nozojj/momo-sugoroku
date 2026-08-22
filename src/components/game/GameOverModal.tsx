@@ -97,7 +97,12 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
         <div className="mt-6">
           <button
             type="button"
-            onClick={onRestart}
+            onClick={() => {
+              // Phase10/P10-4-4: セッション終了後の1回きりの確定操作。GameOverModalはCPUの
+              // 自動操作経路が存在しない(常に人間がクリックする)ため、CPU向けの状態差分検知は不要。
+              playSE("ui_select");
+              onRestart();
+            }}
             className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
           >
             もう一度遊ぶ

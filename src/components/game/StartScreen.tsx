@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PlayerController } from "@/types/game";
 import { MAX_PLAYERS, MIN_PLAYERS, PLAYER_COLORS, CAR_ICONS, YEAR_OPTIONS, DEFAULT_TOTAL_YEARS } from "@/lib/game/engine";
+import { playSE } from "@/lib/audio/soundManager";
 import { CharacterSprite } from "./CharacterSprite";
 
 interface StartScreenProps {
@@ -31,6 +32,9 @@ export function StartScreen({ onStart }: StartScreenProps) {
   }
 
   function handleStart() {
+    // Phase10/P10-4-4: セッション開始の1回きりの確定操作。StartScreenはCPUの自動操作経路が
+    // 存在しない(常に人間がクリックする)ため、CPU向けの状態差分検知は不要。
+    playSE("ui_select");
     const chosen = names
       .slice(0, playerCount)
       .map((n, i) => n.trim() || DEFAULT_NAMES[i]);
