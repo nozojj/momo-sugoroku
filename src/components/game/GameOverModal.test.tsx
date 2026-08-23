@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// GameOverModal.tsx(Phase10/P10-2で効果音を追加)の自動テスト。
-// マウント時にgame_over_fanfareがちょうど1回だけ再生されることを確認する。
+// GameOverModal.tsx(Phase10/P10-2で効果音を追加、P11-3-Aでgame_over_fanfareの発火元を
+// FinalRaceSequence.tsxへ移設)の自動テスト。
+// マウント時にはもう何のSEも鳴らさないことを確認する(fanfareはFinalRaceSequence.test.tsx側で検証する)。
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import { playSE } from "@/lib/audio/soundManager";
@@ -52,13 +53,12 @@ afterEach(() => {
 });
 
 describe("GameOverModal", () => {
-  it("マウント時にgame_over_fanfareが1回だけ再生される", () => {
+  it("マウント時には何のSEも鳴らさない(game_over_fanfareはFinalRaceSequence側へ移設済み)", () => {
     const player = buildPlayer();
     render(
       <GameOverModal players={[player]} winnerIds={[player.id]} totalYears={3} netWorthHistory={[]} onRestart={() => {}} />,
     );
 
-    expect(playSEMock).toHaveBeenCalledTimes(1);
-    expect(playSEMock).toHaveBeenCalledWith("game_over_fanfare");
+    expect(playSEMock).not.toHaveBeenCalled();
   });
 });

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useHasHydrated } from "@/store/useHasHydrated";
 import { getMap } from "@/data/maps";
 import { getNode, shortestDistance, destinationCandidateNodes } from "@/lib/game/mapGraph";
-import { getCalendar, MONTHS_PER_YEAR } from "@/lib/game/engine";
+import { getCalendar, MONTHS_PER_YEAR, rankPlayers } from "@/lib/game/engine";
 import { getYearEventDef } from "@/lib/game/yearEvent";
 import { Board } from "./Board";
 import { Dice } from "./Dice";
@@ -27,6 +27,7 @@ import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
 import { YearEventAnnounceModal } from "./YearEventAnnounceModal";
 import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
 import { GameOverModal } from "./GameOverModal";
+import { FinalRaceSequence } from "./FinalRaceSequence";
 import { StartScreen } from "./StartScreen";
 import { useCpuAutoplay } from "./useCpuAutoplay";
 import { useGameplaySoundEffects } from "./useGameplaySoundEffects";
@@ -94,6 +95,28 @@ export function GameScreen() {
   const continueAfterSettlement = useGameStore((s) => s.continueAfterSettlement);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 最終順位発表演出(FinalRaceSequence)が完了したかどうか。GameScreen自体は一度きり
+  // マウントされる単一コンポーネントなので、"もう一度遊ぶ"で新しいプレイが始まった後の
+  // 次のゲーム終了でも演出をもう一度頭から見せられるよう、statusが"finished"を離れた
+  // 瞬間(=リスタート後)にfalseへ戻す(下のuseEffect参照)。
+  const [raceSequenceDone, setRaceSequenceDone] = useState(false);
+
+  useEffect(() => {
+    if (status !== "finished") setRaceSequenceDone(false);
+  }, [status]);
+
+  // finished突入時点の最終順位スナップショット。winnerIdsはgameStore.ts側でfinished確定の
+  // 瞬間に1回だけ新しい配列としてセットされ、以後status:"finished"が続く間は同じ参照の
+  // まま変化しない(次のゲームでまたfinishedになったときだけ新しい配列になる)ため、
+  // これをuseMemoの依存に使うことで「finished突入時点のplayersでrankPlayers()した結果」を
+  // レース演出が終わるまで固定できる(GameScreenの再レンダー理由がdrawerOpenの開閉など
+  // finishedと無関係なものであっても再計算されない)。FinalRaceSequence自身はこの
+  // 固定済み配列を受け取るだけで、一切再計算しない。
+  const finishedRanked = useMemo(
+    () => rankPlayers(players),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [winnerIds],
+  );
 
   const currentPlayer = players[currentPlayerIndex];
   // CPUの手番中は、人間が誤ってサイコロ・分岐・購入・カード選択等を操作できないようにする
@@ -327,7 +350,19 @@ export function GameScreen() {
         <SettlementIntroAnnouncer info={settlementInfo} onContinue={continueAfterSettlementIntro} />
       )}
 
-      {status === "finished" && winnerIds && (
+      {/* 最終順位発表演出(P11-3-A/FinalRaceSequence)→静的な結果画面(GameOverModal)の2段階。
+          順位はfinishedRanked(上のuseMemoでfinished突入時点のplayersから1回だけ計算し、
+          winnerIdsが変わらない限り再計算されない固定スナップショット)をそのまま渡すだけで、
+          演出側では一切再計算しない(SettlementIntroAnnouncer→SettlementScreenと同じ構成)。 */}
+      {status === "finished" && winnerIds && !raceSequenceDone && (
+        <FinalRaceSequence
+          ranked={finishedRanked}
+          winnerIds={winnerIds}
+          onFinish={() => setRaceSequenceDone(true)}
+        />
+      )}
+
+      {status === "finished" && winnerIds && raceSequenceDone && (
         <GameOverModal
           players={players}
           winnerIds={winnerIds}

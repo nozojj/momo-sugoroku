@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import type { NetWorthHistoryEntry, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { rankPlayers, type RankedPlayer } from "@/lib/game/engine";
@@ -32,6 +31,10 @@ interface GameOverModalProps {
  * continueAfterSettlement()→advanceToNextTurn()が手番送りするだけでプレイヤー操作を
  * 一切挟まないため、ここで受け取るplayersの所有物件・目的地到着回数は最終決算時点の
  * ものとそのまま一致する(独占状況・物件数もここで安全に再計算できる)。
+ *
+ * game_over_fanfareの再生はここでは行わない(最終順位発表演出FinalRaceSequence.tsxの
+ * introフェーズへ移設済み。GameScreen.tsxはstatus:"finished"になるとまずFinalRaceSequenceを
+ * 表示し、その演出が完了(onFinish)してからこのGameOverModalへ切り替える)。
  */
 export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory, onRestart }: GameOverModalProps) {
   const isTie = winnerIds.length > 1;
@@ -40,12 +43,6 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
   const awards = computeFinalAwards(players);
   const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsMobileViewport();
-
-  // Phase10/P10-2: ゲーム終了画面はstatus:"finished"で1回しかマウントされないため、
-  // マウント時に1回だけ鳴らせば十分。
-  useEffect(() => {
-    playSE("game_over_fanfare");
-  }, []);
 
   return (
     // Visual Prototype 1.5: 「遊び切ったご褒美画面」として、GameStateの他画面より明確に一段豪華な
