@@ -30,7 +30,7 @@ export const useAudioSettingsStore = create<AudioSettingsState>()(
       seEnabled: true,
       seVolume: 0.8,
       bgmEnabled: true,
-      bgmVolume: 0.5,
+      bgmVolume: 0.2,
       setSeEnabled: (seEnabled) => set({ seEnabled }),
       setSeVolume: (seVolume) => set({ seVolume: Math.min(1, Math.max(0, seVolume)) }),
       setBgmEnabled: (bgmEnabled) => set({ bgmEnabled }),
