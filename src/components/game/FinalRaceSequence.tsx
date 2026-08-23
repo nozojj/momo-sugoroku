@@ -50,6 +50,27 @@ const REDUCED_TIMING_MS = {
   celebration: 400,
 };
 
+/**
+ * rankedのindexが「現時点で脱落済み(=順位発表済みで、静的なレーンから外れて良い)」かどうかを
+ * 判定する純粋関数。新しい状態は一切追加せず、既存のphase/eliminatedCountとplayerCountだけから
+ * 毎回導出する(P11-3-A設計原則: 順位・脱落状態の再計算は行わず、既に確定したデータの
+ * 読み方だけを変える)。
+ *
+ * index<2(上位2人)は、eliminating中はもちろんfinalTwo以降(winnerSprint/finish/celebration/done)
+ * でも絶対に脱落扱いにしない。eliminating中は「発表済み(eliminatedCount件)」に加えて
+ * 「現在アナウンス中の1人」も同時に脱落扱いにする(Phase B-1では脱落transitionを実装しない
+ * ため、アナウンスと同時に静的な「脱落済み」表示へ切り替える)。
+ */
+function isEliminatedIndex(index: number, phase: RacePhase, eliminatedCount: number, playerCount: number): boolean {
+  if (index < 2) return false;
+  if (phase === "intro" || phase === "running") return false;
+  if (phase === "eliminating") {
+    const eliminationOrder = playerCount - index; // このindexが末尾から数えて何番目に脱落するか(1始まり)
+    return eliminationOrder <= eliminatedCount + 1;
+  }
+  return true; // finalTwo以降は上位2人以外すべて脱落済み
+}
+
 export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequenceProps) {
   const reduceMotion = usePrefersReducedMotion();
   const timing = reduceMotion ? REDUCED_TIMING_MS : TIMING_MS;
@@ -70,6 +91,12 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   // rankedは既に1位が先頭の確定済み配列なので、末尾から読むだけで「最下位から発表」になる。
   const currentEliminationIndex = playerCount - 1 - eliminatedCount;
   const eliminatedEntry = phase === "eliminating" ? ranked[currentEliminationIndex] : undefined;
+
+  // レース会場に表示する「現役」と、脱落済みエリアに表示する「脱落済み」の分離(Phase B-1)。
+  // isEliminatedIndex()はindexとphase/eliminatedCountだけから導出する純粋関数で、ranked自体の
+  // 並び順・rank値には一切手を加えない(絞り込む=filterするだけ)。
+  const activeRanked = ranked.filter((_, idx) => !isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
+  const eliminatedRanked = ranked.filter((_, idx) => isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
 
   function finish() {
     if (finishedRef.current) return;
@@ -180,19 +207,65 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
         </p>
       )}
 
-      {/* Phase A時点では全プレイヤーを常時列挙するだけの仮表示。脱落済みのフェードアウト等
-          見た目の作り込みはPhase Cで行う。 */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        {ranked.map((r) => (
-          <span
+      {/* レース会場(Phase B-1: 静的レイアウトのみ、動きは無し)。
+          PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、名前・車を左に固定し、
+          右へ伸びる線の先に「ゴール →」を置く。
+          スマホ(sm未満)は上→下の縦レーンを横に並べる: 各レーン=1プレイヤーの列、名前・車を
+          上に固定し、下へ伸びる線の先に「↓ ゴール」を置く(PCレイアウトの単純縮小ではなく、
+          縦画面の向きに合わせてレーンの方向自体を変えている)。
+          jostle等の「動き」・脱落transition・ゴール演出はPhase B-2以降で追加する。 */}
+      <div className="flex w-full max-w-4xl flex-row items-stretch justify-center gap-3 overflow-x-auto px-2 sm:flex-col sm:items-stretch sm:gap-2.5 sm:overflow-visible sm:px-0">
+        {activeRanked.map((r) => (
+          <div
             key={r.player.id}
-            className="flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 text-sm font-bold text-slate-800 shadow dark:bg-slate-800/70 dark:text-white"
-            style={{ borderLeft: `4px solid ${r.player.color}` }}
+            data-player-id={r.player.id}
+            data-eliminated="false"
+            className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
           >
-            {r.player.carIcon} {r.player.name}
-          </span>
+            <div className="flex flex-col items-center gap-1 sm:w-32 sm:shrink-0 sm:flex-row sm:justify-start sm:gap-1.5">
+              <span
+                className="w-full min-w-0 truncate text-center text-[11px] font-bold text-white drop-shadow sm:w-auto sm:text-left sm:text-sm"
+                title={r.player.name}
+              >
+                {r.player.name}
+              </span>
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow"
+                style={{ backgroundColor: r.player.color }}
+              >
+                {r.player.carIcon}
+              </span>
+            </div>
+            {/* 静的なレース track。Phase B-1では車の位置はここでは動かさず、レーンの
+                方向(縦/横)と「ゴールの方角」だけを示す。 */}
+            <div className="w-px flex-1 rounded-full bg-white/40 sm:h-px sm:w-auto" />
+            <span className="text-[9px] font-bold text-white/70 sm:hidden">↓ ゴール</span>
+            <span className="hidden text-xs font-bold text-white/70 sm:inline">ゴール →</span>
+          </div>
         ))}
       </div>
+
+      {/* 脱落済み・順位発表済みエリア。完全に消さず、小さなchip一覧として残す
+          (Phase Aの仮表示と同じ見た目のパターンを踏襲)。 */}
+      {eliminatedRanked.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="text-[10px] font-bold text-white/70">脱落済み・順位発表済み</span>
+          {eliminatedRanked.map((r) => (
+            <span
+              key={r.player.id}
+              data-player-id={r.player.id}
+              data-eliminated="true"
+              className="flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-800 opacity-80 shadow dark:bg-slate-800/70 dark:text-white"
+              style={{ borderLeft: `3px solid ${r.player.color}` }}
+            >
+              <span className="max-w-16 truncate" title={r.player.name}>
+                {r.player.carIcon} {r.player.name}
+              </span>
+              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400">{r.rank}位</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

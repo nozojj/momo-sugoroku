@@ -210,3 +210,110 @@ describe("FinalRaceSequence", () => {
     expect(screen.getByText(`4位! ${ranked[ranked.length - 1].player.name}さん`)).not.toBeNull();
   });
 });
+
+/** [data-player-id]を持つ要素(現役レーンまたは脱落済みchip)を1件取得する。 */
+function laneFor(playerId: string): HTMLElement | null {
+  return document.querySelector(`[data-player-id="${playerId}"]`);
+}
+
+function isActive(playerId: string): boolean {
+  return laneFor(playerId)?.getAttribute("data-eliminated") === "false";
+}
+
+describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it.each([2, 3, 4])("%i人プレイ: introの時点で全員が現役レーンとして表示される", async (n) => {
+    const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    for (const r of ranked) {
+      expect(laneFor(r.player.id)).not.toBeNull();
+      expect(isActive(r.player.id)).toBe(true);
+    }
+    // 全員合わせてplayerCount件、脱落済みは0件のはず。
+    expect(document.querySelectorAll('[data-player-id]')).toHaveLength(n);
+    expect(document.querySelectorAll('[data-eliminated="true"]')).toHaveLength(0);
+  });
+
+  it("name/color/carIconがレーンへ反映される", () => {
+    const players = [
+      { ...buildPlayer("p1", "たろう", 2000), color: "#ff0000", carIcon: "🚙" },
+      { ...buildPlayer("p2", "じろう", 1000), color: "#00ff00", carIcon: "🚕" },
+    ];
+    const ranked = rankPlayers(players);
+    const winnerIds = computeWinnerIds(players);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const lane = laneFor("p1")!;
+    expect(lane.textContent).toContain("たろう");
+    expect(lane.textContent).toContain("🚙");
+    // colorはプレイヤー名側ではなく車アイコンのバッジ(style.backgroundColor)に反映される。
+    expect(lane.innerHTML).toContain("rgb(255, 0, 0)");
+  });
+
+  it("4人: eliminatingの進行に応じて脱落済みが1人→2人と正しく増え、上位2人は誤って脱落扱いされない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位, p2=3位, p3=2位, p4=1位
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // intro→running→eliminating開始(4位=p1が脱落扱いになる)
+    expect(isActive("p1")).toBe(false);
+    expect(isActive("p2")).toBe(true);
+    expect(isActive("p3")).toBe(true);
+    expect(isActive("p4")).toBe(true);
+    expect(document.querySelectorAll('[data-eliminated="true"]')).toHaveLength(1);
+
+    await advance(700); // eliminating 2人目(3位=p2)
+    expect(isActive("p1")).toBe(false);
+    expect(isActive("p2")).toBe(false);
+    expect(isActive("p3")).toBe(true); // 上位2人は誤って脱落扱いされない
+    expect(isActive("p4")).toBe(true);
+    expect(document.querySelectorAll('[data-eliminated="true"]')).toHaveLength(2);
+  });
+
+  it.each([2, 3, 4])("%i人プレイ: finalTwo到達時点で現役レーンがちょうど2人になる", async (n) => {
+    const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const eliminationSteps = Array(Math.max(0, n - 2)).fill(700);
+    await advanceSteps([1200, 900, ...eliminationSteps]);
+
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(document.querySelectorAll('[data-eliminated="false"]')).toHaveLength(2);
+    // 現役の2人は常に1位・2位(rank上位2件)のはず。
+    const activeIds = [...document.querySelectorAll('[data-eliminated="false"]')].map((el) => el.getAttribute("data-player-id"));
+    const top2Ids = ranked.slice(0, 2).map((r) => r.player.id);
+    expect(new Set(activeIds)).toEqual(new Set(top2Ids));
+  });
+
+  it("winnerSprint/finish/celebrationでも上位2人は脱落扱いにならない(4人プレイ)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 700, 700, 1500]); // finalTwo → winnerSprintへ
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+    expect(isActive(ranked[0].player.id)).toBe(true);
+    expect(isActive(ranked[1].player.id)).toBe(true);
+  });
+
+  it("12文字の長い名前でもtruncate用クラスとtitle属性が付与される(レイアウト崩れの回避策が効いている)", () => {
+    const longName = "あいうえおかきくけこさし"; // 12文字ちょうど(StartScreenのmaxLength上限)
+    const players = [buildPlayer("p1", longName, 2000), buildPlayer("p2", "プレイヤー2", 1000)];
+    const ranked = rankPlayers(players);
+    const winnerIds = computeWinnerIds(players);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const nameEl = screen.getByTitle(longName);
+    expect(nameEl.className).toContain("truncate");
+    expect(nameEl.textContent).toBe(longName);
+  });
+});
