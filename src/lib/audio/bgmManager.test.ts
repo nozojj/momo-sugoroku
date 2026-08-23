@@ -10,6 +10,7 @@
 // テスト間の干渉やvi.resetModules()は不要)。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBgmManager } from "@/lib/audio/bgmManager";
+import { BGM_TRACK_SRC } from "@/lib/audio/bgmTracks";
 import { useAudioSettingsStore } from "@/store/audioSettingsStore";
 
 class FakeAudio {
@@ -188,7 +189,15 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     vi.unstubAllGlobals();
   });
 
-  it("P11-1時点ではBGM_TRACK_SRCが空のため、どのsceneへ切り替えてもAudio要素を生成せず例外も投げない", () => {
+  it("BGM_TRACK_SRCがtitle/gameplayをMP3パスで登録し、他の3sceneは未登録(undefined)のままである", () => {
+    expect(BGM_TRACK_SRC.title).toBe("/sounds/bgm_title.mp3");
+    expect(BGM_TRACK_SRC.gameplay).toBe("/sounds/bgm_gameplay.mp3");
+    expect(BGM_TRACK_SRC.destinationCelebration).toBeUndefined();
+    expect(BGM_TRACK_SRC.settlement).toBeUndefined();
+    expect(BGM_TRACK_SRC.gameOver).toBeUndefined();
+  });
+
+  it("P11-2時点ではtitle/gameplayのみBGM_TRACK_SRCに登録されており、未登録の3sceneは例外も投げずAudio要素を生成しない", () => {
     const manager = createBgmManager(); // 引数省略=bgmTracks.tsの実際のBGM_TRACK_SRCを使う
 
     expect(() => {
@@ -199,7 +208,13 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
       manager.setScene("gameOver");
     }).not.toThrow();
 
-    expect(FakeAudio.instances).toHaveLength(0);
+    const titleInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_title"));
+    const gameplayInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_gameplay"));
+    expect(titleInstances).toHaveLength(1);
+    expect(titleInstances[0].src).toBe("/sounds/bgm_title.mp3");
+    expect(gameplayInstances).toHaveLength(1);
+    expect(gameplayInstances[0].src).toBe("/sounds/bgm_gameplay.mp3");
+    expect(FakeAudio.instances.filter((a) => /destinationCelebration|settlement|gameOver/.test(a.src))).toHaveLength(0);
   });
 });
 

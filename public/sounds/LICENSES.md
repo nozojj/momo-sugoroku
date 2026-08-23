@@ -27,10 +27,22 @@
 | `game_over_fanfare.wav` | P10-4-4 (2026-08-22) | 矩形波の呼びかけ(G4→C5→E5→G5→C6)→1オクターブ上のエコー(C6→E6→G6→C7)→C7(矩形波)+G6+E6(三角波)の3声和音フィナーレ、1489ms。ゲーム全体で最も低い音(G4)から始まり、最も長く、最も声部数の多い(3声)フィナーレとして設計。フィナーレ実測ピーク振幅0.7469(クリッピングなし)を確認済み |
 | `ui_select.wav` | P10-4-4 (2026-08-22) | 正弦波の単音(1200Hz)、130ms。既存13音がすべて矩形波/三角波/ノイズのみで構成されるのに対し、ui_selectだけが正弦波を使うことで汎用UI音として明確に区別される |
 
+## 第三者配布素材(DOVA-SYNDROME)
+
+以下の2曲は**このリポジトリの管理者による自作ではなく**、DOVA-SYNDROME(https://dova-s.jp/)で配布されている第三者の楽曲をダウンロードして`public/sounds/`へ組み込んだものである。音源自体を素材として再配布する目的ではなく、本ゲームのBGMとして組み込んで使用している。利用条件はDOVA-SYNDROMEの利用規約および各作者の個別条件に従う(コード上でDOVA-SYNDROMEへ直接アクセスしたり、DOVAのURLからストリーミング再生したりすることはなく、常にローカルに同梱した`/sounds/bgm_title.mp3`・`/sounds/bgm_gameplay.mp3`を再生する)。
+
+| ファイル | 導入 | Original title | Composer | Source | Source page | Usage | sample rate | channels | bitrate | duration |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bgm_title.mp3` | P11-2 (2026-08-23) | おさかなシャトルⅡ | Hupple | DOVA-SYNDROME | https://dova-s.jp/bgm/detail/23317 | title BGM | 48000Hz | 2 (stereo) | 320kbps (CBR) | 62.400s |
+| `bgm_gameplay.mp3` | P11-2 (2026-08-23) | 夏を終わらせない！ | しんさんわーくす | DOVA-SYNDROME | https://dova-s.jp/bgm/detail/23761 | normal gameplay BGM | 48000Hz | 2 (stereo) | 160kbps (CBR) | 192.048s |
+
+License/terms: DOVA-SYNDROMEの利用規約および作者個別条件に従う。
+
 ## 旧ファイルの削除記録
 
 | ファイル | 経緯 |
 |---|---|
 | `monopoly_group.mp3` | 2026-08-13追加時点で入手元・ライセンスの記録が一切残っておらず、リポジトリ内(コミットメッセージ・README・ファイルメタデータ)のいずれからも確認できなかった(P10-4調査時点)。Phase10/P10-4-3で`monopoly_group.wav`(自作・手続き的生成)へ正式に置き換え、コード上の参照が完全になくなったことを確認したうえで**削除済み**。 |
+| `bgm_title.wav` / `bgm_gameplay.wav` | P11-2で`scripts/generate-bgm.mjs`により自作・手続き的生成したBGM(コミット前の未コミット段階)。試聴の結果、方針をDOVA-SYNDROME配布の第三者楽曲(上記`bgm_title.mp3`/`bgm_gameplay.mp3`)へ変更したため正式に不採用とし、生成スクリプト`scripts/generate-bgm.mjs`・専用テスト`scripts/generate-bgm.test.ts`とあわせて**削除済み**(いずれも未コミットのままの差し替えのため、コミット履歴には残らない)。 |
 
-すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。
+すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。BGM(title/gameplay)はP11-2でDOVA-SYNDROME配布の第三者楽曲を採用した。
