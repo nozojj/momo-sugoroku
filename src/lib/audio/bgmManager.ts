@@ -64,8 +64,9 @@ export function createBgmManager(trackSrc: Partial<Record<BgmSceneId, string>> =
     }, FADE_STEP_MS);
   }
 
-  /** autoplay拒否・音源読み込み失敗等によるplay()の失敗を安全に無視する。P11-1では
-   *  再試行やunlock処理を一切行わない(P11-3で初回ユーザー操作後の再生開始を実装する)。
+  /** autoplay拒否・音源読み込み失敗等によるplay()の失敗を安全に無視する。この関数自体は
+   *  再試行を行わない(単発のplay()呼び出しをtry/catchするだけ)。初回ユーザー操作後の
+   *  再試行はP11-3で本ファイル下部のdocument.pointerdown/keydownリスナー側が担う。
    *  unhandled rejection・console.errorの連鎖・無限retryのいずれも起こさない。 */
   function playSafely(el: HTMLAudioElement): void {
     try {
@@ -122,12 +123,57 @@ export function createBgmManager(trackSrc: Partial<Record<BgmSceneId, string>> =
       }
       if (state.bgmEnabled !== prevState.bgmEnabled) {
         if (state.bgmEnabled) {
+          // bgmEnabled=false中にsetScene()されたAudio要素はvolumeが0のまま保持されている
+          // ことがある(setScene()はbgmEnabled=falseの間fadeToを一切呼ばないため)。ここでも
+          // 改めてfadeToをかけることで、無効化中に生成された要素でも現在のbgmVolumeまで
+          // 確実にフェードインする(既にvolumeが目標値ならfadeTo自身が即座に収束するだけ
+          // なので、「再生中に一時停止→再開」のような既存ケースへの影響はない)。
           playSafely(el);
+          fadeTo(el, state.bgmVolume, FADE_DURATION_MS);
         } else {
           el.pause();
         }
       }
     });
+  }
+
+  // 初回autoplayがブラウザに拒否された場合の再試行(P11-3)。document.pointerdown/keydownを
+  // 「最初の適切なユーザー操作」の代表として一度だけ監視し、発火した瞬間の(クロージャ変数
+  // としてライブな)audioElへplay()を再試行する。イベント登録時に特定のAudio要素を
+  // 閉じ込めない(常にその時点の最新のaudioElを読む)ことで、「autoplay拒否中にtitle→
+  // gameplayへscene変更→その後ユーザー操作」という順序でも、常にその時点のcurrent scene
+  // だけを再生する(古いsceneが遅れて鳴り出すことがない)。
+  //
+  // audioElがまだ存在しない(setScene()が一度も呼ばれていない)場合やbgmEnabled=falseの
+  // 場合はリスナーを解除せずに待機し続ける: 最初の1回の操作だけでunlockの機会を永久に
+  // 失わないようにするため。bgmEnabled=falseからtrueへの切り替え自体は上のsubscribe()側が
+  // 処理する(そのON操作自体がユーザージェスチャーのため、ここで改めて拾う必要はない)。
+  // 実際にplay()を再試行できた場合、またはHTMLAudioElement.pausedが既にfalse(autoplayが
+  // 最初から許可されていた場合)の場合だけリスナーを解除する: 後者では頭出し・再スタート
+  // 等の余計な処理を一切行わない(P11-3の受け入れ要件)。
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    const attemptUnlock = () => {
+      if (!audioEl) return; // 再生対象がまだ無い: 次の操作に備えて監視を継続する
+
+      if (!audioEl.paused) {
+        // 既に再生中(autoplayが最初から許可されていた)。再試行不要、頭出しもしない。
+        removeUnlockListeners();
+        return;
+      }
+
+      if (!useAudioSettingsStore.getState().bgmEnabled) return; // OFF中は監視を継続する
+
+      playSafely(audioEl);
+      removeUnlockListeners();
+    };
+
+    function removeUnlockListeners(): void {
+      document.removeEventListener("pointerdown", attemptUnlock);
+      document.removeEventListener("keydown", attemptUnlock);
+    }
+
+    document.addEventListener("pointerdown", attemptUnlock);
+    document.addEventListener("keydown", attemptUnlock);
   }
 
   return { setScene };
