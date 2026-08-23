@@ -10,16 +10,26 @@ interface StartScreenProps {
   onStart: (names: string[], totalYears: number, controlledBy: PlayerController[]) => void;
 }
 
-const DEFAULT_NAMES = ["プレイヤー1", "プレイヤー2", "プレイヤー3", "プレイヤー4"];
 const PLAYER_COUNT_OPTIONS = Array.from(
   { length: MAX_PLAYERS - MIN_PLAYERS + 1 },
   (_, i) => MIN_PLAYERS + i,
 );
 const DEFAULT_CONTROLLERS: PlayerController[] = ["human", "human", "human", "human"];
 
+/** 名前欄が未入力のときだけ使う既定名。プロフィール等への永続保存は行わず、ゲーム開始の
+ *  たびに(「もう一度遊ぶ」からの再スタートも含めて)必ずこの関数で毎回組み立て直す
+ *  (StartScreenはGameScreen.tsxの早期returnで毎回新規マウントされ、names自体も
+ *  下のuseStateで空文字始まりのため、前回入力した名前が次回に持ち越されることもない)。
+ *  人間は「プレイヤーN」、CPUは「CPU N」(Nは1始まりの座席番号)。 */
+function defaultNameFor(index: number, controller: PlayerController): string {
+  return controller === "cpu" ? `CPU ${index + 1}` : `プレイヤー${index + 1}`;
+}
+
 export function StartScreen({ onStart }: StartScreenProps) {
   const [playerCount, setPlayerCount] = useState<number>(MIN_PLAYERS);
-  const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  // 未入力(空文字)始まり: 入力欄にはdefaultNameFor()をplaceholderとして表示するだけで、
+  // 値そのものは「本当に何か入力されたか」を空文字/非空文字で正直に保持する。
+  const [names, setNames] = useState<string[]>(() => Array(MAX_PLAYERS).fill(""));
   const [controlledBy, setControlledBy] = useState<PlayerController[]>(DEFAULT_CONTROLLERS);
   const [totalYears, setTotalYears] = useState<number>(DEFAULT_TOTAL_YEARS);
 
@@ -37,7 +47,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
     playSE("ui_select");
     const chosen = names
       .slice(0, playerCount)
-      .map((n, i) => n.trim() || DEFAULT_NAMES[i]);
+      .map((n, i) => n.trim() || defaultNameFor(i, controlledBy[i]));
     onStart(chosen, totalYears, controlledBy.slice(0, playerCount));
   }
 
@@ -105,6 +115,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
               <input
                 className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-500 dark:bg-slate-700"
                 value={name}
+                placeholder={defaultNameFor(i, controlledBy[i])}
                 maxLength={12}
                 onChange={(e) => setName(i, e.target.value)}
               />
