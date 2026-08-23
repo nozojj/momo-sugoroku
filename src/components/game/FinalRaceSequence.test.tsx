@@ -317,3 +317,105 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
     expect(nameEl.textContent).toBe(longName);
   });
 });
+
+/** レーン要素のdata-running属性を読む(現役レーンにのみ存在する)。 */
+function isRunning(playerId: string): boolean | null {
+  const attr = laneFor(playerId)?.getAttribute("data-running");
+  if (attr === null || attr === undefined) return null;
+  return attr === "true";
+}
+
+/** レーン要素内から走行演出クラス(race-drift/animate-race-vibrate)が実際に付与されているか。 */
+function hasMotionClasses(playerId: string): boolean {
+  const html = laneFor(playerId)?.innerHTML ?? "";
+  return html.includes("race-drift") && html.includes("animate-race-vibrate");
+}
+
+describe("FinalRaceSequence(Phase B-2a: 通常走行モーション)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("introでは通常走行animationが付かない(data-running=falseかつ走行クラスも無い)", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(document.querySelector('[data-race-phase="intro"]')).not.toBeNull();
+    for (const r of ranked) {
+      expect(isRunning(r.player.id)).toBe(false);
+      expect(hasMotionClasses(r.player.id)).toBe(false);
+    }
+  });
+
+  it("runningに入ると現役車に走行animationが付く(data-running=trueかつ走行クラスが付与される)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advance(1200); // intro → running
+    expect(document.querySelector('[data-race-phase="running"]')).not.toBeNull();
+    for (const r of ranked) {
+      expect(isRunning(r.player.id)).toBe(true);
+      expect(hasMotionClasses(r.player.id)).toBe(true);
+    }
+  });
+
+  it("eliminating中も現役車は走行animationを維持し、脱落済みplayerには付かない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位, p2=3位, p3=2位, p4=1位
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // intro→running→eliminating開始(4位=p1が脱落済みへ)
+    expect(document.querySelector('[data-race-phase="eliminating"]')).not.toBeNull();
+
+    // 現役(p2/p3/p4)は走行animationを維持する。
+    expect(isRunning("p2")).toBe(true);
+    expect(hasMotionClasses("p2")).toBe(true);
+    expect(isRunning("p3")).toBe(true);
+    expect(isRunning("p4")).toBe(true);
+
+    // 脱落済み(p1)はchip表示のみで、data-running属性自体を持たない・走行クラスも無い。
+    expect(isRunning("p1")).toBeNull();
+    expect(hasMotionClasses("p1")).toBe(false);
+    expect(laneFor("p1")?.getAttribute("data-eliminated")).toBe("true");
+  });
+
+  it("プレイヤーごとに決定論的なanimation-delayが設定される(同じidなら常に同じ値、Math.randomに依存しない)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    await advance(1200); // running
+    const vibrateEl1 = document.querySelector('[data-player-id="p1"] .animate-race-vibrate') as HTMLElement;
+    const delay1 = vibrateEl1.style.animationDelay;
+    unmount();
+
+    // 同じplayer.idで再マウントしても同じ遅延値になること(決定論的)。
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    await advance(1200);
+    const vibrateEl2 = document.querySelector('[data-player-id="p1"] .animate-race-vibrate') as HTMLElement;
+    const delay2 = vibrateEl2.style.animationDelay;
+
+    expect(delay1).toBe(delay2);
+    expect(delay1).toMatch(/^\d+ms$/);
+  });
+
+  it("reduced-motion時は連続走行animationが無効になる(data-running=falseかつ走行クラスも無い、ただしdata-eliminatedによる現役情報は保持される)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advance(300); // reduced-motion設定でのintro→running
+    expect(document.querySelector('[data-race-phase="running"]')).not.toBeNull();
+
+    for (const r of ranked) {
+      expect(isRunning(r.player.id)).toBe(false); // 装飾アニメーションは無効
+      expect(hasMotionClasses(r.player.id)).toBe(false);
+      expect(laneFor(r.player.id)?.getAttribute("data-eliminated")).toBe("false"); // 現役であるという情報自体は保持される
+    }
+  });
+});

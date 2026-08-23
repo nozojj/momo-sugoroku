@@ -71,6 +71,22 @@ function isEliminatedIndex(index: number, phase: RacePhase, eliminatedCount: num
   return true; // finalTwo以降は上位2人以外すべて脱落済み
 }
 
+/**
+ * player.idから決定論的に「揺れ/漂いアニメーションの開始遅延(ms)」を求める(P11-3-B2a)。
+ * Math.random()は使わない: 同じゲーム状態(同じplayer.id)なら常に同じ見た目になることを
+ * 優先するため(リロード・再レンダーのたびに揺れ方が変わって不自然に見えるのを避ける)。
+ * 単純な文字コード合計ではなく乗算込みの簡易ハッシュにして、"p1"/"p2"のような連番id同士でも
+ * バケットが偏りにくいようにしている。bucketCountで割った余りだけを使うため、
+ * 実際の見た目の均等さより「決定論的でズレを作れること」を優先した最小実装。
+ */
+function deterministicDelayMs(playerId: string, bucketCount: number, bucketMs: number): number {
+  let hash = 0;
+  for (let i = 0; i < playerId.length; i++) {
+    hash = (hash * 31 + playerId.charCodeAt(i)) >>> 0;
+  }
+  return (hash % bucketCount) * bucketMs;
+}
+
 export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequenceProps) {
   const reduceMotion = usePrefersReducedMotion();
   const timing = reduceMotion ? REDUCED_TIMING_MS : TIMING_MS;
@@ -97,6 +113,15 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   // 並び順・rank値には一切手を加えない(絞り込む=filterするだけ)。
   const activeRanked = ranked.filter((_, idx) => !isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
   const eliminatedRanked = ranked.filter((_, idx) => isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
+
+  // P11-3-B2a: 通常走行の演出(車体の振動・疑似的な抜きつ抜かれつ・流れるコース線)を
+  // 有効にするかどうか。intro中はまだ「よーい」の間なので走行感を出さず、runningに入った
+  // 瞬間から立ち上げる(ユーザー要求どおり)。eliminating/finalTwo/winnerSprint等、それ以降の
+  // 全フェーズでは現役レーサーは走り続ける(このフラグだけを見ればよく、フェーズごとに
+  // 個別分岐する必要はない)。prefers-reduced-motionが有効な間は、情報を持たない純粋な
+  // 装飾アニメーションなので丸ごと無効化する(誰が現役/脱落かという情報自体はdata-eliminated
+  // 側で既に伝わっており、ここで失われる情報は無い)。
+  const decorativeMotionEnabled = phase !== "intro" && !reduceMotion;
 
   function finish() {
     if (finishedRef.current) return;
@@ -207,42 +232,72 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
         </p>
       )}
 
-      {/* レース会場(Phase B-1: 静的レイアウトのみ、動きは無し)。
-          PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、名前・車を左に固定し、
-          右へ伸びる線の先に「ゴール →」を置く。
-          スマホ(sm未満)は上→下の縦レーンを横に並べる: 各レーン=1プレイヤーの列、名前・車を
-          上に固定し、下へ伸びる線の先に「↓ ゴール」を置く(PCレイアウトの単純縮小ではなく、
-          縦画面の向きに合わせてレーンの方向自体を変えている)。
-          jostle等の「動き」・脱落transition・ゴール演出はPhase B-2以降で追加する。 */}
+      {/* レース会場。PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、
+          名前を左に固定し、右へ伸びるコース上を車が走る先に「ゴール →」を置く。
+          スマホ(sm未満)は上→下の縦レーンを横に並べる: 各レーン=1プレイヤーの列、名前を
+          上に固定し、下へ伸びるコース上を車が走る先に「↓ ゴール」を置く(PCレイアウトの
+          単純縮小ではなく、縦画面の向きに合わせてレーンの方向自体を変えている)。
+          名前ラベル自体は固定し、車・コース側だけに走行演出(P11-3-B2a)を与える。 */}
       <div className="flex w-full max-w-4xl flex-row items-stretch justify-center gap-3 overflow-x-auto px-2 sm:flex-col sm:items-stretch sm:gap-2.5 sm:overflow-visible sm:px-0">
-        {activeRanked.map((r) => (
-          <div
-            key={r.player.id}
-            data-player-id={r.player.id}
-            data-eliminated="false"
-            className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
-          >
-            <div className="flex flex-col items-center gap-1 sm:w-32 sm:shrink-0 sm:flex-row sm:justify-start sm:gap-1.5">
+        {activeRanked.map((r) => {
+          // P11-3-B2a: 振動(短周期)・漂い(長周期、疑似的な抜きつ抜かれつ)・コース流れの
+          // 3つの装飾アニメーションすべてに同じ遅延を再利用する。CSSのanimation-delayは
+          // 「開始時刻をずらす」だけで足り、周期の異なる複数アニメーションへ同じ値を渡しても
+          // 十分にズレて見える(値そのものは4パターンに丸めているだけの決定論的なもの)。
+          const delayMs = deterministicDelayMs(r.player.id, 4, 90);
+          return (
+            <div
+              key={r.player.id}
+              data-player-id={r.player.id}
+              data-eliminated="false"
+              data-running={decorativeMotionEnabled}
+              className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
+            >
+              {/* 名前ラベル。sm:w-28で固定幅を持たせることでtruncateの基準を作る(carアイコンを
+                  トラック側へ移したため、Phase B-1時点であったname+carの共有ラッパーは廃止し、
+                  この要素単体でPC/スマホ双方の幅制約を持つ)。 */}
               <span
-                className="w-full min-w-0 truncate text-center text-[11px] font-bold text-white drop-shadow sm:w-auto sm:text-left sm:text-sm"
+                className="w-full min-w-0 truncate text-center text-[11px] font-bold text-white drop-shadow sm:w-28 sm:shrink-0 sm:text-left sm:text-sm"
                 title={r.player.name}
               >
                 {r.player.name}
               </span>
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow"
-                style={{ backgroundColor: r.player.color }}
+
+              {/* コース(トラック)本体。flexで「開始位置=主軸の先頭・中央=交差軸」に車を
+                  自然に配置する(絶対配置+transform計算をReact側で行わない)ことで、
+                  drift/vibrateの2層transformと衝突しない(centeringにtransformを使わない)。 */}
+              <div
+                className={`relative flex flex-1 flex-col items-center sm:flex-row sm:items-center ${
+                  decorativeMotionEnabled ? "race-track-line" : "bg-white/40"
+                } rounded-full`}
               >
-                {r.player.carIcon}
-              </span>
+                {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
+                    @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
+                    rankedの並び順・rankを読み書きすることはない。 */}
+                <div
+                  className={`relative mt-2 sm:mt-0 sm:ml-2 ${decorativeMotionEnabled ? "race-drift" : ""}`}
+                  style={decorativeMotionEnabled ? { animationDelay: `${delayMs}ms` } : undefined}
+                >
+                  {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
+                      分離することで、2つの独立したtransformアニメーションを衝突させずに
+                      合成する(1要素に複数transformアニメーションを重ねると片方しか
+                      反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
+                      Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
+                      トラック側へ移った今回もこの丸バッジとして維持する。 */}
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${decorativeMotionEnabled ? "animate-race-vibrate" : ""}`}
+                    style={{ backgroundColor: r.player.color, animationDelay: decorativeMotionEnabled ? `${delayMs}ms` : undefined }}
+                  >
+                    {r.player.carIcon}
+                  </span>
+                </div>
+              </div>
+
+              <span className="text-[9px] font-bold text-white/70 sm:hidden">↓ ゴール</span>
+              <span className="hidden text-xs font-bold text-white/70 sm:inline">ゴール →</span>
             </div>
-            {/* 静的なレース track。Phase B-1では車の位置はここでは動かさず、レーンの
-                方向(縦/横)と「ゴールの方角」だけを示す。 */}
-            <div className="w-px flex-1 rounded-full bg-white/40 sm:h-px sm:w-auto" />
-            <span className="text-[9px] font-bold text-white/70 sm:hidden">↓ ゴール</span>
-            <span className="hidden text-xs font-bold text-white/70 sm:inline">ゴール →</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 脱落済み・順位発表済みエリア。完全に消さず、小さなchip一覧として残す

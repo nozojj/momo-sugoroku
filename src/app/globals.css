@@ -287,6 +287,106 @@ body {
   transform-origin: center;
 }
 
+/* P11-3-B2a: 最終順位発表演出(FinalRaceSequence.tsx)の通常走行モーション。
+   路面からの細かな振動(短周期、車体アイコンそのものに適用)と、疑似的な抜きつ抜かれつを
+   表す漂い(長周期、車体を包む1つ外側の要素に適用)を別要素へ分離しているのは、CSSでは
+   1要素に複数のtransformアニメーションを重ねても最後の1つしか反映されないため
+   (CharacterAnnouncer.tsxのentering中bounceと同じ「入れ子で合成する」手法)。
+   大きく跳ねるコミカルな動きにはせず、あくまで数px単位の微振動・微移動に留める。 */
+@keyframes race-vibrate {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(0.6px, -1px);
+  }
+  50% {
+    transform: translate(-0.6px, 0.6px);
+  }
+  75% {
+    transform: translate(0.5px, -0.4px);
+  }
+}
+.animate-race-vibrate {
+  animation: race-vibrate 220ms ease-in-out infinite;
+}
+
+/* 漂い(疑似的な抜きつ抜かれつ)。rankedの順位計算には一切関与しない演出専用のtransformで、
+   PC(左→右の水平レース)ではX軸、スマホ(上→下の縦レース)ではY軸を主方向にする。
+   1つのクラス名(.race-drift)のまま、下の@mediaでアニメーション対象だけ切り替えることで、
+   呼び出し側(FinalRaceSequence.tsx)はブレークポイントを意識せず1クラスを付けるだけでよい。 */
+@keyframes race-drift-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(12px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+  75% {
+    transform: translateY(-9px);
+  }
+}
+@keyframes race-drift-x {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(12px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-9px);
+  }
+}
+.race-drift {
+  animation: race-drift-y 2600ms ease-in-out infinite;
+}
+@media (min-width: 640px) {
+  .race-drift {
+    animation-name: race-drift-x;
+  }
+}
+
+/* コース側の流れ(周囲が流れているため前進しているように感じさせる、車以外の速度感)。
+   路面の破線パターンをbackground-positionアニメーションだけで流す軽量な表現(新規画像素材
+   不要)。.race-driftと同じく1クラスのまま@mediaで方向だけ切り替える。 */
+@keyframes race-track-flow-y {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 -24px;
+  }
+}
+@keyframes race-track-flow-x {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: -24px 0;
+  }
+}
+.race-track-line {
+  background-image: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0 6px, transparent 6px 14px);
+  background-size: 100% 24px;
+  animation: race-track-flow-y 650ms linear infinite;
+}
+@media (min-width: 640px) {
+  .race-track-line {
+    background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0 6px, transparent 6px 14px);
+    background-size: 24px 100%;
+    animation: race-track-flow-x 650ms linear infinite;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,
@@ -298,6 +398,9 @@ body {
   .animate-spotlight-glow,
   .animate-spotlight-pop,
   .animate-vehicle-transform-flash,
+  .animate-race-vibrate,
+  .race-drift,
+  .race-track-line,
   /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
      止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
      「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */
