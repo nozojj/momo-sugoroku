@@ -71,6 +71,14 @@ async function advanceSteps(steps: number[]): Promise<void> {
   for (const ms of steps) await advance(ms);
 }
 
+/** P11-3-B2b-1: 1回の脱落発表(holding→departing→settled)の各サブ段階の時間。
+ *  FinalRaceSequence.tsxのTIMING_MS/REDUCED_TIMING_MSと値を合わせておく(旧eliminationStep相当)。
+ *  advanceSteps()へ渡すときは必ずこの配列を丸ごとspreadする(1回のadvance(合計ms)にまとめると、
+ *  holding→departing→settledの各段階間でReactがuseEffectを再登録する前に時間だけ進んでしまい
+ *  待ち漏れる。advanceSteps自体のコメントで説明している既存の制約と同じ理由)。 */
+const ELIMINATION_STEP_STAGES_MS = [250, 550, 150]; // holding, departing, settled(合計950)
+const REDUCED_ELIMINATION_STEP_STAGES_MS = [60, 120, 40]; // 合計220
+
 describe("FinalRaceSequence", () => {
   beforeEach(() => {
     stubMatchMedia(false);
@@ -99,14 +107,16 @@ describe("FinalRaceSequence", () => {
     await advance(1200); // intro → running
     expect(document.querySelector('[data-race-phase="running"]')).not.toBeNull();
 
-    await advance(900); // running → eliminating(1人目=4位=p1)
+    await advance(900); // running → eliminating(1人目=4位=p1、holding開始)
     expect(document.querySelector('[data-race-phase="eliminating"]')).not.toBeNull();
     expect(screen.getByText("4位! プレイヤー1さん")).not.toBeNull();
 
-    await advance(700); // eliminating 2人目=3位=p2
+    // P11-3-B2b-1: 見出しが出た直後(holding)はまだ対象車がactiveのまま。
+    // holding→departing→settledの合計(ELIMINATION_STEP_STAGES_MSの合計)が経過して初めて次の対象へ進む。
+    await advanceSteps(ELIMINATION_STEP_STAGES_MS); // p1のステップ完了 → 2人目(3位=p2)のholding開始
     expect(screen.getByText("3位! プレイヤー2さん")).not.toBeNull();
 
-    await advance(700); // eliminating完了 → finalTwo
+    await advanceSteps(ELIMINATION_STEP_STAGES_MS); // p2のステップ完了 → finalTwo
     expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
 
     await advance(1500); // finalTwo → winnerSprint
@@ -125,10 +135,10 @@ describe("FinalRaceSequence", () => {
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000]); // p1=3位, p2=2位, p3=1位
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900]); // intro→running→eliminating開始
+    await advanceSteps([1200, 900]); // intro→running→eliminating開始(holding)
     expect(screen.getByText("3位! プレイヤー1さん")).not.toBeNull();
 
-    await advance(700); // eliminating完了(1回だけ)→finalTwo
+    await advanceSteps(ELIMINATION_STEP_STAGES_MS); // eliminating完了(1回だけ)→finalTwo
     expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
   });
 
@@ -150,7 +160,7 @@ describe("FinalRaceSequence", () => {
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
     // intro→running→eliminating(3位)完了→finalTwo→winnerSprint→finish→celebration開始
-    await advanceSteps([1200, 900, 700, 1500, 800, 400]);
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 400]);
 
     expect(screen.getByText("優勝 引き分け!")).not.toBeNull();
   });
@@ -190,9 +200,18 @@ describe("FinalRaceSequence", () => {
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
 
     // reduced-motion設定(REDUCED_TIMING_MS)の合計: 4人プレイなのでeliminationStepは2回。
-    // intro(300)+running(200)+eliminationStep(200)*2+finalTwo(400)+winnerSprint(200)+finish(100)+celebration(400)
-    // = 2000ms。通常設定の合計7800msよりずっと短い時間で完了することを確認する。
-    await advanceSteps([300, 200, 200, 200, 400, 200, 100, 400]);
+    // intro(300)+running(200)+eliminationStep(220)*2+finalTwo(400)+winnerSprint(200)+finish(100)+celebration(400)
+    // = 2040ms。通常設定の合計(950*2を含む)よりずっと短い時間で完了することを確認する。
+    await advanceSteps([
+      300,
+      200,
+      ...REDUCED_ELIMINATION_STEP_STAGES_MS,
+      ...REDUCED_ELIMINATION_STEP_STAGES_MS,
+      400,
+      200,
+      100,
+      400,
+    ]);
 
     expect(onFinish).toHaveBeenCalledTimes(1);
   });
@@ -261,18 +280,21 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
     expect(lane.innerHTML).toContain("rgb(255, 0, 0)");
   });
 
-  it("4人: eliminatingの進行に応じて脱落済みが1人→2人と正しく増え、上位2人は誤って脱落扱いされない", async () => {
+  it("4人: 各eliminatingステップが完了するたびに脱落済みが1人→2人と正しく増え、上位2人は誤って脱落扱いされない", async () => {
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位, p2=3位, p3=2位, p4=1位
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900]); // intro→running→eliminating開始(4位=p1が脱落扱いになる)
+    // P11-3-B2b-1: 「4位!」の見出しが出た直後(holding)ではまだp1はactiveのまま
+    // (isActive/data-eliminationStageの詳細な検証は別describe「B-2b-1」で行う)。
+    // ここではholding→departing→settledの合計(1ステップ分)が経過した「後」の状態を確認する。
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS]); // running→eliminating→p1のステップ完了
     expect(isActive("p1")).toBe(false);
     expect(isActive("p2")).toBe(true);
     expect(isActive("p3")).toBe(true);
     expect(isActive("p4")).toBe(true);
     expect(document.querySelectorAll('[data-eliminated="true"]')).toHaveLength(1);
 
-    await advance(700); // eliminating 2人目(3位=p2)
+    await advanceSteps(ELIMINATION_STEP_STAGES_MS); // p2のステップ完了
     expect(isActive("p1")).toBe(false);
     expect(isActive("p2")).toBe(false);
     expect(isActive("p3")).toBe(true); // 上位2人は誤って脱落扱いされない
@@ -284,7 +306,9 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
     const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    const eliminationSteps = Array(Math.max(0, n - 2)).fill(700);
+    const eliminationSteps = Array(Math.max(0, n - 2))
+      .fill(null)
+      .flatMap(() => ELIMINATION_STEP_STAGES_MS);
     await advanceSteps([1200, 900, ...eliminationSteps]);
 
     expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
@@ -299,7 +323,7 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 700, 700, 1500]); // finalTwo → winnerSprintへ
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS, 1500]); // finalTwo → winnerSprintへ
     expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
     expect(isActive(ranked[0].player.id)).toBe(true);
     expect(isActive(ranked[1].player.id)).toBe(true);
@@ -366,11 +390,12 @@ describe("FinalRaceSequence(Phase B-2a: 通常走行モーション)", () => {
     }
   });
 
-  it("eliminating中も現役車は走行animationを維持し、脱落済みplayerには付かない", async () => {
+  it("eliminatingの1ステップ完了後、現役車は走行animationを維持し、脱落済みplayerには付かない", async () => {
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位, p2=3位, p3=2位, p4=1位
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900]); // intro→running→eliminating開始(4位=p1が脱落済みへ)
+    // P11-3-B2b-1: holding→departing→settledの合計(1ステップ分)経過後、p1がchipへ移る。
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS]);
     expect(document.querySelector('[data-race-phase="eliminating"]')).not.toBeNull();
 
     // 現役(p2/p3/p4)は走行animationを維持する。
@@ -417,5 +442,134 @@ describe("FinalRaceSequence(Phase B-2a: 通常走行モーション)", () => {
       expect(hasMotionClasses(r.player.id)).toBe(false);
       expect(laneFor(r.player.id)?.getAttribute("data-eliminated")).toBe("false"); // 現役であるという情報自体は保持される
     }
+  });
+});
+
+/** レーン要素のdata-elimination-stage属性を読む(今回発表中の対象にのみ存在する)。 */
+function eliminationStageOf(playerId: string): string | null {
+  return laneFor(playerId)?.getAttribute("data-elimination-stage") ?? null;
+}
+
+describe("FinalRaceSequence(Phase B-2b-1: holding/departing/settledの分離)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("eliminating開始直後(holding)は対象車がまだactiveで、data-elimination-stage=holdingになる", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // running → eliminating開始
+    expect(document.querySelector('[data-race-phase="eliminating"]')).not.toBeNull();
+    expect(screen.getByText("4位! プレイヤー1さん")).not.toBeNull();
+    expect(isActive("p1")).toBe(true); // 見出しは出たが、まだレーンに残っている
+    expect(eliminationStageOf("p1")).toBe("holding");
+  });
+
+  it("holding→departingへ移っても対象車はまだactiveのまま、data-elimination-stage=departingになる", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 250]); // holding完了 → departing開始
+    expect(isActive("p1")).toBe(true); // departing中もまだレーンに残っている
+    expect(eliminationStageOf("p1")).toBe("departing");
+  });
+
+  it("settled到達時に対象車が初めてeliminatedになり、脱落済みchipへ移る", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 250, 550]); // holding+departing完了 → settled
+    expect(isActive("p1")).toBe(false);
+    expect(laneFor("p1")?.getAttribute("data-eliminated")).toBe("true");
+  });
+
+  it("4人プレイの全eliminatingステップを通して、上位2人は一度もeliminated/発表対象扱いにならない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p3=2位, p4=1位
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    function assertTopTwoUntouched() {
+      expect(eliminationStageOf("p3")).toBeNull();
+      expect(eliminationStageOf("p4")).toBeNull();
+      expect(isActive("p3")).toBe(true);
+      expect(isActive("p4")).toBe(true);
+    }
+
+    await advanceSteps([1200, 900]);
+    assertTopTwoUntouched();
+    await advance(250); // p1 departing
+    assertTopTwoUntouched();
+    await advance(550); // p1 settled
+    assertTopTwoUntouched();
+    await advance(150); // p1確定、p2のholding開始
+    assertTopTwoUntouched();
+    await advance(250); // p2 departing
+    assertTopTwoUntouched();
+    await advance(550); // p2 settled
+    assertTopTwoUntouched();
+    await advance(150); // p2確定 → finalTwo
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    assertTopTwoUntouched();
+  });
+
+  it("stage遷移を最後まで進めてもonFinish()の二重発火・finalTwoへの二重遷移は起きない(4人プレイ通し)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      400,
+    ]);
+    expect(onFinish).not.toHaveBeenCalled(); // celebration中はまだ
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).toBeNull(); // 既に通過済み、戻っていない
+
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1); // 二重発火なし
+  });
+
+  it("departing中にunmountしてもtimerがクリーンアップされ、その後onFinish()が呼ばれない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([1200, 900, 250]); // departing中でunmount
+    unmount();
+
+    await advance(10000); // unmount後にどれだけ進めてもタイマーは残っていないはず
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("reduced-motion時もholding→departing→settledの論理順序は維持される(時間だけ短縮される)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200]); // reduced intro+running → eliminating開始
+    expect(eliminationStageOf("p1")).toBe("holding");
+    expect(isActive("p1")).toBe(true);
+
+    await advance(60); // reduced eliminationHold
+    expect(eliminationStageOf("p1")).toBe("departing");
+    expect(isActive("p1")).toBe(true);
+
+    await advance(120); // reduced eliminationDepart → settled
+    expect(isActive("p1")).toBe(false);
+    expect(laneFor("p1")?.getAttribute("data-eliminated")).toBe("true");
   });
 });

@@ -29,12 +29,30 @@ interface FinalRaceSequenceProps {
  */
 type RacePhase = "intro" | "running" | "eliminating" | "finalTwo" | "winnerSprint" | "finish" | "celebration" | "done";
 
+/**
+ * P11-3-B2b-1: 「今回発表中の1人」が脱落演出のどのサブ段階にいるかを表す。
+ * - holding: 見出し(「N位!」)は出たが、対象車はまだ通常走行のまま(結果を先読みさせない溜め)。
+ * - departing: 対象車が脱落動作中(B-2b-1時点では見た目のCSSはまだ無く、単なる時間の区切り)。
+ * - settled: 脱落が確定し、対象車を脱落済みchip側へ移してよい状態。
+ * 同時に発表中になり得るのは常に最大1人(indexで一意)なので、配列やMapは不要。
+ */
+type EliminationStage = "holding" | "departing" | "settled";
+
 /** 演出タイミング(調整用定数)。DestinationCelebrationScreen.tsxと同じく、
- *  prefers-reduced-motion時は演出自体を消さずに大幅短縮するだけにする。 */
+ *  prefers-reduced-motion時は演出自体を消さずに大幅短縮するだけにする。
+ *
+ *  P11-3-B2b-1: 単一だったeliminationStep(700ms)を、脱落1人分の3段階
+ *  (holding→departing→settled)へ分割した(合計950ms、旧700msから微増)。
+ *  holdingは「順位発表の見出しだけ出て、まだ何も起きない溜め」、departingは
+ *  「対象車が後退・視覚的に脱落していく間」、settledは「脱落済みchipへ移った後の
+ *  短い余韻」を表す時間で、B-2b-1時点ではCSS側の演出はまだ無いため、いずれも
+ *  「この段階のままどれだけ待つか」という時間の区切りとしてのみ機能する。 */
 const TIMING_MS = {
   intro: 1200,
   running: 900,
-  eliminationStep: 700,
+  eliminationHold: 250,
+  eliminationDepart: 550,
+  eliminationSettle: 150,
   finalTwo: 1500, // ユーザー要求どおり、ここだけ意図的に長めに引っ張る
   winnerSprint: 800,
   finish: 400,
@@ -43,7 +61,9 @@ const TIMING_MS = {
 const REDUCED_TIMING_MS = {
   intro: 300,
   running: 200,
-  eliminationStep: 200,
+  eliminationHold: 60,
+  eliminationDepart: 120,
+  eliminationSettle: 40,
   finalTwo: 400,
   winnerSprint: 200,
   finish: 100,
@@ -51,22 +71,52 @@ const REDUCED_TIMING_MS = {
 };
 
 /**
- * rankedのindexが「現時点で脱落済み(=順位発表済みで、静的なレーンから外れて良い)」かどうかを
- * 判定する純粋関数。新しい状態は一切追加せず、既存のphase/eliminatedCountとplayerCountだけから
- * 毎回導出する(P11-3-A設計原則: 順位・脱落状態の再計算は行わず、既に確定したデータの
- * 読み方だけを変える)。
+ * rankedのindexが「今回発表中の対象」である場合にのみそのEliminationStageを返し、
+ * それ以外(まだ発表されていない/既に確定済み/上位2人/eliminatingフェーズでない)は
+ * undefinedを返す純粋関数。isEliminatedIndex()/isDepartingIndex()は両方ともこの1つの
+ * 関数の結果だけから導出する(新しい状態はeliminationStageの1つだけに絞り、判定ロジックの
+ * source of truthを増やさない)。
  *
- * index<2(上位2人)は、eliminating中はもちろんfinalTwo以降(winnerSprint/finish/celebration/done)
- * でも絶対に脱落扱いにしない。eliminating中は「発表済み(eliminatedCount件)」に加えて
- * 「現在アナウンス中の1人」も同時に脱落扱いにする(Phase B-1では脱落transitionを実装しない
- * ため、アナウンスと同時に静的な「脱落済み」表示へ切り替える)。
+ * 同時に「発表中」になり得るプレイヤーは常に最大1人(index = playerCount-1-eliminatedCount
+ * で一意に決まる)なので、配列やMapではなく単純な等値比較だけで十分。
  */
-function isEliminatedIndex(index: number, phase: RacePhase, eliminatedCount: number, playerCount: number): boolean {
+function eliminationStageForIndex(
+  index: number,
+  phase: RacePhase,
+  eliminatedCount: number,
+  eliminationStage: EliminationStage,
+  playerCount: number,
+): EliminationStage | undefined {
+  if (index < 2) return undefined; // 上位2人はeliminating中もfinalTwo以降も絶対に対象にならない
+  if (phase !== "eliminating") return undefined;
+  const eliminationOrder = playerCount - index; // このindexが末尾から数えて何番目に脱落するか(1始まり)
+  if (eliminationOrder !== eliminatedCount + 1) return undefined; // 今回発表中の1人ではない
+  return eliminationStage;
+}
+
+/**
+ * rankedのindexが「現時点で脱落済み(=脱落済みchip側に表示してよい)」かどうかを判定する
+ * 純粋関数。新しい状態は一切追加せず、既存のphase/eliminatedCount/eliminationStageと
+ * playerCountだけから毎回導出する(P11-3-A設計原則: 順位・脱落状態の再計算は行わず、
+ * 既に確定したデータの読み方だけを変える)。
+ *
+ * P11-3-B2b-1で「発表済み(eliminatedCount件)」と「今回発表中の1人」を分離した:
+ * 前者は無条件でchip側、後者はeliminationStageが"settled"に達するまでレーン側(現役)に
+ * 留める(holding/departing中は"4位!"の見出しが出ていてもまだレーンに残り続ける)。
+ */
+function isEliminatedIndex(
+  index: number,
+  phase: RacePhase,
+  eliminatedCount: number,
+  eliminationStage: EliminationStage,
+  playerCount: number,
+): boolean {
   if (index < 2) return false;
   if (phase === "intro" || phase === "running") return false;
   if (phase === "eliminating") {
-    const eliminationOrder = playerCount - index; // このindexが末尾から数えて何番目に脱落するか(1始まり)
-    return eliminationOrder <= eliminatedCount + 1;
+    const eliminationOrder = playerCount - index;
+    if (eliminationOrder <= eliminatedCount) return true; // 前のステップまでに確定済み
+    return eliminationStageForIndex(index, phase, eliminatedCount, eliminationStage, playerCount) === "settled";
   }
   return true; // finalTwo以降は上位2人以外すべて脱落済み
 }
@@ -94,6 +144,10 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   const [phase, setPhase] = useState<RacePhase>("intro");
   // 何人分の脱落発表が完了したか(0 〜 playerCount-2)。
   const [eliminatedCount, setEliminatedCount] = useState(0);
+  // P11-3-B2b-1: 「今回発表中の1人」がholding/departing/settledのどこにいるか。
+  // 次の対象へ移るたびに"holding"へ戻す(eliminatedCountを進める同じコールバック内で行う。
+  // 別立てのリセットeffectにしないことで、リセット漏れ・二重リセットのrace conditionを避ける)。
+  const [eliminationStage, setEliminationStage] = useState<EliminationStage>("holding");
   // onFinish()の二重発火防止(DestinationCelebrationScreen.tsxのcontinuedRefと同じ役割)。
   const finishedRef = useRef(false);
 
@@ -108,11 +162,12 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   const currentEliminationIndex = playerCount - 1 - eliminatedCount;
   const eliminatedEntry = phase === "eliminating" ? ranked[currentEliminationIndex] : undefined;
 
-  // レース会場に表示する「現役」と、脱落済みエリアに表示する「脱落済み」の分離(Phase B-1)。
-  // isEliminatedIndex()はindexとphase/eliminatedCountだけから導出する純粋関数で、ranked自体の
+  // レース会場に表示する「現役」と、脱落済みエリアに表示する「脱落済み」の分離(Phase B-1、
+  // P11-3-B2b-1でholding/departing中も現役側に残すよう更新)。isEliminatedIndex()は
+  // indexとphase/eliminatedCount/eliminationStageだけから導出する純粋関数で、ranked自体の
   // 並び順・rank値には一切手を加えない(絞り込む=filterするだけ)。
-  const activeRanked = ranked.filter((_, idx) => !isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
-  const eliminatedRanked = ranked.filter((_, idx) => isEliminatedIndex(idx, phase, eliminatedCount, playerCount));
+  const activeRanked = ranked.filter((_, idx) => !isEliminatedIndex(idx, phase, eliminatedCount, eliminationStage, playerCount));
+  const eliminatedRanked = ranked.filter((_, idx) => isEliminatedIndex(idx, phase, eliminatedCount, eliminationStage, playerCount));
 
   // P11-3-B2a: 通常走行の演出(車体の振動・疑似的な抜きつ抜かれつ・流れるコース線)を
   // 有効にするかどうか。intro中はまだ「よーい」の間なので走行感を出さず、runningに入った
@@ -155,20 +210,45 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   }, [phase, eliminationTotal, timing.running]);
 
   // eliminating: 現在の最下位から1人ずつ、eliminationTotal回だけ脱落発表を繰り返す。
-  // setTimeoutの羅列ではなく、1つのuseEffectが「表示→時間経過→次の1人へ(またはfinalTwoへ)」を
-  // eliminatedCountを介して繰り返す(DestinationCelebrationScreen.tsxのspinフェーズと同じ設計)。
+  // P11-3-B2b-1で1ステップをholding→departing→settledの3段階へ分割した(以下3つのeffect)。
+  // 3つとも同じ「phase==="eliminating" && eliminationStage==="X"のときだけ動く」という
+  // ガード形式で、DestinationCelebrationScreen.tsxのspinフェーズと同じ設計思想を踏襲する。
+
+  // holding → departing: 見出し(「N位!」)が出てからしばらく、対象車はまだ通常走行のまま
+  // (結果を先読みさせない溜め)。
   useEffect(() => {
-    if (phase !== "eliminating") return;
+    if (phase !== "eliminating" || eliminationStage !== "holding") return;
+    const timer = window.setTimeout(() => setEliminationStage("departing"), timing.eliminationHold);
+    return () => window.clearTimeout(timer);
+  }, [phase, eliminationStage, timing.eliminationHold]);
+
+  // departing → settled: 対象車が脱落動作中の時間(B-2b-1時点ではCSS演出はまだ無く、
+  // 「departingという状態である」ことがDOM(data-elimination-stage)から確認できるだけ)。
+  useEffect(() => {
+    if (phase !== "eliminating" || eliminationStage !== "departing") return;
+    const timer = window.setTimeout(() => setEliminationStage("settled"), timing.eliminationDepart);
+    return () => window.clearTimeout(timer);
+  }, [phase, eliminationStage, timing.eliminationDepart]);
+
+  // settled → 次の対象(holdingへ戻す)またはfinalTwoへ。脱落済みchip側へ実際に移すのは
+  // isEliminatedIndex()がeliminationStage==="settled"を検知した瞬間(このeffectの発火より
+  // 前、settledになったレンダーで既に反映済み)。ここではsettledの短い余韻の後、
+  // eliminatedCountを進める/次のholdingへリセットする/finalTwoへ抜けるという「次への遷移」
+  // だけを1箇所で行う(setEliminationStageとsetEliminatedCount/setPhaseを同じコールバック内で
+  // 行うことで、リセット漏れ・二重発火のrace conditionを避ける)。
+  useEffect(() => {
+    if (phase !== "eliminating" || eliminationStage !== "settled") return;
     const timer = window.setTimeout(() => {
       const next = eliminatedCount + 1;
       if (next >= eliminationTotal) {
         setPhase("finalTwo");
       } else {
         setEliminatedCount(next);
+        setEliminationStage("holding");
       }
-    }, timing.eliminationStep);
+    }, timing.eliminationSettle);
     return () => window.clearTimeout(timer);
-  }, [phase, eliminatedCount, eliminationTotal, timing.eliminationStep]);
+  }, [phase, eliminationStage, eliminatedCount, eliminationTotal, timing.eliminationSettle]);
 
   // finalTwo: ユーザー要求どおり意図的に長めに引っ張ってからwinnerSprintへ。
   useEffect(() => {
@@ -245,12 +325,19 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
           // 「開始時刻をずらす」だけで足り、周期の異なる複数アニメーションへ同じ値を渡しても
           // 十分にズレて見える(値そのものは4パターンに丸めているだけの決定論的なもの)。
           const delayMs = deterministicDelayMs(r.player.id, 4, 90);
+          // P11-3-B2b-1: このプレイヤーが「今回発表中の対象」であれば、そのholding/departing/
+          // settledをdata-elimination-stageとして露出する(対象でなければundefined=属性なし)。
+          // B-2b-1時点ではこの値に応じたCSS演出はまだ無く、DOM上でstageを確認できるだけ
+          // (B-2b-2でdeparting時にrace-departing等のクラスを付ける際、ここへ分岐を足す想定)。
+          const racerIndex = ranked.indexOf(r);
+          const stageForRacer = eliminationStageForIndex(racerIndex, phase, eliminatedCount, eliminationStage, playerCount);
           return (
             <div
               key={r.player.id}
               data-player-id={r.player.id}
               data-eliminated="false"
               data-running={decorativeMotionEnabled}
+              data-elimination-stage={stageForRacer}
               className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
             >
               {/* 名前ラベル。sm:w-28で固定幅を持たせることでtruncateの基準を作る(carアイコンを
