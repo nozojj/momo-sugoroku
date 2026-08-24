@@ -958,3 +958,143 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     expect(seCallCount("game_over_fanfare")).toBe(1);
   });
 });
+
+describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("finalTwo中は見出しにanimate-highlight-slamが付き、他のフェーズには付かない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(document.querySelector(".animate-highlight-slam")).toBeNull(); // intro中は無し
+
+    await advanceSteps([1200, 900]); // running → finalTwo
+    const heading = document.querySelector(".animate-highlight-slam");
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe("残り2人、デッドヒート!");
+
+    await advance(1500); // finalTwo → winnerSprint
+    expect(document.querySelector(".animate-highlight-slam")).toBeNull(); // winnerSprintには付かない
+  });
+
+  it("celebration開始時にのみ紙吹雪(animate-confetti-fall)とsparkle(animate-announcer-sparkle)が表示される", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish開始まで
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull(); // celebration前は無し
+    expect(document.querySelector(".animate-announcer-sparkle")).toBeNull();
+
+    await advance(400); // finish → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".animate-announcer-sparkle").length).toBeGreaterThan(0);
+
+    // 優勝者名のテキスト自体は紙吹雪の陰に隠れず、DOM上でそのまま読み取れる。
+    expect(screen.getByText("優勝 プレイヤー2さん!")).not.toBeNull();
+  });
+
+  it("celebration→done到達後は紙吹雪/sparkleが消える(doneでは表示しない)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
+
+    await advance(1600); // celebration → done
+    expect(document.querySelector('[data-race-phase="done"]')).not.toBeNull();
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull();
+    expect(document.querySelector(".animate-announcer-sparkle")).toBeNull();
+    // done中も優勝者名の表示自体は維持される。
+    expect(screen.getByText("優勝 プレイヤー2さん!")).not.toBeNull();
+  });
+
+  it("unmount後に紙吹雪/sparkle関連のDOM・タイマーが残らない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
+
+    unmount();
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull();
+    await advance(10000); // unmount後にどれだけ進めてもエラーにならない
+  });
+
+  it.each([2, 3, 4])("%i人プレイでもcelebrationで紙吹雪/sparkleが表示され、finalTwoの強調も付く", async (n) => {
+    const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const eliminationSteps = Array(Math.max(0, n - 2))
+      .fill(null)
+      .flatMap(() => ELIMINATION_STEP_STAGES_MS);
+    await advanceSteps([1200, 900, ...eliminationSteps]);
+    expect(document.querySelector(".animate-highlight-slam")).not.toBeNull(); // finalTwo突入直後
+
+    await advanceSteps([1500, 800, 400]);
+    expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".animate-announcer-sparkle").length).toBeGreaterThan(0);
+  });
+
+  it("reduced-motion時はcelebrationでも紙吹雪/sparkleを表示しない(ただしcelebration自体は表示される)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400, 200, 100]); // reduced: intro→running→finalTwo→winnerSprint→finish
+    await advance(100); // finish → celebration(reduced)
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull();
+    expect(document.querySelector(".animate-announcer-sparkle")).toBeNull();
+    expect(screen.getByText("優勝 プレイヤー2さん!")).not.toBeNull();
+  });
+
+  it("紙吹雪/sparkle/finalTwo強調を追加してもSE発火回数(destination_arrive×1, game_over_fanfare×1)とonFinish×1は変わらない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      400,
+    ]);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(seCallCount("destination_arrive")).toBe(1); // 視覚演出の再renderで増えない
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("AnnouncerEffectLayerはpointer-events-noneかつaria-hiddenで、優勝者名テキストの操作性・可読性を妨げない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    const layer = document.querySelector('[aria-hidden="true"].pointer-events-none');
+    expect(layer).not.toBeNull();
+    // 優勝者名は紙吹雪レイヤーの外(通常のテキストノード)としてそのまま存在する。
+    expect(screen.getByText("優勝 プレイヤー2さん!")).not.toBeNull();
+  });
+});

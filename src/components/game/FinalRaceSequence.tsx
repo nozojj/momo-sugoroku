@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { RankedPlayer } from "@/lib/game/engine";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
+import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { playSE } from "@/lib/audio/soundManager";
+import { AnnouncerEffectLayer } from "./AnnouncerEffectLayer";
 
 interface FinalRaceSequenceProps {
   /** finished確定直後にrankPlayers(players)で計算した結果をそのまま渡す(1位が先頭)。
@@ -139,6 +141,7 @@ function deterministicDelayMs(playerId: string, bucketCount: number, bucketMs: n
 
 export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequenceProps) {
   const reduceMotion = usePrefersReducedMotion();
+  const isMobile = useIsMobileViewport();
   const timing = reduceMotion ? REDUCED_TIMING_MS : TIMING_MS;
 
   const [phase, setPhase] = useState<RacePhase>("intro");
@@ -319,7 +322,16 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
           {eliminatedEntry.rank}位! {eliminatedEntry.player.name}さん
         </p>
       )}
-      {phase === "finalTwo" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">残り2人、デッドヒート!</p>}
+      {/* P11-3-B2c-2: finalTwo突入の一発強調。DestinationCelebrationScreen.tsxの目的地名reveal
+          (「{name}!!」にanimate-highlight-slamを適用するパターン)と全く同じ既存keyframeを
+          そのまま流用する(新規keyframeなし)。highlight-slamは480ms both(0%→scale(0.3)から
+          100%→scale(1)で静止)の一発アニメーションで、1500msのfinalTwo全体を動かし続けは
+          しない(最初の一発だけ強調し、残りは読みやすい静止状態のまま)。reduced-motion時の
+          抑制はglobals.cssの@media (prefers-reduced-motion: reduce)側で.animate-highlight-slam
+          自体が無効化される既存の仕組みにそのまま乗る(ここでの追加ガードは不要)。 */}
+      {phase === "finalTwo" && (
+        <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">残り2人、デッドヒート!</p>
+      )}
       {phase === "winnerSprint" && (
         <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">
           {winners.map((w) => w.player.name).join("・")}さん、加速!
@@ -327,9 +339,22 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
       )}
       {phase === "finish" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">ゴール!!</p>}
       {(phase === "celebration" || phase === "done") && (
-        <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
-          {isTie ? "優勝 引き分け!" : `優勝 ${winners[0]?.player.name}さん!`}
-        </p>
+        <div className="relative">
+          <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
+            {isTie ? "優勝 引き分け!" : `優勝 ${winners[0]?.player.name}さん!`}
+          </p>
+          {/* P11-3-B2c-2: celebration開始時だけ紙吹雪+sparkleを表示する。DestinationCelebrationScreen.tsx
+              の「relativeな親div + AnnouncerEffectLayer(confetti/sparkle)」パターンをそのまま流用
+              (新規紙吹雪システムは作らない)。AnnouncerEffectLayer自身がpointer-events-noneかつ
+              aria-hidden="true"のoverlayなので、優勝者名の可読性・下のレーン/chipの操作性を
+              妨げない。doneフェーズでは表示しない(celebrationの1600msだけの一発演出とするため)。
+              reduceMotion時は既存パターンと同じく呼び出し側で丸ごと非表示にする
+              (confetti-fall/announcer-sparkle自体もglobals.cssのreduced-motion側で二重に無効化
+              される既存の仕組みに乗る)。 */}
+          {phase === "celebration" && !reduceMotion && (
+            <AnnouncerEffectLayer effect={{ confetti: true, sparkle: true }} mobile={isMobile} />
+          )}
+        </div>
       )}
 
       {/* レース会場。PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、
