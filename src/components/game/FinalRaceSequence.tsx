@@ -184,8 +184,10 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
     onFinish();
   }
 
-  // intro: game_over_fanfareをここで1回だけ鳴らす(GameOverModal.tsxのマウント時発火から
-  // このintroフェーズへ移設した。GameOverModal側はもう鳴らさない)。
+  // intro: P11-3-B2c-1でgame_over_fanfareの発火をここからcelebrationへ移設した
+  // (「レース開始」ではなく「優勝決定」の瞬間に全SE中最大のファンファーレを鳴らす方が
+  // 自然、というB-2c設計判断による)。introは今回あえて無音のまま(新規スタートSEも
+  // 追加しない)。
   //
   // timing.introを依存配列に含める理由: usePrefersReducedMotion()はSSR安全性のため
   // 初回レンダーでは必ずfalseを返し、実際の値はマウント後のuseEffectで非同期に確定する
@@ -195,7 +197,6 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   // reduceMotionが1レンダー遅れて確定した瞬間にこのeffectが正しい時間で再実行される。
   useEffect(() => {
     if (phase !== "intro") return;
-    playSE("game_over_fanfare");
     const timer = window.setTimeout(() => setPhase("running"), timing.intro);
     return () => window.clearTimeout(timer);
   }, [phase, timing.intro]);
@@ -259,9 +260,14 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
     return () => window.clearTimeout(timer);
   }, [phase, eliminationStage, eliminatedCount, eliminationTotal, timing.eliminationSettle]);
 
-  // finalTwo: ユーザー要求どおり意図的に長めに引っ張ってからwinnerSprintへ。
+  // finalTwo: ユーザー要求どおり意図的に長めに引っ張ってからwinnerSprintへ。P11-3-B2c-1:
+  // finalTwoへ入った瞬間に1回だけdestination_arrive(既存SEの流用、新規追加なし)を鳴らす。
+  // 他のphase遷移effectと同じ「ガード+playSE+setTimeoutを1つのeffectにまとめる」パターンを
+  // 踏襲し、依存配列[phase, timing.finalTwo]が変化したとき(=finalTwoへ入った瞬間)だけ
+  // 実行されるため重複発火しない。
   useEffect(() => {
     if (phase !== "finalTwo") return;
+    playSE("destination_arrive");
     const timer = window.setTimeout(() => setPhase("winnerSprint"), timing.finalTwo);
     return () => window.clearTimeout(timer);
   }, [phase, timing.finalTwo]);
@@ -281,10 +287,15 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   }, [phase, timing.finish]);
 
   // celebration → done → onFinish()(演出全体の終着点。ここで初めてGameOverModalへ制御を渡す)。
-  // finish()自体は依存に含めない(finishedRefで二重発火を防いでいるため関数の再生成は
-  // 挙動に影響しない。他の全effectと同じくtiming側の値だけを依存に持たせる)。
+  // P11-3-B2c-1: game_over_fanfare(全SE中最大のファンファーレ)をintroからここへ移設し、
+  // 「優勝決定」の瞬間をゲーム終了レース全体の音の最大ピークにする。finalTwoのdestination_arrive
+  // と同じく、celebrationへ入った瞬間に1回だけ鳴らす(依存配列[phase, timing.celebration]が
+  // 変化したとき=celebrationへ入った瞬間だけ実行されるため、celebration中の再renderで
+  // 重複発火しない)。finish()自体は依存に含めない(finishedRefで二重発火を防いでいるため
+  // 関数の再生成は挙動に影響しない。他の全effectと同じくtiming側の値だけを依存に持たせる)。
   useEffect(() => {
     if (phase !== "celebration") return;
+    playSE("game_over_fanfare");
     const timer = window.setTimeout(() => {
       setPhase("done");
       finish();

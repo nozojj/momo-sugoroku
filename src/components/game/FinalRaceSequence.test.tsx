@@ -4,7 +4,9 @@
 // 重点: (1) 順位を一切再計算せず、渡されたranked/winnerIdsの順序をそのまま使うこと、
 // (2) 2/3/4人プレイと同着1位で正しいフェーズ数・脱落順になること、(3) onFinish()が
 // ちょうど1回だけ呼ばれること、(4) unmount時にタイマーが残らないこと、(5) reduced-motion時に
-// 大幅短縮されること、(6) game_over_fanfareがGameOverModalからここへ移設されていること。
+// 大幅短縮されること、(6) game_over_fanfareはGameOverModalからここへ移設された上で、
+// P11-3-B2c-1でさらにintroからcelebration開始時点へ移設されていること(「優勝決定」の
+// 瞬間を全SE中最大のファンファーレにする設計)。
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,11 +95,11 @@ describe("FinalRaceSequence", () => {
     vi.useRealTimers();
   });
 
-  it("マウント(introフェーズ開始)時にgame_over_fanfareが1回だけ再生される(GameOverModalから移設された発火)", () => {
+  it("マウント(introフェーズ開始)時点ではgame_over_fanfareは鳴らない(P11-3-B2c-1でcelebrationへ移設済み)", () => {
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    expect(playSEMock.mock.calls.filter((c) => c[0] === "game_over_fanfare")).toHaveLength(1);
+    expect(playSEMock.mock.calls.filter((c) => c[0] === "game_over_fanfare")).toHaveLength(0);
   });
 
   it("4人: intro→running→eliminating(4位→3位)→finalTwo→winnerSprint→finish→celebrationの順に自動進行する", async () => {
@@ -721,13 +723,15 @@ describe("FinalRaceSequence(Phase B-2b-3: 順位発表/脱落SE)", () => {
     expect(seCallCount("destination_reveal")).toBe(2);
     expect(seCallCount("elimination_out")).toBe(2);
 
-    await advance(150); // 3位確定 → finalTwoへ(今回はSEを追加しない)
+    await advance(150); // 3位確定 → finalTwoへ(P11-3-B2c-1でdestination_arriveが1回鳴る)
     expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
     expect(seCallCount("destination_reveal")).toBe(2);
     expect(seCallCount("elimination_out")).toBe(2);
+    expect(seCallCount("destination_arrive")).toBe(1);
 
-    // game_over_fanfareはintroで1回だけ(従来どおり、今回のSE追加とは独立)。
-    expect(seCallCount("game_over_fanfare")).toBe(1);
+    // game_over_fanfareはP11-3-B2c-1でcelebration開始時点へ移設済みのため、
+    // finalTwo到達時点ではまだ0回(intro時点でも0回であることは別テストで確認済み)。
+    expect(seCallCount("game_over_fanfare")).toBe(0);
   });
 
   it("3人プレイ: destination_reveal/elimination_outとも1回ずつ", async () => {
@@ -748,7 +752,11 @@ describe("FinalRaceSequence(Phase B-2b-3: 順位発表/脱落SE)", () => {
     expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
     expect(seCallCount("destination_reveal")).toBe(0);
     expect(seCallCount("elimination_out")).toBe(0);
-    expect(seCallCount("game_over_fanfare")).toBe(1);
+    // P11-3-B2c-1: 2人プレイでもfinalTwoへ入った瞬間にdestination_arriveは1回鳴る
+    // (eliminatingを経由しないこととは独立)。game_over_fanfareはcelebrationへ移設済みのため
+    // この時点ではまだ0回。
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(0);
   });
 
   it("reduced-motion時も4人プレイでdestination_reveal×2/elimination_out×2が短縮タイミングで重複なく鳴る", async () => {
@@ -807,10 +815,146 @@ describe("FinalRaceSequence(Phase B-2b-3: 順位発表/脱落SE)", () => {
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect(seCallCount("destination_reveal")).toBe(2);
     expect(seCallCount("elimination_out")).toBe(2);
+    // P11-3-B2c-1: celebration開始時点でgame_over_fanfareが1回鳴っているはず。
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
 
     await advance(10000);
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect(seCallCount("destination_reveal")).toBe(2); // finalTwo以降は今回SEを追加しないため増えない
     expect(seCallCount("elimination_out")).toBe(2);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1); // done後も増えない
+  });
+});
+
+describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("introではSEが一切鳴らない(game_over_fanfareも含む)", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalled();
+  });
+
+  it("4人プレイ通し: destination_reveal×2 / elimination_out×2 / destination_arrive×1 / game_over_fanfare×1 の最終回数になる", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS]);
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_arrive")).toBe(1); // finalTwoへ入った瞬間に1回
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(1500); // finalTwo → winnerSprint(SE追加なし)
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(800); // winnerSprint → finish(SE追加なし)
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(400); // finish → celebration(ここでgame_over_fanfareが1回)
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("3人プレイ通し: destination_reveal×1 / elimination_out×1 / destination_arrive×1 / game_over_fanfare×1", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 400]);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(1);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("2人プレイ通し: eliminatingを経由しないため destination_reveal×0 / elimination_out×0、destination_arrive×1 / game_over_fanfare×1 は変わらず鳴る", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    expect(seCallCount("destination_reveal")).toBe(0);
+    expect(seCallCount("elimination_out")).toBe(0);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("celebration中に時間が進んでも(done到達後も)game_over_fanfareは増えない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    await advance(1600); // celebration → done
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    await advance(10000); // done後もどれだけ進めても増えない
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("celebration開始直後にunmountしても、それ以上SEは増えずタイマーも残らない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    const onFinish = vi.fn();
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    unmount();
+    await advance(10000);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+    expect(onFinish).not.toHaveBeenCalled(); // celebrationの1600ms経過前にunmountしたため
+  });
+
+  it("reduced-motion時も4人プレイでdestination_arrive×1/game_over_fanfare×1が短縮タイミングで重複なく鳴る", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([
+      300,
+      200,
+      ...REDUCED_ELIMINATION_STEP_STAGES_MS,
+      ...REDUCED_ELIMINATION_STEP_STAGES_MS,
+    ]);
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(400); // finalTwo → winnerSprint(reduced、SE追加なし)
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(200); // winnerSprint → finish(reduced、SE追加なし)
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    expect(seCallCount("game_over_fanfare")).toBe(0);
+
+    await advance(100); // finish → celebration(reduced、ここでgame_over_fanfareが1回)
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
   });
 });
