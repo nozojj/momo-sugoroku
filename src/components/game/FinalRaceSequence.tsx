@@ -215,17 +215,26 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   // ガード形式で、DestinationCelebrationScreen.tsxのspinフェーズと同じ設計思想を踏襲する。
 
   // holding → departing: 見出し(「N位!」)が出てからしばらく、対象車はまだ通常走行のまま
-  // (結果を先読みさせない溜め)。
+  // (結果を先読みさせない溜め)。P11-3-B2b-3: このholdingへ入った瞬間に1回だけ
+  // destination_reveal(既存SEの流用、新規追加なし)を鳴らす。introのgame_over_fanfareと
+  // 同じ「ガード+playSE+setTimeoutを1つのeffectにまとめる」パターンを踏襲することで、
+  // 依存配列[phase, eliminationStage, timing.eliminationHold]が変化したとき(=新しい対象が
+  // holdingに入ったとき)だけ実行され、同じ対象のholding中に再render等で重複発火することはない
+  // (settled→次のholdingへ戻るときはeliminationStage自体の値が変わるので、そのたびに正しく
+  // 1回だけ再実行される)。
   useEffect(() => {
     if (phase !== "eliminating" || eliminationStage !== "holding") return;
+    playSE("destination_reveal");
     const timer = window.setTimeout(() => setEliminationStage("departing"), timing.eliminationHold);
     return () => window.clearTimeout(timer);
   }, [phase, eliminationStage, timing.eliminationHold]);
 
-  // departing → settled: 対象車が脱落動作中の時間(B-2b-1時点ではCSS演出はまだ無く、
-  // 「departingという状態である」ことがDOM(data-elimination-stage)から確認できるだけ)。
+  // departing → settled: 対象車が脱落動作中の時間。P11-3-B2b-3: departingへ入った瞬間に
+  // 1回だけelimination_out(脱落コースアウト専用の新規SE)を鳴らす。上のholding effectと
+  // 同じ設計(ガード+playSE+setTimeoutを1つのeffectにまとめ、依存配列の変化でのみ実行)。
   useEffect(() => {
     if (phase !== "eliminating" || eliminationStage !== "departing") return;
+    playSE("elimination_out");
     const timer = window.setTimeout(() => setEliminationStage("settled"), timing.eliminationDepart);
     return () => window.clearTimeout(timer);
   }, [phase, eliminationStage, timing.eliminationDepart]);

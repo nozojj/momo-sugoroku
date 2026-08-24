@@ -1,21 +1,23 @@
-// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張)。
+// 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張、
+// P11-3-B2b-3でelimination_outを追加)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、全14種のSE(高頻度SE、money系、card/property系、
-// monopoly系、destination系、game_over_fanfare、ui_select)を、外部素材に一切依存せずこの
-// スクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+ホワイトノイズ、
-// 線形アタック+指数ディケイのエンベロープ、複数音を重ねる和音合成)のみで、外部ライブラリ・
-// サンプル音源は使用していない。ライセンス上の扱いは public/sounds/LICENSES.md を参照
-// (自作・パラメータ手続き生成のため権利上の懸念なし)。
+// 目的: 「出所不明の音源は使わない」方針のもと、全15種のSE(高頻度SE、money系、card/property系、
+// monopoly系、destination系、game_over_fanfare、ui_select、elimination_out)を、外部素材に
+// 一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+
+// ホワイトノイズ、線形アタック+指数ディケイのエンベロープ、複数音を重ねる和音合成)のみで、
+// 外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
+// public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため権利上の懸念なし)。
 //
 // 実行方法: `node scripts/generate-se.mjs`
 // 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
 //        card_get,card_use,property_buy,monopoly_group,monopoly_region,
-//        destination_arrive,destination_reveal,game_over_fanfare,ui_select}.wav
+//        destination_arrive,destination_reveal,game_over_fanfare,ui_select,
+//        elimination_out}.wav
 //        (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
-// P10-4-1/P10-4-2/P10-4-3で作成した既存12音の定義・生成コードは今回も一切変更していない
+// P10-4-1/P10-4-2/P10-4-3/P10-4-4で作成した既存14音の定義・生成コードは今回も一切変更していない
 // (再実行してもバイト単位で同一の出力になることをP10-4-4でもSHA256ハッシュ比較により確認済み)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -335,6 +337,25 @@ const SOUND_DEFS = {
   // 明確に一線を画す最もシンプルな音にしている。1200Hzは既存の音階(C/D/E/G/A音)から
   // あえて外した、電子的な「ビープ」寄りの周波数。
   ui_select: () => renderTone({ waveform: "sine", freqStart: 1200, durationMs: 130, peak: 0.3, attackMs: 2, decayExp: 4.5 }),
+
+  // P11-3-B2b-3: 最終順位発表演出(FinalRaceSequence.tsx)でdeparting(脱落のコースアウト)開始時
+  // に鳴らす専用SE。「一瞬のガクッ→失速→外へ抜けていく下降感」をコミカルに(money_lossの
+  // ような「しょんぼり」系の単調な下降や、爆発・クラッシュ系の激しい音にはしない)伝えるため、
+  // 4段階で構成する: (1) 矩形波の短い下降ブリップ(「ガクッ」というつまずきの一瞬)、
+  // (2) 短い無音(つまずきに気づく一拍)、(3) 三角波の二段構え下降(単調な一直線ではなく、
+  // 一度下がってから少し高い位置から再度下がる「ボヨンと弾みながら落ちる」コミカルな軌道)、
+  // (4) 末尾の柔らかいノイズ減衰(「ポフッ」という土煙、money_lossには無いtailを足すことで
+  // 波形の輪郭そのものを差別化する)。money_lossとは(a)矩形波の頭が付く/付かない、
+  // (b)一直線の下降か二段の下降か、(c)末尾にノイズtailがあるか無いか、の3点すべてで異なる。
+  // 合計約365ms(departing 550msの中に収まり、CSSのコースアウトアニメーションより短く終わる)。
+  elimination_out: () =>
+    concat([
+      renderTone({ waveform: "square", freqStart: 760, freqEnd: 520, durationMs: 45, peak: 0.4, attackMs: 1, decayExp: 6 }),
+      silence(10),
+      renderTone({ waveform: "triangle", freqStart: 480, freqEnd: 300, durationMs: 90, peak: 0.34, attackMs: 2, decayExp: 3 }),
+      renderTone({ waveform: "triangle", freqStart: 380, freqEnd: 170, durationMs: 160, peak: 0.32, attackMs: 2, decayExp: 3.5 }),
+      renderNoise({ durationMs: 60, peak: 0.16, decayExp: 8, seed: 11 }),
+    ]),
 };
 
 let totalBytes = 0;

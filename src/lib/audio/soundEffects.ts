@@ -13,6 +13,9 @@
  *   property_buy(✅P10-4-2) / monopoly_group(✅P10-4-3、出所不明だった旧mp3から自作wavへ置き換え済み) /
  *   monopoly_region(✅P10-4-3) / destination_arrive(✅P10-4-3) / destination_reveal(✅P10-4-3) /
  *   game_over_fanfare(✅P10-4-4) / ui_select(✅P10-4-4)
+ *
+ * P11-3-B2b-3で追加(最終順位発表演出の脱落コースアウト専用): elimination_out。
+ * 既存destination_revealはholding(順位発表)側に流用するのみで新規追加していない。
  */
 export type SoundEffectId =
   | "dice_roll"
@@ -28,7 +31,8 @@ export type SoundEffectId =
   | "destination_arrive"
   | "destination_reveal"
   | "game_over_fanfare"
-  | "ui_select";
+  | "ui_select"
+  | "elimination_out";
 
 export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Phase10/P10-4-1: 手続き的生成(scripts/generate-se.mjs)によるWAV。他の未配置idとの
@@ -51,4 +55,6 @@ export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Phase10/P10-4-4: 同じくscripts/generate-se.mjsによるWAV。これで全14音が手続き的生成で揃った。
   game_over_fanfare: "/sounds/game_over_fanfare.wav",
   ui_select: "/sounds/ui_select.wav",
+  // P11-3-B2b-3: 同じくscripts/generate-se.mjsによるWAV。
+  elimination_out: "/sounds/elimination_out.wav",
 };

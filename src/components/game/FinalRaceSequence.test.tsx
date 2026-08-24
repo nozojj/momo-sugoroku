@@ -675,3 +675,142 @@ describe("FinalRaceSequence(Phase B-2b-2: departingの脱落アニメーショ�
     expect(css).toContain(".race-departing-reduced");
   });
 });
+
+/** playSEMock.mock.callsのうち、指定idの呼び出し回数だけを数える。 */
+function seCallCount(id: string): number {
+  return playSEMock.mock.calls.filter((c) => c[0] === id).length;
+}
+
+describe("FinalRaceSequence(Phase B-2b-3: 順位発表/脱落SE)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("4人プレイ: holding開始のたびにdestination_reveal、departing開始のたびにelimination_outが1回ずつ鳴り、settledでは増えない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // running → eliminating開始(4位のholding)
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(0);
+
+    await advance(250); // 4位: holding → departing
+    expect(seCallCount("destination_reveal")).toBe(1); // 増えない
+    expect(seCallCount("elimination_out")).toBe(1);
+
+    await advance(550); // 4位: departing → settled
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(1); // settledでは追加SEなし
+
+    await advance(150); // 4位確定 → 3位のholding開始
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(1);
+
+    await advance(250); // 3位: holding → departing
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+
+    await advance(550); // 3位: departing → settled
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+
+    await advance(150); // 3位確定 → finalTwoへ(今回はSEを追加しない)
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+
+    // game_over_fanfareはintroで1回だけ(従来どおり、今回のSE追加とは独立)。
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("3人プレイ: destination_reveal/elimination_outとも1回ずつ", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS]); // running→eliminating(1回)→finalTwo
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(1);
+  });
+
+  it("2人プレイ: eliminatingフェーズを経由しないため、destination_reveal/elimination_outとも0回", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // running → (eliminatingを経由せず)finalTwo
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_reveal")).toBe(0);
+    expect(seCallCount("elimination_out")).toBe(0);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("reduced-motion時も4人プレイでdestination_reveal×2/elimination_out×2が短縮タイミングで重複なく鳴る", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200]); // reduced intro+running → 4位holding
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(0);
+
+    await advance(60); // 4位: holding → departing(reduced)
+    expect(seCallCount("elimination_out")).toBe(1);
+
+    await advanceSteps([120, 40]); // 4位: departing → settled → 3位holding
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(1);
+
+    await advance(60); // 3位: holding → departing(reduced)
+    expect(seCallCount("elimination_out")).toBe(2);
+
+    await advanceSteps([120, 40]); // 3位: departing → settled → finalTwo
+    expect(document.querySelector('[data-race-phase="finalTwo"]')).not.toBeNull();
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+  });
+
+  it("holding/departing中にunmountしても、以降SEが追加で鳴らずタイマーも残らない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // 4位holding開始
+    expect(seCallCount("destination_reveal")).toBe(1);
+
+    unmount();
+    await advance(10000); // unmount後にどれだけ進めても増えないはず
+    expect(seCallCount("destination_reveal")).toBe(1);
+    expect(seCallCount("elimination_out")).toBe(0);
+  });
+
+  it("onFinish()の呼び出し回数(1回だけ)はSE追加の影響を受けない(4人プレイ通し)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      400,
+    ]);
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(seCallCount("destination_reveal")).toBe(2);
+    expect(seCallCount("elimination_out")).toBe(2);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(seCallCount("destination_reveal")).toBe(2); // finalTwo以降は今回SEを追加しないため増えない
+    expect(seCallCount("elimination_out")).toBe(2);
+  });
+});
