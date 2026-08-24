@@ -57,7 +57,12 @@ const TIMING_MS = {
   eliminationSettle: 150,
   finalTwo: 1500, // ユーザー要求どおり、ここだけ意図的に長めに引っ張る
   winnerSprint: 800,
-  finish: 400,
+  // P11-3-B2c-4: B-2c最終監査で「実速度400msではゴール!!を認識しづらい」と判定されたため
+  // 700msへ延長した(finalTwo=1500msの中間ビートとしての存在感を確保しつつ、finalTwo/
+  // celebrationほど長くはしない)。合わせて見出しにanimate-highlight-slam(finalTwoの見出しと
+  // 同じ既存one-shot)を付与するため、480msのアニメーション完了後に220msの読了猶予が残る
+  // 配分になる。SEは追加しない(finish→celebrationの無音区間を「溜め」として維持する設計)。
+  finish: 700,
   celebration: 1600,
 };
 const REDUCED_TIMING_MS = {
@@ -68,7 +73,10 @@ const REDUCED_TIMING_MS = {
   eliminationSettle: 40,
   finalTwo: 400,
   winnerSprint: 200,
-  finish: 100,
+  // P11-3-B2c-4: 通常値700msに対し、他フェーズと同じ「約4分の1に短縮する」既存比率
+  // (intro:4x, running:4.5x, finalTwo:3.75x等)に合わせた175ms。animate-highlight-slam自体は
+  // 既存の@media (prefers-reduced-motion: reduce)ブロックで自動的に無効化される(追加ガード不要)。
+  finish: 175,
   celebration: 400,
 };
 
@@ -174,12 +182,21 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
 
   // P11-3-B2a: 通常走行の演出(車体の振動・疑似的な抜きつ抜かれつ・流れるコース線)を
   // 有効にするかどうか。intro中はまだ「よーい」の間なので走行感を出さず、runningに入った
-  // 瞬間から立ち上げる(ユーザー要求どおり)。eliminating/finalTwo/winnerSprint等、それ以降の
-  // 全フェーズでは現役レーサーは走り続ける(このフラグだけを見ればよく、フェーズごとに
-  // 個別分岐する必要はない)。prefers-reduced-motionが有効な間は、情報を持たない純粋な
-  // 装飾アニメーションなので丸ごと無効化する(誰が現役/脱落かという情報自体はdata-eliminated
-  // 側で既に伝わっており、ここで失われる情報は無い)。
-  const decorativeMotionEnabled = phase !== "intro" && !reduceMotion;
+  // 瞬間から立ち上げる(ユーザー要求どおり)。eliminating/finalTwo/winnerSprint/finishでは
+  // 現役レーサーは走り続ける(このフラグだけを見ればよく、フェーズごとに個別分岐する
+  // 必要はない)。prefers-reduced-motionが有効な間は、情報を持たない純粋な装飾アニメーション
+  // なので丸ごと無効化する(誰が現役/脱落かという情報自体はdata-eliminated側で既に伝わって
+  // おり、ここで失われる情報は無い)。
+  //
+  // P11-3-B2c-4: celebration/doneでは装飾モーション(race-drift/vibrate/track-line)を止める。
+  // 優勝が決まった後もレース中と同じ微揺れを続けているのが「まだ走っている」ように見え
+  // 落ち着かない、という監査指摘への対応。winnerSprintで付与されるrace-winner-advance
+  // (前進オフセット・glow)はこのフラグと完全に独立した別state(isWinnerAdvancingPhase)
+  // なので一切影響を受けず、celebration中も勝者の最終位置・強調表示はそのまま維持される。
+  // reduceMotion時は元々このフラグがfalse(=全フェーズで装飾モーション無し)だったため、
+  // celebrationでの見え方は今回の変更前後で変わらない(reduced-motionユーザーには
+  // 既にこの「静止した」体験が提供されていた)。
+  const decorativeMotionEnabled = phase !== "intro" && phase !== "celebration" && phase !== "done" && !reduceMotion;
 
   // P11-3-B2c-3: winnerSprintで勝者だけを前方へ抜け出させるためのフェーズ集合。
   // finalTwo中はwinnerIds自体は既に内部で確定しているが、視覚的な強調は一切与えない
@@ -345,7 +362,17 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
           {winners.map((w) => w.player.name).join("・")}さん、加速!
         </p>
       )}
-      {phase === "finish" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">ゴール!!</p>}
+      {/* P11-3-B2c-4: finishへの一発強調。finalTwoの見出し(残り2人、デッドヒート!)と全く同じ
+          animate-highlight-slam(既存keyframeの再利用、新規keyframeなし)を適用する。480ms
+          both(0%→scale(0.3)から100%→scale(1)で静止)の一発アニメーションで、700msに延長した
+          finish全体を動かし続けはしない(最初の一発だけ強調し、残り約220msは読みやすい
+          静止状態のまま)。SEは意図的に追加しない(無音のままfinish→celebrationの「溜め」を
+          維持し、celebrationのgame_over_fanfareを演出全体の音の最大ピークとして保つ設計を
+          崩さない)。reduced-motion時の抑制はglobals.cssの@media (prefers-reduced-motion: reduce)
+          側で.animate-highlight-slam自体が無効化される既存の仕組みにそのまま乗る。 */}
+      {phase === "finish" && (
+        <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">ゴール!!</p>
+      )}
       {(phase === "celebration" || phase === "done") && (
         <div className="relative">
           <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">

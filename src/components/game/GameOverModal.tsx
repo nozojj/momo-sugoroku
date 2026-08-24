@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { NetWorthHistoryEntry, Player } from "@/types/game";
 import { formatMoney } from "@/lib/format";
 import { rankPlayers, type RankedPlayer } from "@/lib/game/engine";
@@ -35,6 +36,14 @@ interface GameOverModalProps {
  * game_over_fanfareの再生はここでは行わない(最終順位発表演出FinalRaceSequence.tsxの
  * introフェーズへ移設済み。GameScreen.tsxはstatus:"finished"になるとまずFinalRaceSequenceを
  * 表示し、その演出が完了(onFinish)してからこのGameOverModalへ切り替える)。
+ *
+ * P11-3-B2c-4: FinalRaceSequence→GameOverModalの切り替えはGameScreen.tsx側でraceSequenceDone
+ * (boolean)が反転した瞬間の排他的な条件レンダリングであり、両者が同時にマウントされる瞬間は
+ * 存在しない(=背後のBoardが一瞬透けて見えるリスクが構造的に無い)。ハードカット感を和らげる
+ * ため、このコンポーネント側だけでmount直後にopacity 0→100のfade-inを行う
+ * (GameDrawer.tsxのbackdropと同じtransition-opacity+opacityクラス切り替えパターンを踏襲、
+ * 新規ライブラリ・新規keyframeは使わない)。GameScreen.tsxの状態機械・z-index構成は一切
+ * 変更しない。
  */
 export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory, onRestart }: GameOverModalProps) {
   const isTie = winnerIds.length > 1;
@@ -44,11 +53,26 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
   const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsMobileViewport();
 
+  // mount直後は常にfalseで描画し、次のeffectでtrueへ切り替える(GameDrawer.tsxのopen状態と
+  // 同じ「初期値→effectで反転」による2フレーム構成)。reduceMotion自体もusePrefersReducedMotion()
+  // の仕様上、初回レンダーでは常にfalseを返し実値はeffectで後追い確定するため(SSR安全性のための
+  // 既存パターン、FinalRaceSequence.tsxのintro effectと同じ制約)、reduced-motionユーザーでも
+  // ごく最初の1フレームだけopacity-0を経由しうるが、直後のeffectで即座にopacity-100へ収束し、
+  // transitionクラス自体を付けないため体感上のフェードは発生しない。
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    setEntered(true);
+  }, []);
+  const fadeOpacityClass = reduceMotion || entered ? "opacity-100" : "opacity-0";
+  const fadeTransitionClass = reduceMotion ? "" : "transition-opacity duration-300";
+
   return (
     // Visual Prototype 1.5: 「遊び切ったご褒美画面」として、GameStateの他画面より明確に一段豪華な
     // 暖色グラデーションの全画面背景。SettlementScreenより彩度・輝き感を強めて「フィナーレ」感を出す。
     // 情報構造(タイトル→アワード→ランキング→チャート→ボタン)は無変更。
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-linear-to-b from-amber-200 via-orange-100 to-amber-50 p-4 dark:from-amber-950/50 dark:via-slate-900 dark:to-slate-950">
+    <div
+      className={`fixed inset-0 z-50 overflow-y-auto bg-linear-to-b from-amber-200 via-orange-100 to-amber-50 p-4 dark:from-amber-950/50 dark:via-slate-900 dark:to-slate-950 ${fadeTransitionClass} ${fadeOpacityClass}`}
+    >
       <div className="mx-auto my-6 w-full max-w-sm rounded-2xl border-2 border-amber-300/70 bg-linear-to-b from-white to-amber-50/50 p-5 shadow-2xl dark:border-amber-400/20 dark:from-slate-800 dark:to-slate-800/80 lg:max-w-5xl lg:p-8">
         <div className="text-center">
           {/* P9-2: 到着演出(DestinationCelebrationScreen)と同じ組み合わせ(CharacterSprite+

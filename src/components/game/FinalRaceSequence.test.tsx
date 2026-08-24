@@ -130,7 +130,7 @@ describe("FinalRaceSequence", () => {
     await advance(800); // winnerSprint → finish
     expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
 
-    await advance(400); // finish → celebration
+    await advance(700); // finish → celebration
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
     expect(screen.getByText("優勝 プレイヤー4さん!")).not.toBeNull();
   });
@@ -164,7 +164,7 @@ describe("FinalRaceSequence", () => {
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
     // intro→running→eliminating(3位)完了→finalTwo→winnerSprint→finish→celebration開始
-    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 400]);
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 700]);
 
     expect(screen.getByText("優勝 引き分け!")).not.toBeNull();
   });
@@ -175,7 +175,7 @@ describe("FinalRaceSequence", () => {
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
 
     // 2人プレイなのでeliminatingを経由しない: intro→running→finalTwo→winnerSprint→finish
-    await advanceSteps([1200, 900, 1500, 800, 400]);
+    await advanceSteps([1200, 900, 1500, 800, 700]);
     expect(onFinish).not.toHaveBeenCalled(); // celebration中はまだ
 
     await advance(1600); // celebration → done → onFinish()
@@ -204,8 +204,8 @@ describe("FinalRaceSequence", () => {
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
 
     // reduced-motion設定(REDUCED_TIMING_MS)の合計: 4人プレイなのでeliminationStepは2回。
-    // intro(300)+running(200)+eliminationStep(220)*2+finalTwo(400)+winnerSprint(200)+finish(100)+celebration(400)
-    // = 2040ms。通常設定の合計(950*2を含む)よりずっと短い時間で完了することを確認する。
+    // intro(300)+running(200)+eliminationStep(220)*2+finalTwo(400)+winnerSprint(200)+finish(175)+celebration(400)
+    // = 2115ms。通常設定の合計(950*2を含む)よりずっと短い時間で完了することを確認する。
     await advanceSteps([
       300,
       200,
@@ -213,7 +213,7 @@ describe("FinalRaceSequence", () => {
       ...REDUCED_ELIMINATION_STEP_STAGES_MS,
       400,
       200,
-      100,
+      175,
       400,
     ]);
 
@@ -540,7 +540,7 @@ describe("FinalRaceSequence(Phase B-2b-1: holding/departing/settledの分離)", 
       ...ELIMINATION_STEP_STAGES_MS,
       1500,
       800,
-      400,
+      700,
     ]);
     expect(onFinish).not.toHaveBeenCalled(); // celebration中はまだ
     expect(document.querySelector('[data-race-phase="finalTwo"]')).toBeNull(); // 既に通過済み、戻っていない
@@ -660,7 +660,7 @@ describe("FinalRaceSequence(Phase B-2b-2: departingの脱落アニメーショ�
     const eliminationSteps = Array(Math.max(0, n - 2))
       .fill(null)
       .flatMap(() => ELIMINATION_STEP_STAGES_MS);
-    await advanceSteps([1200, 900, ...eliminationSteps, 1500, 800, 400]);
+    await advanceSteps([1200, 900, ...eliminationSteps, 1500, 800, 700]);
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
 
     await advance(1600); // celebration → done → onFinish()
@@ -809,7 +809,7 @@ describe("FinalRaceSequence(Phase B-2b-3: 順位発表/脱落SE)", () => {
       ...ELIMINATION_STEP_STAGES_MS,
       1500,
       800,
-      400,
+      700,
     ]);
     await advance(1600); // celebration → done → onFinish()
     expect(onFinish).toHaveBeenCalledTimes(1);
@@ -865,7 +865,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
     expect(seCallCount("game_over_fanfare")).toBe(0);
 
-    await advance(400); // finish → celebration(ここでgame_over_fanfareが1回)
+    await advance(700); // finish → celebration(ここでgame_over_fanfareが1回)
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
     expect(seCallCount("game_over_fanfare")).toBe(1);
 
@@ -879,7 +879,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     const { ranked, winnerIds } = buildRanked([1000, 2000, 3000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 400]);
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 700]);
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
 
     expect(seCallCount("destination_reveal")).toBe(1);
@@ -892,7 +892,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]);
+    await advanceSteps([1200, 900, 1500, 800, 700]);
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
 
     expect(seCallCount("destination_reveal")).toBe(0);
@@ -905,7 +905,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
     expect(seCallCount("game_over_fanfare")).toBe(1);
 
     await advance(1600); // celebration → done
@@ -920,7 +920,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     const onFinish = vi.fn();
     const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
     expect(seCallCount("game_over_fanfare")).toBe(1);
 
     unmount();
@@ -952,7 +952,7 @@ describe("FinalRaceSequence(Phase B-2c-1: finalTwo/celebrationの音構造)", ()
     expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
     expect(seCallCount("game_over_fanfare")).toBe(0);
 
-    await advance(100); // finish → celebration(reduced、ここでgame_over_fanfareが1回)
+    await advance(175); // finish → celebration(reduced、ここでgame_over_fanfareが1回)
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
     expect(seCallCount("destination_arrive")).toBe(1);
     expect(seCallCount("game_over_fanfare")).toBe(1);
@@ -995,7 +995,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     expect(document.querySelector(".animate-confetti-fall")).toBeNull(); // celebration前は無し
     expect(document.querySelector(".animate-announcer-sparkle")).toBeNull();
 
-    await advance(400); // finish → celebration
+    await advance(700); // finish → celebration
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
     expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
     expect(document.querySelectorAll(".animate-announcer-sparkle").length).toBeGreaterThan(0);
@@ -1008,7 +1008,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
     expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
 
     await advance(1600); // celebration → done
@@ -1023,7 +1023,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
     expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
 
     unmount();
@@ -1041,7 +1041,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     await advanceSteps([1200, 900, ...eliminationSteps]);
     expect(document.querySelector(".animate-highlight-slam")).not.toBeNull(); // finalTwo突入直後
 
-    await advanceSteps([1500, 800, 400]);
+    await advanceSteps([1500, 800, 700]);
     expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
     expect(document.querySelectorAll(".animate-announcer-sparkle").length).toBeGreaterThan(0);
   });
@@ -1051,8 +1051,8 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([300, 200, 400, 200, 100]); // reduced: intro→running→finalTwo→winnerSprint→finish
-    await advance(100); // finish → celebration(reduced)
+    await advanceSteps([300, 200, 400, 200, 175]); // reduced: intro→running→finalTwo→winnerSprint→finish
+    await advance(175); // finish → celebration(reduced)
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
     expect(document.querySelector(".animate-confetti-fall")).toBeNull();
     expect(document.querySelector(".animate-announcer-sparkle")).toBeNull();
@@ -1071,7 +1071,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
       ...ELIMINATION_STEP_STAGES_MS,
       1500,
       800,
-      400,
+      700,
     ]);
     expect(seCallCount("destination_arrive")).toBe(1);
     expect(seCallCount("game_over_fanfare")).toBe(1);
@@ -1091,7 +1091,7 @@ describe("FinalRaceSequence(Phase B-2c-2: finalTwo強調とcelebration紙吹雪)
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // celebration開始
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
     const layer = document.querySelector('[aria-hidden="true"].pointer-events-none');
     expect(layer).not.toBeNull();
     // 優勝者名は紙吹雪レイヤーの外(通常のテキストノード)としてそのまま存在する。
@@ -1166,7 +1166,7 @@ describe("FinalRaceSequence(Phase B-2c-3: winnerSprintの勝者前進演出)", (
     const { ranked, winnerIds } = buildRanked([1000, 2000]);
     render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
 
-    await advanceSteps([1200, 900, 1500, 800, 400]); // → celebration
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
     expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
 
     const winnerId = winnerIds[0];
@@ -1205,7 +1205,7 @@ describe("FinalRaceSequence(Phase B-2c-3: winnerSprintの勝者前進演出)", (
     }
     expect(screen.getByText(`${ranked[0].player.name}・${ranked[1].player.name}さん、加速!`)).not.toBeNull();
 
-    await advanceSteps([800, 400]); // finish → celebration
+    await advanceSteps([800, 700]); // finish → celebration
     expect(screen.getByText("優勝 引き分け!")).not.toBeNull();
   });
 
@@ -1246,7 +1246,7 @@ describe("FinalRaceSequence(Phase B-2c-3: winnerSprintの勝者前進演出)", (
       ...ELIMINATION_STEP_STAGES_MS,
       1500,
       800,
-      400,
+      700,
     ]);
     expect(seCallCount("destination_arrive")).toBe(1);
     expect(seCallCount("game_over_fanfare")).toBe(1);
@@ -1255,5 +1255,152 @@ describe("FinalRaceSequence(Phase B-2c-3: winnerSprintの勝者前進演出)", (
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect(seCallCount("destination_arrive")).toBe(1);
     expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+});
+
+describe("FinalRaceSequence(Phase B-2c-4: finish強調とcelebration静止)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("finishは700ms維持される(699msではまだfinish、700msでcelebrationへ切り替わる)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish開始
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    await advance(699);
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+  });
+
+  it("finish見出し(ゴール!!)にanimate-highlight-slamが付与される", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    const heading = document.querySelector(".animate-highlight-slam");
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe("ゴール!!");
+  });
+
+  it("celebrationへ遷移するとfinishのanimate-highlight-slamは残らない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(document.querySelector(".animate-highlight-slam")).toBeNull();
+  });
+
+  it("celebrationでは装飾モーション(race-drift/animate-race-vibrate)が停止する(data-running=false)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
+    for (const r of ranked) {
+      expect(isRunning(r.player.id)).toBe(false);
+      expect(hasMotionClasses(r.player.id)).toBe(false);
+    }
+  });
+
+  it("finishまでは装飾モーションが維持され、celebrationでのみ止まる(4人プレイで前後比較)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS, 1500, 800]); // → finish
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    for (const r of ranked.slice(0, 2)) {
+      expect(isRunning(r.player.id)).toBe(true);
+      expect(hasMotionClasses(r.player.id)).toBe(true);
+    }
+
+    await advance(700); // finish → celebration
+    for (const r of ranked.slice(0, 2)) {
+      expect(isRunning(r.player.id)).toBe(false);
+      expect(hasMotionClasses(r.player.id)).toBe(false);
+    }
+  });
+
+  it("celebrationで装飾モーションが止まっても、winnerの前進class(race-winner-advance)と位置は維持される", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
+    const winnerId = winnerIds[0];
+    expect(isWinnerAdvancing(winnerId)).toBe(true);
+    expect(hasDescendantWithClass(winnerId, "race-winner-advance")).toBe(true);
+    expect(isRunning(winnerId)).toBe(false); // 装飾モーション自体は止まる(winnerAdvanceとは別state)
+  });
+
+  it("reduced-motion時のfinishは175ms維持される(174msではまだfinish、175msでcelebrationへ)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400, 200]); // reduced: intro→running→finalTwo→winnerSprint → finish開始
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    await advance(174);
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+  });
+
+  it("reduced-motion時もcelebrationでdata-running=falseのまま(既存のreduced-motion挙動から変化なし)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400, 200, 175]); // → celebration(reduced)
+    for (const r of ranked) {
+      expect(isRunning(r.player.id)).toBe(false);
+    }
+  });
+
+  it("finish延長・celebration静止を追加してもSE構成(destination_arrive×1, game_over_fanfare×1)とonFinish×1は変わらない(4人プレイ通し)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      700,
+    ]);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(seCallCount("destination_arrive")).toBe(1);
+    expect(seCallCount("game_over_fanfare")).toBe(1);
+  });
+
+  it("finish中にunmountしてもタイマー・SEの副作用が残らずonFinish()も呼ばれない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    const onFinish = vi.fn();
+    const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 300]); // finishの途中でunmount
+    unmount();
+
+    await advance(10000);
+    expect(onFinish).not.toHaveBeenCalled();
   });
 });
