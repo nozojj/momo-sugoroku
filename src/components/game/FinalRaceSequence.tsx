@@ -181,6 +181,14 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   // 側で既に伝わっており、ここで失われる情報は無い)。
   const decorativeMotionEnabled = phase !== "intro" && !reduceMotion;
 
+  // P11-3-B2c-3: winnerSprintで勝者だけを前方へ抜け出させるためのフェーズ集合。
+  // finalTwo中はwinnerIds自体は既に内部で確定しているが、視覚的な強調は一切与えない
+  // (勝者が事前にバレないようにする、という今回の最重要ルール)。winnerSprintへ入った
+  // 瞬間に初めてこの前進classが付与され、以後finish/celebration/doneまで同じ集合の
+  // ままにする(=同じclass文字列を保ち続けることで、finish突入時にCSSアニメーションが
+  // 再スタートせず、winnerSprintで生まれた位置差がワープせず維持される)。
+  const isWinnerAdvancingPhase = phase === "winnerSprint" || phase === "finish" || phase === "celebration" || phase === "done";
+
   function finish() {
     if (finishedRef.current) return;
     finishedRef.current = true;
@@ -402,6 +410,16 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
               : decorativeMotionEnabled
                 ? "animate-race-vibrate"
                 : "";
+          // P11-3-B2c-3: このプレイヤーがwinnerSprint以降に「前進表示すべき勝者」かどうか。
+          // isWinnerAdvancingPhaseとwinnerIdsの両方を満たす場合のみtrueになる(finalTwo中は
+          // isWinnerAdvancingPhaseが常にfalseなので、winnerIds自体が既に分かっていても
+          // 視覚上は絶対に前進しない)。
+          const isWinnerAdvancing = isWinnerAdvancingPhase && winnerIds.includes(r.player.id);
+          // race-drift/race-departingとは別のDOM階層(1つ外側のwrapper)へ適用することで、
+          // 同一要素上でtransform系animationを重ねない(B-2b-2で発生した競合の教訓を踏襲)。
+          // reduceMotion時は大きなtranslateを避けた静的オフセット版へ切り替える
+          // (race-departing/race-departing-reducedと同じ、コンポーネント側の実値による分岐)。
+          const winnerAdvanceClass = isWinnerAdvancing ? (reduceMotion ? "race-winner-advance-reduced" : "race-winner-advance") : "";
           return (
             <div
               key={r.player.id}
@@ -409,6 +427,7 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
               data-eliminated="false"
               data-running={decorativeMotionEnabled}
               data-elimination-stage={stageForRacer}
+              data-winner-advancing={isWinnerAdvancing}
               className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
             >
               {/* 名前ラベル。sm:w-28で固定幅を持たせることでtruncateの基準を作る(carアイコンを
@@ -429,31 +448,39 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
                   decorativeMotionEnabled ? "race-track-line" : "bg-white/40"
                 } rounded-full`}
               >
-                {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
-                    @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
-                    rankedの並び順・rankを読み書きすることはない。P11-3-B2b-2: departing中は
-                    このクラスがrace-departing(-reduced)に置き換わり、脱落のコースアウトを
-                    一本のtransformアニメーションで担う。 */}
-                <div
-                  className={`relative mt-2 sm:mt-0 sm:ml-2 ${wrapperMotionClass}`}
-                  style={wrapperMotionClass === "race-drift" ? { animationDelay: `${delayMs}ms` } : undefined}
-                >
-                  {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
-                      分離することで、2つの独立したtransformアニメーションを衝突させずに
-                      合成する(1要素に複数transformアニメーションを重ねると片方しか
-                      反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
-                      Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
-                      トラック側へ移った今回もこの丸バッジとして維持する。P11-3-B2b-2:
-                      holding中はanimate-character-bounce、departing中は無し(動きはwrapper側)。 */}
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${badgeMotionClass}`}
-                    style={{
-                      backgroundColor: r.player.color,
-                      animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
-                    }}
+                {/* P11-3-B2c-3: winnerSprint以降の前進オフセット専用wrapper。race-drift/
+                    race-departingを持つ内側wrapperとは別要素にすることで、進行方向の
+                    transformアニメーション同士を衝突させない(wrapper/inner分離、
+                    B-2b-2の教訓を踏襲)。margin(mt-2/sm:ml-2)は元々内側wrapperが
+                    持っていたものをこちらへ移設した(内側は「relative + 漂いclass」だけの
+                    役割に一本化するため)。 */}
+                <div className={`relative mt-2 sm:mt-0 sm:ml-2 ${winnerAdvanceClass}`}>
+                  {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
+                      @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
+                      rankedの並び順・rankを読み書きすることはない。P11-3-B2b-2: departing中は
+                      このクラスがrace-departing(-reduced)に置き換わり、脱落のコースアウトを
+                      一本のtransformアニメーションで担う。 */}
+                  <div
+                    className={`relative ${wrapperMotionClass}`}
+                    style={wrapperMotionClass === "race-drift" ? { animationDelay: `${delayMs}ms` } : undefined}
                   >
-                    {r.player.carIcon}
-                  </span>
+                    {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
+                        分離することで、2つの独立したtransformアニメーションを衝突させずに
+                        合成する(1要素に複数transformアニメーションを重ねると片方しか
+                        反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
+                        Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
+                        トラック側へ移った今回もこの丸バッジとして維持する。P11-3-B2b-2:
+                        holding中はanimate-character-bounce、departing中は無し(動きはwrapper側)。 */}
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${badgeMotionClass}`}
+                      style={{
+                        backgroundColor: r.player.color,
+                        animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
+                      }}
+                    >
+                      {r.player.carIcon}
+                    </span>
+                  </div>
                 </div>
               </div>
 

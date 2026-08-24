@@ -486,6 +486,68 @@ body {
   animation: race-departing-reduced 120ms ease-out both;
 }
 
+/* P11-3-B2c-3: winnerSprintで勝者だけを前方へ抜け出させる演出。race-drift/race-departingを
+   持つ内側wrapperとは別のDOM階層(1つ外側のwrapper、FinalRaceSequence.tsx側)へ適用し、
+   同一要素上でtransform系animationを重ねない(B-2b-2の教訓を踏襲)。winnerSprintへ入った
+   瞬間にこのクラスが付与され、以後finish/celebration/doneまで同じクラス名を保ち続ける
+   ことでアニメーションを再スタートさせず(=Reactが同じclass文字列を保つ限り属性を
+   書き換えない)、fill-mode bothで終端フレームのまま位置差を維持する
+   (finish突入時に元の位置へワープしないようにするための設計)。
+   PC(横方向レース)はtranslateX、スマホ(縦方向レース)はtranslateYと、進行方向を
+   race-drift/race-departingと同じ考え方で@mediaにより切り替える。移動量はrace-drift
+   (最大12px程度)より一回り大きい「半歩〜1台分」程度に留め、画面外へ出ない値にする。 */
+@keyframes race-winner-advance-y {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+  100% {
+    transform: translateY(20px) scale(1.05);
+    box-shadow:
+      0 0 0 3px rgba(250, 204, 21, 0.55),
+      0 0 10px 4px rgba(250, 204, 21, 0.35);
+  }
+}
+@keyframes race-winner-advance-x {
+  0% {
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+  100% {
+    transform: translateX(28px) scale(1.05);
+    box-shadow:
+      0 0 0 3px rgba(250, 204, 21, 0.55),
+      0 0 10px 4px rgba(250, 204, 21, 0.35);
+  }
+}
+.race-winner-advance {
+  animation: race-winner-advance-y 800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  border-radius: 9999px;
+}
+@media (min-width: 640px) {
+  .race-winner-advance {
+    animation-name: race-winner-advance-x;
+  }
+}
+
+/* reduced-motion時: 大きなtranslateアニメーションは行わず、静的な前方オフセット+微scale+glowの
+   組み合わせだけで「誰が勝者か」を伝える(移動を伴わない表現に置き換える、既存プロジェクト方針。
+   race-departing/race-departing-reducedと同じく、コンポーネント側のusePrefersReducedMotion()
+   実値による分岐でこちらを使う。下のprefers-reduced-motionメディアクエリでの二重ガードは
+   不要)。.race-driftと同じく1クラスのまま@mediaで方向だけ切り替える。 */
+.race-winner-advance-reduced {
+  transform: translateY(8px) scale(1.04);
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.55),
+    0 0 8px 3px rgba(250, 204, 21, 0.3);
+  border-radius: 9999px;
+}
+@media (min-width: 640px) {
+  .race-winner-advance-reduced {
+    transform: translateX(12px) scale(1.04);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,
