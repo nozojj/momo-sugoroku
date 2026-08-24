@@ -327,10 +327,36 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
           const delayMs = deterministicDelayMs(r.player.id, 4, 90);
           // P11-3-B2b-1: このプレイヤーが「今回発表中の対象」であれば、そのholding/departing/
           // settledをdata-elimination-stageとして露出する(対象でなければundefined=属性なし)。
-          // B-2b-1時点ではこの値に応じたCSS演出はまだ無く、DOM上でstageを確認できるだけ
-          // (B-2b-2でdeparting時にrace-departing等のクラスを付ける際、ここへ分岐を足す想定)。
           const racerIndex = ranked.indexOf(r);
           const stageForRacer = eliminationStageForIndex(racerIndex, phase, eliminatedCount, eliminationStage, playerCount);
+          const isHolding = stageForRacer === "holding";
+          const isDeparting = stageForRacer === "departing";
+
+          // P11-3-B2b-2: departing中は通常走行(race-drift)を外し、脱落専用アニメーションへ
+          // 置き換える(同一要素にtransform系animationを重ねて「たまたま動く」実装にしないための
+          // 責務分離。動きは全てこのwrapper側が担い、内側のbadge(車アイコン)はdeparting中は
+          // 静止させる)。reduceMotion時はCSSのprefers-reduced-motionメディアクエリではなく、
+          // コンポーネントが既に持つreduceMotion判定にここで揃える(departingはintro/running/
+          // holdingを経てから到達するため、その時点ではusePrefersReducedMotion()の実値が
+          // 確定済みで、CSS側の二重ガードは不要)。
+          const wrapperMotionClass = isDeparting
+            ? reduceMotion
+              ? "race-departing-reduced"
+              : "race-departing"
+            : decorativeMotionEnabled
+              ? "race-drift"
+              : "";
+          // departing中は動きをwrapper側に一本化するためvibrateを外す。holding中は
+          // 「まもなく発表されるぞ」という控えめな強調として、既存のanimate-character-bounce
+          // (CharacterAnnouncer.tsxで使用済みの一発ポップ)を一時的に流用する(新規keyframeを
+          // 増やさず、reduced-motion時の無効化も既存CSSにそのまま乗る)。
+          const badgeMotionClass = isDeparting
+            ? ""
+            : isHolding
+              ? "animate-character-bounce"
+              : decorativeMotionEnabled
+                ? "animate-race-vibrate"
+                : "";
           return (
             <div
               key={r.player.id}
@@ -360,20 +386,26 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
               >
                 {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
                     @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
-                    rankedの並び順・rankを読み書きすることはない。 */}
+                    rankedの並び順・rankを読み書きすることはない。P11-3-B2b-2: departing中は
+                    このクラスがrace-departing(-reduced)に置き換わり、脱落のコースアウトを
+                    一本のtransformアニメーションで担う。 */}
                 <div
-                  className={`relative mt-2 sm:mt-0 sm:ml-2 ${decorativeMotionEnabled ? "race-drift" : ""}`}
-                  style={decorativeMotionEnabled ? { animationDelay: `${delayMs}ms` } : undefined}
+                  className={`relative mt-2 sm:mt-0 sm:ml-2 ${wrapperMotionClass}`}
+                  style={wrapperMotionClass === "race-drift" ? { animationDelay: `${delayMs}ms` } : undefined}
                 >
                   {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
                       分離することで、2つの独立したtransformアニメーションを衝突させずに
                       合成する(1要素に複数transformアニメーションを重ねると片方しか
                       反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
                       Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
-                      トラック側へ移った今回もこの丸バッジとして維持する。 */}
+                      トラック側へ移った今回もこの丸バッジとして維持する。P11-3-B2b-2:
+                      holding中はanimate-character-bounce、departing中は無し(動きはwrapper側)。 */}
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${decorativeMotionEnabled ? "animate-race-vibrate" : ""}`}
-                    style={{ backgroundColor: r.player.color, animationDelay: decorativeMotionEnabled ? `${delayMs}ms` : undefined }}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${badgeMotionClass}`}
+                    style={{
+                      backgroundColor: r.player.color,
+                      animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
+                    }}
                   >
                     {r.player.carIcon}
                   </span>
@@ -388,7 +420,9 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
       </div>
 
       {/* 脱落済み・順位発表済みエリア。完全に消さず、小さなchip一覧として残す
-          (Phase Aの仮表示と同じ見た目のパターンを踏襲)。 */}
+          (Phase Aの仮表示と同じ見た目のパターンを踏襲)。P11-3-B2b-2: chip出現に
+          既存のanimate-arrival-popを流用するが、主役はあくまでレース上のコースアウト側
+          なので、chip側はこの一発ポップだけに留める(新規演出は追加しない)。 */}
       {eliminatedRanked.length > 0 && (
         <div className="flex flex-wrap items-center justify-center gap-2">
           <span className="text-[10px] font-bold text-white/70">脱落済み・順位発表済み</span>
@@ -397,7 +431,7 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
               key={r.player.id}
               data-player-id={r.player.id}
               data-eliminated="true"
-              className="flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-800 opacity-80 shadow dark:bg-slate-800/70 dark:text-white"
+              className="flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-800 opacity-80 shadow dark:bg-slate-800/70 dark:text-white animate-arrival-pop"
               style={{ borderLeft: `3px solid ${r.player.color}` }}
             >
               <span className="max-w-16 truncate" title={r.player.name}>

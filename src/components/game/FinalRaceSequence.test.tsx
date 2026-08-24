@@ -5,6 +5,8 @@
 // (2) 2/3/4人プレイと同着1位で正しいフェーズ数・脱落順になること、(3) onFinish()が
 // ちょうど1回だけ呼ばれること、(4) unmount時にタイマーが残らないこと、(5) reduced-motion時に
 // 大幅短縮されること、(6) game_over_fanfareがGameOverModalからここへ移設されていること。
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { playSE } from "@/lib/audio/soundManager";
@@ -398,11 +400,16 @@ describe("FinalRaceSequence(Phase B-2a: 通常走行モーション)", () => {
     await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS]);
     expect(document.querySelector('[data-race-phase="eliminating"]')).not.toBeNull();
 
-    // 現役(p2/p3/p4)は走行animationを維持する。
+    // 現役(p2/p3/p4)は走行animationを維持する。ただしp2は同じタイミングで次の発表対象
+    // (3位、holding)へ切り替わっているため、P11-3-B2b-2のholding強調(animate-character-bounce)
+    // へ一時的に置き換わる(通常のanimate-race-vibrateとは重ねない設計、data-running=trueで
+    // 「現役」であること自体は変わらない)。
     expect(isRunning("p2")).toBe(true);
-    expect(hasMotionClasses("p2")).toBe(true);
+    expect(eliminationStageOf("p2")).toBe("holding");
     expect(isRunning("p3")).toBe(true);
+    expect(hasMotionClasses("p3")).toBe(true);
     expect(isRunning("p4")).toBe(true);
+    expect(hasMotionClasses("p4")).toBe(true);
 
     // 脱落済み(p1)はchip表示のみで、data-running属性自体を持たない・走行クラスも無い。
     expect(isRunning("p1")).toBeNull();
@@ -571,5 +578,100 @@ describe("FinalRaceSequence(Phase B-2b-1: holding/departing/settledの分離)", 
     await advance(120); // reduced eliminationDepart → settled
     expect(isActive("p1")).toBe(false);
     expect(laneFor("p1")?.getAttribute("data-eliminated")).toBe("true");
+  });
+});
+
+/** レーン(またはchip)要素の子孫に、指定classをぴったり持つ要素があるか。querySelectorの
+ *  class選択子はトークン完全一致なので、".race-departing"は"race-departing-reduced"を
+ *  誤って拾わない(部分文字列一致にならない)。 */
+function hasDescendantWithClass(playerId: string, className: string): boolean {
+  return (laneFor(playerId)?.querySelector(`.${className}`) ?? null) !== null;
+}
+
+describe("FinalRaceSequence(Phase B-2b-2: departingの脱落アニメーション)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("holding中は対象車にanimate-character-bounceが付き、通常のrace-drift走行とanimate-race-vibrateは維持される", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]); // p1=4位
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900]); // running → eliminating開始(holding)
+    expect(eliminationStageOf("p1")).toBe("holding");
+    expect(isActive("p1")).toBe(true);
+    expect(hasDescendantWithClass("p1", "animate-character-bounce")).toBe(true);
+    expect(hasDescendantWithClass("p1", "animate-race-vibrate")).toBe(false); // bounceに置き換わり、vibrateとは重ねない
+    expect(hasDescendantWithClass("p1", "race-drift")).toBe(true); // まだ通常走行中(コースアウトしない)
+  });
+
+  it("departing中はwrapperがrace-drift→race-departingへ切り替わり、badge側のvibrateは外れる。まだ脱落済みにはならない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 250]); // holding完了 → departing開始
+    expect(eliminationStageOf("p1")).toBe("departing");
+    expect(hasDescendantWithClass("p1", "race-departing")).toBe(true);
+    expect(hasDescendantWithClass("p1", "race-drift")).toBe(false); // 通常走行クラスは外れる
+    expect(hasDescendantWithClass("p1", "animate-race-vibrate")).toBe(false); // 動きはwrapper側に一本化
+    expect(hasDescendantWithClass("p1", "animate-character-bounce")).toBe(false); // holding用の強調も残らない
+    expect(isActive("p1")).toBe(true); // departing中はまだ現役レーン扱い
+    expect(laneFor("p1")?.getAttribute("data-eliminated")).toBe("false");
+  });
+
+  it("settled到達後は脱落済みchipへ移り、animate-arrival-popが付く", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 250, 550]); // holding+departing完了 → settled
+    expect(isActive("p1")).toBe(false);
+    const chip = laneFor("p1");
+    expect(chip?.getAttribute("data-eliminated")).toBe("true");
+    expect(chip?.className).toContain("animate-arrival-pop");
+    // レース上のwrapper/badge用クラスはchip側には存在しない(主役はコースアウト、chipは一発ポップのみ)。
+    expect(chip?.className).not.toContain("race-departing");
+  });
+
+  it("reduced-motion時のdepartingはrace-departing-reduced(短いfade)を使い、通常のrace-departingは使わない", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 60]); // reduced intro+running+holding → departing開始
+    expect(eliminationStageOf("p1")).toBe("departing");
+    expect(hasDescendantWithClass("p1", "race-departing-reduced")).toBe(true);
+    expect(hasDescendantWithClass("p1", "race-departing")).toBe(false); // トークン完全一致なので誤検出しない
+  });
+
+  it.each([2, 3, 4])("%i人プレイでも、departingの見た目クラス追加後にfinalTwo以降(既存演出)まで正しく到達する", async (n) => {
+    const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    const eliminationSteps = Array(Math.max(0, n - 2))
+      .fill(null)
+      .flatMap(() => ELIMINATION_STEP_STAGES_MS);
+    await advanceSteps([1200, 900, ...eliminationSteps, 1500, 800, 400]);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("globals.cssにdeparting用keyframe(PC/スマホ)とreduced-motion用の短いfadeが定義されている", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+
+    expect(css).toContain("@keyframes race-departing-desktop");
+    expect(css).toContain("@keyframes race-departing-mobile");
+    expect(css).toContain("@keyframes race-departing-reduced");
+    expect(css).toContain(".race-departing-reduced");
   });
 });

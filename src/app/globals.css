@@ -387,6 +387,105 @@ body {
   }
 }
 
+/* P11-3-B2b-2: 脱落(departing)する車体だけに適用する一発アニメーション。通常走行の
+   race-drift/animate-race-vibrateとは責務を分離し、departing中はこのクラス“だけ”を
+   drift wrapper(race-driftと同じ要素)に適用する(同一要素上でtransform系animationを
+   重ねて「たまたま動く」実装にしないため。FinalRaceSequence.tsx側でdeparting中は
+   race-drift/animate-race-vibrateを外し、この1クラスへ置き換える)。
+   0〜22%(≒120ms、反応)・22〜64%(≒350ms、失速)・64〜100%(≒550ms、コースアウト)の
+   3段階を1つのcontinuous keyframeで表現する(複数animationの重ね掛けを避けるため、
+   あえて1本にまとめている)。現在脱落対象になり得るのは常にレーン内の最後尾
+   (PC=表示上の最下段、スマホ=表示上の最右列)だけなので、PCは進行方向の勢いを残した
+   斜め下、スマホは横方向へ抜けても他レーンと衝突しない。 */
+@keyframes race-departing-mobile {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  10% {
+    transform: translate(0, -2px) rotate(-3deg);
+    opacity: 1;
+  }
+  20% {
+    transform: translate(0, 2px) rotate(3deg);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(1px, 0) rotate(-2deg);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(7px, 1px) rotate(-6deg);
+    opacity: 0.85;
+  }
+  64% {
+    transform: translate(13px, 2px) rotate(-9deg);
+    opacity: 0.4;
+  }
+  85%,
+  100% {
+    transform: translate(20px, 2px) rotate(-11deg);
+    opacity: 0;
+  }
+}
+@keyframes race-departing-desktop {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  10% {
+    transform: translate(-2px, 0) rotate(-4deg);
+    opacity: 1;
+  }
+  20% {
+    transform: translate(2px, 1px) rotate(4deg);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(0, 2px) rotate(-2deg);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(4px, 12px) rotate(-8deg);
+    opacity: 1;
+  }
+  64% {
+    transform: translate(7px, 20px) rotate(-12deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(13px, 42px) rotate(-16deg);
+    opacity: 0;
+  }
+}
+.race-departing {
+  animation: race-departing-mobile 550ms ease-in both;
+}
+@media (min-width: 640px) {
+  .race-departing {
+    animation-name: race-departing-desktop;
+  }
+}
+
+/* reduced-motion時のdeparting: 大きなshake/translate/rotateを避け、TIMING_MSのreduced版
+   (eliminationDepart=120ms)に合わせた短いfadeだけで脱落が分かるようにする。
+   FinalRaceSequence.tsx側でreduceMotion時はrace-departingではなくこちらを使う
+   (下のprefers-reduced-motionメディアクエリではなく、コンポーネントが既に持つ
+   reduceMotion判定にここで揃えている。departingはintro/running/holdingを経てから
+   到達するため、その時点ではusePrefersReducedMotion()の実値が確定済みで、CSS側の
+   二重ガードは不要)。 */
+@keyframes race-departing-reduced {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.race-departing-reduced {
+  animation: race-departing-reduced 120ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,
