@@ -2,102 +2,102 @@
   "addedNodes": [
     {
       "id": "ed_mshbwqgz_b5vk",
-      "name": "新しい交差点1",
+      "name": "田村寒川連絡路(西)",
       "x": 53,
       "y": 303
     },
     {
       "id": "ed_mshbwrbe_ww7x",
-      "name": "新しい交差点2",
+      "name": "田村寒川連絡路(西中央)",
       "x": 107,
       "y": 303
     },
     {
       "id": "ed_mshbwslm_vudk",
-      "name": "新しい交差点3",
+      "name": "田村寒川連絡路分岐(北)",
       "x": 158,
       "y": 303,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshbwt3j_gmfk",
-      "name": "新しい交差点4",
+      "name": "田村寒川連絡路(中央)",
       "x": 213,
       "y": 303
     },
     {
       "id": "ed_mshbwtm4_58vb",
-      "name": "新しい交差点5",
+      "name": "田村寒川連絡路(東中央)",
       "x": 267,
       "y": 303
     },
     {
       "id": "ed_mshbwu3n_y0wj",
-      "name": "新しい交差点6",
+      "name": "田村寒川連絡路分岐(南)",
       "x": 320,
       "y": 303
     },
     {
       "id": "ed_mshbwuqf_mo2a",
-      "name": "新しい交差点7",
+      "name": "田村寒川連絡路(東)",
       "x": 374,
       "y": 303,
       "type": "card"
     },
     {
       "id": "ed_mshbx1nr_itq8",
-      "name": "新しい交差点8",
+      "name": "田村寒川連絡路(南中央)",
       "x": 320,
       "y": 381
     },
     {
       "id": "ed_mshbx3sh_rk2i",
-      "name": "新しい交差点9",
+      "name": "田村寒川連絡路(南西)",
       "x": 320,
       "y": 458,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshbx4zk_qfz3",
-      "name": "新しい交差点10",
+      "name": "田村寒川連絡路(南)",
       "x": 379,
       "y": 458
     },
     {
       "id": "ed_mshbzdsq_9ew1",
-      "name": "新しい交差点11",
+      "name": "平塚住宅街(西)",
       "x": 0,
       "y": 825,
       "type": "moneyLoss"
     },
     {
       "id": "ed_mshc1wb9_vu0l",
-      "name": "新しい交差点13",
+      "name": "香川バイパス通り(北)",
       "x": 930,
       "y": 392
     },
     {
       "id": "ed_mshc1xir_997b",
-      "name": "新しい交差点14",
+      "name": "香川バイパス通り(南)",
       "x": 883,
       "y": 392
     },
     {
       "id": "ed_mshc7g0m_8tw1",
-      "name": "新しい交差点15",
+      "name": "御成通り合流(角)",
       "x": 1625,
       "y": 611,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshcco84_n5vd",
-      "name": "新しい交差点16",
+      "name": "建長寺参道連絡路(東)",
       "x": 1430,
       "y": 444
     },
     {
       "id": "ed_mshccoug_azj8",
-      "name": "新しい交差点17",
+      "name": "建長寺参道連絡路(西)",
       "x": 1380,
       "y": 444
     },
@@ -141,147 +141,147 @@
     },
     {
       "id": "ed_mshdz0nk_nkym",
-      "name": "新しい交差点38",
+      "name": "寒川香川連絡路分岐",
       "x": 534,
       "y": 259
     },
     {
       "id": "ed_mshdz28z_isop",
-      "name": "新しい交差点39",
+      "name": "寒川香川連絡路(西中央)",
       "x": 636,
       "y": 261,
       "type": "card"
     },
     {
       "id": "ed_mshdz3iv_875n",
-      "name": "新しい交差点40",
+      "name": "寒川香川連絡路(東中央)",
       "x": 735,
       "y": 263,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshdz5pt_418l",
-      "name": "新しい交差点41",
+      "name": "寒川香川連絡路(東)",
       "x": 835,
       "y": 266
     },
     {
       "id": "ed_mshdzil0_v58t",
-      "name": "新しい交差点42",
+      "name": "湘南台南通り",
       "x": 1134,
       "y": 309
     },
     {
       "id": "ed_mshdzll5_yjog",
-      "name": "新しい交差点43",
+      "name": "湘南台バイパス通り",
       "x": 1031,
       "y": 263
     },
     {
       "id": "ed_mshe04fn_23xp",
-      "name": "新しい交差点44",
+      "name": "北中間連絡路(北)",
       "x": 560,
       "y": -45
     },
     {
       "id": "ed_mshe07ww_7xb9",
-      "name": "新しい交差点45",
+      "name": "北中間連絡路(南)",
       "x": 648,
       "y": 2
     },
     {
       "id": "ed_mshe0dq4_cbni",
-      "name": "新しい交差点46",
+      "name": "北ルート湘南台連絡路(西)",
       "x": 937,
       "y": -11,
       "type": "moneyLoss"
     },
     {
       "id": "ed_mshe0gt3_trcf",
-      "name": "新しい交差点47",
+      "name": "北ルート湘南台連絡路(東)",
       "x": 988,
       "y": -13
     },
     {
       "id": "ed_mshoq9j9_hfu7",
-      "name": "新しい交差点47",
+      "name": "梶原中央通り",
       "x": 1283,
       "y": 489
     },
     {
       "id": "ed_mshoqage_sxop",
-      "name": "新しい交差点48",
+      "name": "梶原大通り",
       "x": 1288,
       "y": 573,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshor87s_2uhu",
-      "name": "新しい交差点48",
+      "name": "寒川香川連絡路(南中央)",
       "x": 538,
       "y": 332,
       "type": "moneyGain"
     },
     {
       "id": "ed_mshor9ec_g6nz",
-      "name": "新しい交差点49",
+      "name": "寒川香川連絡路(南西)",
       "x": 541,
       "y": 415,
       "type": "event"
     },
     {
       "id": "ed_mshoras4_dixr",
-      "name": "新しい交差点50",
+      "name": "寒川香川連絡路(南)",
       "x": 598,
       "y": 412
     },
     {
       "id": "ed_mshore65_xlpx",
-      "name": "新しい交差点51",
+      "name": "寒川香川連絡路香川口",
       "x": 637,
       "y": 412
     },
     {
       "id": "ed_mshvh3rs_rgil",
-      "name": "新しい交差点50",
+      "name": "辻堂海浜商店街(南)",
       "x": 620,
       "y": 770,
       "type": "moneyLoss"
     },
     {
       "id": "ed_mshvi6na_svsy",
-      "name": "新しい交差点51",
+      "name": "辻堂西入口",
       "x": 700,
       "y": 700,
       "type": "moneyLoss"
     },
     {
       "id": "ed_mshvid73_06va",
-      "name": "新しい交差点52",
+      "name": "茅ヶ崎住宅街(東)",
       "x": 700,
       "y": 600
     },
     {
       "id": "ed_mshvkatx_zr9x",
-      "name": "新しい交差点52",
+      "name": "腰越漁港通り(北西)",
       "x": 1290,
       "y": 960
     },
     {
       "id": "ed_mshvkia8_ezbq",
-      "name": "新しい交差点52",
+      "name": "鎌倉住宅街(北)",
       "x": 1410,
       "y": 1140
     },
     {
       "id": "ed_mshvkqgm_qsny",
-      "name": "新しい交差点53",
+      "name": "由比ヶ浜海岸通り(北東)",
       "x": 1450,
       "y": 1050
     },
     {
       "id": "ed_mshvl9kx_mdzr",
-      "name": "新しい交差点52",
+      "name": "湘南台大船間(北東)",
       "x": 1470,
       "y": 150
     }
