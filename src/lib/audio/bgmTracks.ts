@@ -13,17 +13,20 @@
  *
  * P11-4-1でdestinationCelebration/settlementの実音源を追加した(destinationCelebrationは
  * DOVA-SYNDROME配布、settlementはPeriTune配布。いずれも第三者作品で、出典・ライセンスの
- * 詳細はpublic/sounds/LICENSES.md参照)。gameOverはP11-4-1時点でもまだ楽曲が未決定のため、
- * 意図的に未登録のまま維持する(決定後にP11-4-2として追加予定。他シーンの音源を
- * 代用しない)。
+ * 詳細はpublic/sounds/LICENSES.md参照)。
+ *
+ * P11-4-2でgameOverの実音源を追加し、5シーン全てが揃った。採用曲「どうぶつ大運動会」
+ * (DOVA-SYNDROME配布、作曲者MAKOOTO、ループ仕様のTrack2)は、公式試聴ページで複数候補
+ * (壮大・感動的な優勝ファンファーレ系/ポップでコミカルなレース・運動会系)を比較した上で、
+ * 明るくコミカルで湘南すごろく全体の親しみやすい雰囲気に合う後者の方向性から選定した。
+ * 出典・ライセンスの詳細はpublic/sounds/LICENSES.md参照。
  *
  * soundEffects.tsは「音源が無いidを先に登録してもよい(soundManager.tsのplaySE()が404を
  * 静かに無視するため)」という方針だが、BGMは1トラックあたりの再生時間が長く、シーン切替の
  * たびに存在しないパスへ毎回リクエストが飛ぶことになるため、より安全側に倒す。
  * BGM_TRACK_SRCをPartial<Record<...>>にして「実際に登録されているsceneだけ再生を試みる」
- * 設計を採用し、未登録のsceneはbgmManager.ts側で何も読み込まず無音のまま待機する。
- * gameOverの実音源が決まり次第、このファイルへエントリを1行追加するだけでよい
- * (bgmManager.ts側の変更は不要)。
+ * 設計を採用している(現時点では5シーン全て登録済みだが、将来シーンが増えた場合も同じ設計を
+ * 維持する)。
  */
 export type BgmSceneId = "title" | "gameplay" | "destinationCelebration" | "settlement" | "gameOver";
 
@@ -32,5 +35,5 @@ export const BGM_TRACK_SRC: Partial<Record<BgmSceneId, string>> = {
   gameplay: "/sounds/bgm_gameplay.mp3",
   destinationCelebration: "/sounds/bgm_destination.mp3",
   settlement: "/sounds/bgm_settlement.mp3",
-  // gameOverは楽曲が未決定のため、P11-4-2で決まるまで意図的に空(他シーンの音源は流用しない)。
+  gameOver: "/sounds/bgm_gameover.mp3",
 };

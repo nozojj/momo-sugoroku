@@ -221,15 +221,15 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     vi.unstubAllGlobals();
   });
 
-  it("BGM_TRACK_SRCがtitle/gameplay/destinationCelebration/settlementをMP3パスで登録し、gameOverのみ未登録(undefined)のままである", () => {
+  it("BGM_TRACK_SRCがtitle/gameplay/destinationCelebration/settlement/gameOverの5シーン全てをMP3パスで登録している", () => {
     expect(BGM_TRACK_SRC.title).toBe("/sounds/bgm_title.mp3");
     expect(BGM_TRACK_SRC.gameplay).toBe("/sounds/bgm_gameplay.mp3");
     expect(BGM_TRACK_SRC.destinationCelebration).toBe("/sounds/bgm_destination.mp3");
     expect(BGM_TRACK_SRC.settlement).toBe("/sounds/bgm_settlement.mp3");
-    expect(BGM_TRACK_SRC.gameOver).toBeUndefined();
+    expect(BGM_TRACK_SRC.gameOver).toBe("/sounds/bgm_gameover.mp3");
   });
 
-  it("P11-4-1時点ではtitle/gameplay/destinationCelebration/settlementがBGM_TRACK_SRCに登録されており、未登録のgameOverだけは例外も投げずAudio要素を生成しない", () => {
+  it("P11-4-2時点ではtitle/gameplay/destinationCelebration/settlement/gameOverの5シーン全てがBGM_TRACK_SRCに登録されており、いずれのsceneへ切り替えても例外を投げずAudio要素を生成する", () => {
     const manager = createBgmManager(); // 引数省略=bgmTracks.tsの実際のBGM_TRACK_SRCを使う
 
     expect(() => {
@@ -244,6 +244,7 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     const gameplayInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_gameplay"));
     const destinationInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_destination"));
     const settlementInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_settlement"));
+    const gameOverInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_gameover"));
     expect(titleInstances).toHaveLength(1);
     expect(titleInstances[0].src).toBe("/sounds/bgm_title.mp3");
     expect(gameplayInstances).toHaveLength(1);
@@ -252,7 +253,8 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     expect(destinationInstances[0].src).toBe("/sounds/bgm_destination.mp3");
     expect(settlementInstances).toHaveLength(1);
     expect(settlementInstances[0].src).toBe("/sounds/bgm_settlement.mp3");
-    expect(FakeAudio.instances.filter((a) => a.src.includes("gameOver"))).toHaveLength(0);
+    expect(gameOverInstances).toHaveLength(1);
+    expect(gameOverInstances[0].src).toBe("/sounds/bgm_gameover.mp3");
   });
 });
 
