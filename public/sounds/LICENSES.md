@@ -29,14 +29,27 @@
 
 ## 第三者配布素材(DOVA-SYNDROME)
 
-以下の2曲は**このリポジトリの管理者による自作ではなく**、DOVA-SYNDROME(https://dova-s.jp/)で配布されている第三者の楽曲をダウンロードして`public/sounds/`へ組み込んだものである。音源自体を素材として再配布する目的ではなく、本ゲームのBGMとして組み込んで使用している。利用条件はDOVA-SYNDROMEの利用規約および各作者の個別条件に従う(コード上でDOVA-SYNDROMEへ直接アクセスしたり、DOVAのURLからストリーミング再生したりすることはなく、常にローカルに同梱した`/sounds/bgm_title.mp3`・`/sounds/bgm_gameplay.mp3`を再生する)。
+以下の3曲は**このリポジトリの管理者による自作ではなく**、DOVA-SYNDROME(https://dova-s.jp/)で配布されている第三者の楽曲をダウンロードして`public/sounds/`へ組み込んだものである。音源自体を素材として再配布する目的ではなく、本ゲームのBGMとして組み込んで使用している。利用条件はDOVA-SYNDROMEの利用規約および各作者の個別条件に従う(コード上でDOVA-SYNDROMEへ直接アクセスしたり、DOVAのURLからストリーミング再生したりすることはなく、常にローカルに同梱した`/sounds/bgm_title.mp3`・`/sounds/bgm_gameplay.mp3`・`/sounds/bgm_destination.mp3`を再生する)。
 
 | ファイル | 導入 | Original title | Composer | Source | Source page | Usage | sample rate | channels | bitrate | duration |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `bgm_title.mp3` | P11-2 (2026-08-23) | おさかなシャトルⅡ | Hupple | DOVA-SYNDROME | https://dova-s.jp/bgm/detail/23317 | title BGM | 48000Hz | 2 (stereo) | 320kbps (CBR) | 62.400s |
 | `bgm_gameplay.mp3` | P11-2 (2026-08-23) | 夏を終わらせない！ | しんさんわーくす | DOVA-SYNDROME | https://dova-s.jp/bgm/detail/23761 | normal gameplay BGM | 48000Hz | 2 (stereo) | 160kbps (CBR) | 192.048s |
+| `bgm_destination.mp3` | P11-4-1 (2026-08-25) | 始まりを告げる喇叭 | Kyo_Punch | DOVA-SYNDROME | https://dova-s.jp/bgm/detail/448 | destinationCelebration BGM | 44100Hz | 2 (stereo) | 192kbps (CBR) | 8.046s |
 
 License/terms: DOVA-SYNDROMEの利用規約および作者個別条件に従う。
+
+## 第三者配布素材(PeriTune)
+
+以下の1曲は**このリポジトリの管理者による自作ではなく**、作曲者PeriTune(https://peritune.com/)が自身のサイトで配布している楽曲をダウンロードして`public/sounds/`へ組み込んだものである(DOVA-SYNDROME経由ではない)。音源自体を素材として再配布する目的ではなく、本ゲームのBGMとして組み込んで使用している(コード上でPeriTuneへ直接アクセスしたり、PeriTuneのURLからストリーミング再生したりすることはなく、常にローカルに同梱した`/sounds/bgm_settlement.mp3`を再生する)。
+
+利用規約(https://peritune.com/about/)によると、2026年3月以降に公開された楽曲にはサイト独自の規約が適用されるが、それ以前に公開された楽曲には引き続きCreative Commons Attribution 4.0 International (CC BY 4.0)が適用される。採用した`Result_Celtic`の配布ページ(https://peritune.com/result_celtic/)には公開日として「2021-03-18」の記載があり、2026年3月より前の公開のためCC BY 4.0が適用される。同規約によれば、クレジット表記(「PeriTune」)は推奨されるが必須ではなく、映像・動画・イベント・広告・ゲーム・ライブ配信など媒体を問わず商用利用も可能。ただし、YouTubeのContent ID登録、楽曲ファイルそのものの売却・二次配布、楽曲紹介を目的とした動画での利用(フル再生やメドレー形式)は禁止されている。
+
+| ファイル | 導入 | Original title | Composer | Source | Source page | Published | License | Usage | sample rate | channels | bitrate | duration |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `bgm_settlement.mp3` | P11-4-1 (2026-08-25) | Result_Celtic(リザルトジングル&ループBGM ケルト) | PeriTune | PeriTune | https://peritune.com/result_celtic/ | 2021-03-18 | CC BY 4.0 | settlement BGM | 48000Hz | 2 (stereo) | 192kbps (CBR) | 92.448s |
+
+License/terms: https://peritune.com/about/ に記載のCC BY 4.0(2026年3月より前に公開された楽曲に適用される条件)に従う。
 
 ## 旧ファイルの削除記録
 
@@ -45,4 +58,4 @@ License/terms: DOVA-SYNDROMEの利用規約および作者個別条件に従う�
 | `monopoly_group.mp3` | 2026-08-13追加時点で入手元・ライセンスの記録が一切残っておらず、リポジトリ内(コミットメッセージ・README・ファイルメタデータ)のいずれからも確認できなかった(P10-4調査時点)。Phase10/P10-4-3で`monopoly_group.wav`(自作・手続き的生成)へ正式に置き換え、コード上の参照が完全になくなったことを確認したうえで**削除済み**。 |
 | `bgm_title.wav` / `bgm_gameplay.wav` | P11-2で`scripts/generate-bgm.mjs`により自作・手続き的生成したBGM(コミット前の未コミット段階)。試聴の結果、方針をDOVA-SYNDROME配布の第三者楽曲(上記`bgm_title.mp3`/`bgm_gameplay.mp3`)へ変更したため正式に不採用とし、生成スクリプト`scripts/generate-bgm.mjs`・専用テスト`scripts/generate-bgm.test.ts`とあわせて**削除済み**(いずれも未コミットのままの差し替えのため、コミット履歴には残らない)。 |
 
-すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。BGM(title/gameplay)はP11-2でDOVA-SYNDROME配布の第三者楽曲を採用した。
+すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。BGM(title/gameplay)はP11-2でDOVA-SYNDROME配布の第三者楽曲を採用し、P11-4-1でdestinationCelebration(DOVA-SYNDROME配布)・settlement(PeriTune配布)の2曲を追加した。gameOverは楽曲未決定のため、P11-4-1時点でも意図的に未登録のまま。
