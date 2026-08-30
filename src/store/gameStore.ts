@@ -230,36 +230,63 @@ export const useGameStore = create<GameStore>()(
        * continueAfterSettlementIntro()が担当する)。
        * 年度が変わらない、またはゲーム終了判定に入る場合はfalseを返し、呼び出し側の通常進行に任せる。
        *
+       * 「次に実際に手番を得るプレイヤー」はskipNextRollを持つプレイヤーを飛ばして決まる
+       * (advanceToNextTurn()側のロジック)。年境界をまたぐかどうかも、その飛ばし先まで
+       * 辿って初めて確定する: 直後の1人だけがまだ年度内でも、その先が全員skipNextRollだと
+       * 年度をまたいでさらに先のプレイヤーまで進むことがあるため、「1人先だけ見る」判定では
+       * 年境界を見逃してしまう(=その年の決算がまるごと欠落するバグになる)。
+       * ここではadvanceToNextTurn()の手番探索ループと全く同じ順序を、状態を一切書き換えずに
+       * なぞり、年境界(nextIndexが0に戻り、かつisYearStartになる瞬間)に到達するかどうかだけを見る。
+       * state(currentPlayerIndex/turn/activeDebuffs)はここでは一切書き換えないため、trueを
+       * 返した後にadvanceToNextTurn()が同じstate.currentPlayerIndex/state.turnから改めて同じ
+       * 道のりを辿り直しても、skip消費・妨害キャラいたずら・年度イベント抽選が二重に発生する
+       * ことはない(continueAfterSettlement()側の呼び出し方は変更していない)。
+       *
        * 計算そのものはcalculateSettlement()(純関数)に委譲し、ここではその結果をset()するだけ。
        */
       function applySettlementIfNeeded(): boolean {
         const state = get();
-        const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-        const nextTurn = nextIndex === 0 ? state.turn + 1 : state.turn;
-        if (nextIndex !== 0 || !getCalendar(nextTurn).isYearStart) return false;
+        let index = state.currentPlayerIndex;
+        let turn = state.turn;
 
-        const settledYear = getCalendar(state.turn).year;
-        // state.currentYearEventIdはこの時点ではまだ決算対象年度(settledYear)のもの
-        // (新年度分の再抽選はこの後、実際にturnが繰り上がるadvanceToNextTurn()側で行う)。
-        const { entries, updatedPlayers, historyEntry } = calculateSettlement(
-          state.players,
-          settledYear,
-          state.netWorthHistory,
-          state.currentYearEventId,
-        );
-        const isFinalSettlement = nextTurn > state.totalTurns;
+        for (let i = 0; i < state.players.length; i++) {
+          const nextIndex = (index + 1) % state.players.length;
+          const nextTurn = nextIndex === 0 ? turn + 1 : turn;
 
-        set({
-          players: updatedPlayers,
-          netWorthHistory: [...state.netWorthHistory, historyEntry],
-          status: "settlementIntro",
-          settlementInfo: { year: settledYear, isFinalSettlement, yearEventId: state.currentYearEventId, entries },
-          log: pushLog(
-            state,
-            `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.propertyRevenue}万円`).join("、")}`,
-          ),
-        });
-        return true;
+          if (nextIndex === 0 && getCalendar(nextTurn).isYearStart) {
+            const settledYear = getCalendar(state.turn).year;
+            // state.currentYearEventIdはこの時点ではまだ決算対象年度(settledYear)のもの
+            // (新年度分の再抽選はこの後、実際にturnが繰り上がるadvanceToNextTurn()側で行う)。
+            const { entries, updatedPlayers, historyEntry } = calculateSettlement(
+              state.players,
+              settledYear,
+              state.netWorthHistory,
+              state.currentYearEventId,
+            );
+            const isFinalSettlement = nextTurn > state.totalTurns;
+
+            set({
+              players: updatedPlayers,
+              netWorthHistory: [...state.netWorthHistory, historyEntry],
+              status: "settlementIntro",
+              settlementInfo: { year: settledYear, isFinalSettlement, yearEventId: state.currentYearEventId, entries },
+              log: pushLog(
+                state,
+                `${settledYear}年目の決算: ${entries.map((e) => `${e.playerName}さん+${e.propertyRevenue}万円`).join("、")}`,
+              ),
+            });
+            return true;
+          }
+
+          index = nextIndex;
+          turn = nextTurn;
+
+          const candidate = state.players[index];
+          const skip = candidate.activeDebuffs.some((d) => d.kind === "skipNextRoll");
+          if (!skip) break; // このプレイヤーが実際に手番を得る。年境界を挟まなかったので決算は不要。
+        }
+
+        return false;
       }
 
       /**

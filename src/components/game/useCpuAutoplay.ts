@@ -31,6 +31,12 @@ export function useCpuAutoplay(): void {
   const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
   const targetSelectInfo = useGameStore((s) => s.targetSelectInfo);
   const cardOverflowInfo = useGameStore((s) => s.cardOverflowInfo);
+  const players = useGameStore((s) => s.players);
+  // SettlementScreenは本来「人間が読んで押す」前提の画面(決算内容を確認してから次の年度へ
+  // 進む)なので、決算のたびにgameStore側の状態を変えるのではなく、ここ(実行層)で
+  // 「参加プレイヤー全員がCPUのときだけ」自動的に次へ進める。人間が1人でも混ざっている
+  // ゲームでは以下のkeyが常にfalseになり、既存の決算画面UX(手動クリック待ち)は一切変わらない。
+  const allPlayersAreCpu = players.length > 0 && players.every((p) => p.controlledBy === "cpu");
 
   const rollDice = useGameStore((s) => s.rollDice);
   // "useCard"という名前のままローカル変数に束縛すると、React Hooksの命名規則(use接頭辞)に
@@ -43,6 +49,7 @@ export function useCpuAutoplay(): void {
   const confirmTargetSelection = useGameStore((s) => s.confirmTargetSelection);
   const cancelTargetSelection = useGameStore((s) => s.cancelTargetSelection);
   const resolveCardOverflow = useGameStore((s) => s.resolveCardOverflow);
+  const continueAfterSettlement = useGameStore((s) => s.continueAfterSettlement);
 
   // rolling: カードを使うか、そのままサイコロを振るかを1手ずつ決める。
   useEffect(() => {
@@ -165,4 +172,23 @@ export function useCpuAutoplay(): void {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, cardOverflowInfo]);
+
+  // settlement: SettlementScreenにはCPU向けの操作経路が無い(常に人間が「次の年度へ」/
+  // 「結果を見る」ボタンを押す前提の画面)。参加プレイヤー全員がCPUのときだけ、既存の
+  // CPU_ACTION_DELAY_MSと同じ間を置いて自動的にcontinueAfterSettlement()を呼ぶ。
+  // 他のuseEffectと同じ二重発火対策(cleanupでのtimer解除+timeout内でのstatus再確認)に加え、
+  // continueAfterSettlement()自体もstatusが"settlement"でなければ何もしないため
+  // (gameStore.ts側の既存ガード)、古いtimerが遅れて発火しても多重実行にはならない。
+  useEffect(() => {
+    if (status !== "settlement" || !allPlayersAreCpu) return;
+
+    const timer = window.setTimeout(() => {
+      const state = useGameStore.getState();
+      if (state.status !== "settlement") return;
+      if (state.players.length === 0 || state.players.some((p) => p.controlledBy !== "cpu")) return;
+      continueAfterSettlement();
+    }, CPU_ACTION_DELAY_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, allPlayersAreCpu]);
 }
