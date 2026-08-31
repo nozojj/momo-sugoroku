@@ -167,8 +167,10 @@ export function createInitialState(
     // 妨害キャラ(仮称)はゲーム開始時には存在しない。最初に誰かが目的地へ到着したタイミングで
     // 初めて割り当てられる(gameStore.tsのcheckDestinationArrival()参照)。
     troubleCharacterOwnerId: null,
-    // 形態(S-3a)もowner未登場の間は必ずnull(types/game.tsのTroubleCharacterFormId参照)。
+    // 形態(S-3a)・憑依カウント(S-3c)もowner未登場の間は必ずnull(types/game.tsの
+    // GameState.troubleCharacterFormId/troubleCharacterPossessionCountのコメント参照)。
     troubleCharacterFormId: null,
+    troubleCharacterPossessionCount: null,
     troubleCharacterAnnounceInfo: null,
     netWorthHistory: [],
     log: [

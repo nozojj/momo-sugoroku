@@ -24,6 +24,8 @@ import {
   drawTroubleCharacterMischief,
   applyTroubleCharacterMischief,
   getTroubleCharacterFormDef,
+  decideTroubleCharacterTransform,
+  TROUBLE_CHARACTER_BASE_FORM_ID,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
 import { mergeGameState } from "@/store/persistMigration";
@@ -68,6 +70,7 @@ const IDLE_STATE: GameState = {
   yearEventAnnounceInfo: null,
   troubleCharacterOwnerId: null,
   troubleCharacterFormId: null,
+  troubleCharacterPossessionCount: null,
   troubleCharacterAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
@@ -180,9 +183,10 @@ export const useGameStore = create<GameStore>()(
                 const owner = result.players.find((p) => p.id === ownerId)!;
                 return {
                   troubleCharacterOwnerId: ownerId,
-                  // 初登場は必ず通常形態から(S-3a)。ownerId確定と同じset()にまとめることで
-                  // 「owner有り・form無し」という中間状態を1フレームも作らない。
-                  troubleCharacterFormId: "normal" as const,
+                  // 初登場は必ず通常形態・カウント0から(S-3a/S-3c)。ownerId確定と同じset()に
+                  // まとめることで「owner有り・form/count無し」という中間状態を1フレームも作らない。
+                  troubleCharacterFormId: TROUBLE_CHARACTER_BASE_FORM_ID,
+                  troubleCharacterPossessionCount: 0,
                   troubleCharacterAnnounceInfo: {
                     kind: "appeared" as const,
                     ownerId,
@@ -207,7 +211,11 @@ export const useGameStore = create<GameStore>()(
        *  moverへ所有者を移す。判定・計算そのものはtroubleCharacter.tsのcheckTroubleCharacterHandoff()
        *  (純関数)へ委譲し、ここでは結果を受け取ってset()するだけ。checkDestinationArrival()とは
        *  完全に独立して評価する(呼び出し側のfinishLandingAndEndTurn()で並列に呼ぶ)ため、同じ着地で
-       *  目的地到着と所有者交代が同時に成立しても両方が正しく反映される。 */
+       *  目的地到着と所有者交代が同時に成立しても両方が正しく反映される。
+       *
+       *  S-3c: handoff成功時は形態・憑依カウントを必ず基準形態(normal)・0へリセットする
+       *  (「早く他人へ押し付ければ助かる」というゲーム性を優先する正式仕様。強い形態のまま
+       *  相手へ渡す設計はあえて採らない)。 */
       function checkTroubleCharacterHandoff() {
         const state = get();
         const mover = currentPlayer(state);
@@ -217,6 +225,8 @@ export const useGameStore = create<GameStore>()(
         const fromPlayer = state.players.find((p) => p.id === result.fromPlayerId)!;
         set({
           troubleCharacterOwnerId: result.newOwnerId,
+          troubleCharacterFormId: TROUBLE_CHARACTER_BASE_FORM_ID,
+          troubleCharacterPossessionCount: 0,
           troubleCharacterAnnounceInfo: {
             kind: "handoff",
             fromPlayerId: result.fromPlayerId,
@@ -318,11 +328,17 @@ export const useGameStore = create<GameStore>()(
         // 分岐はturn=nextTurnへ到達する前にreturnするため、「次年度が存在しない」最終年度末には
         // ここは実行されない。
         let yearEventUpdate: { currentYearEventId: string; yearEventAnnounceInfo: GameState["yearEventAnnounceInfo"] } | null = null;
-        // 妨害キャラ(仮称)の「悪さ」は、実際に今回行動するプレイヤーが確定した瞬間(下のif (!skip)の
-        // 内側)にだけ判定する。advanceToNextTurn()は手番交代のたびに1回しか呼ばれないため、
-        // ここで発生させれば二重発火しない。skipNextRollの消費(既存)より後に評価するので、
-        // 既存の処理順序・挙動には影響しない。
-        let troubleCharacterEventUpdate: { troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"] } | null = null;
+        // 妨害キャラ(仮称)の「悪さ」(および形態変化判定・憑依カウント更新、S-3c)は、実際に今回
+        // 行動するプレイヤーが確定した瞬間(下のif (!skip)の内側)にだけ判定する。
+        // advanceToNextTurn()は手番交代のたびに1回しか呼ばれないため、ここで発生させれば
+        // 二重発火しない。skipNextRollの消費(既存)より後に評価するので、既存の処理順序・
+        // 挙動には影響しない(=所有者がスキップされた回は悪さ・カウント加算・変身判定のいずれも
+        // 発生しない。この分岐自体に到達しないため、追加のガードは不要)。
+        let troubleCharacterEventUpdate: {
+          troubleCharacterFormId: GameState["troubleCharacterFormId"];
+          troubleCharacterPossessionCount: GameState["troubleCharacterPossessionCount"];
+          troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"];
+        } | null = null;
 
         for (let i = 0; i < players.length; i++) {
           const nextIndex = (index + 1) % players.length;
@@ -352,20 +368,42 @@ export const useGameStore = create<GameStore>()(
           const candidate = players[index];
           const skip = candidate.activeDebuffs.find((d) => d.kind === "skipNextRoll");
           if (!skip) {
-            // このプレイヤーが実際に手番を行う。妨害キャラ所有者ならここで悪さを1回だけ発生させる。
+            // このプレイヤーが実際に手番を行う。妨害キャラ所有者ならここで
+            // 「変身判定→(成功時のみ)形態変更・カウントリセット→悪さ抽選→カウント+1」を行う(S-3c)。
             if (candidate.id === state.troubleCharacterOwnerId) {
-              // S-3b: 悪さの抽選プールは、現在の形態(troubleCharacterFormId)のmischiefPoolから
-              // 取る。ownerが登場済みならformも必ず非null(S-3aの不変条件)で、S-3b時点では
-              // "normal"しか存在しないため、実際の抽選対象は従来のtroubleCharacterMischiefDefs
-              // (weight 40/40/20の3件)と完全に同じ配列になる=挙動は一切変わらない。
-              // 万一formが解決できない(理論上到達しない防御的分岐)場合のみ、従来の共通プールへ
-              // フォールバックする。
-              const formDef = state.troubleCharacterFormId ? getTroubleCharacterFormDef(state.troubleCharacterFormId) : undefined;
-              const mischief = drawTroubleCharacterMischief(formDef?.mischiefPool ?? troubleCharacterMischiefDefs);
+              // 現在の形態・カウント。owner登場済みならどちらも必ず非null(S-3a/S-3cの不変条件)
+              // だが、理論上到達しない防御的分岐として基準形態・0へフォールバックしておく。
+              const currentFormId = state.troubleCharacterFormId ?? TROUBLE_CHARACTER_BASE_FORM_ID;
+              const currentFormDef = getTroubleCharacterFormDef(currentFormId);
+              const currentCount = state.troubleCharacterPossessionCount ?? 0;
+
+              // 変身ルール(formDef.transform)が無い形態(S-3c時点ではnormalがこれに該当。
+              // sake/seagullKingの実データはまだ無いため必ずここに来る)ではMath.random()自体を
+              // 消費しない: 既存テストがMath.random()をモックして悪さの抽選結果を検証している
+              // ため、不要な乱数消費で既存テストに影響を与えないようにする。
+              const decision = currentFormDef?.transform
+                ? decideTroubleCharacterTransform({
+                    formDef: currentFormDef,
+                    possessionCount: currentCount,
+                    currentTurn: turn,
+                    totalTurns: state.totalTurns,
+                    random: Math.random(),
+                  })
+                : ({ transformed: false } as const);
+
+              const nextFormId = decision.transformed ? decision.nextFormId : currentFormId;
+              const nextFormDef = decision.transformed ? getTroubleCharacterFormDef(nextFormId) : currentFormDef;
+              // 変身が成立した回はカウントを0から数え直す(「今の形態でどれだけ耐えたか」を表す
+              // 値のため)。成立しなければ従来通りcurrentCountの続きから数える。
+              const baseCount = decision.transformed ? 0 : currentCount;
+
+              const mischief = drawTroubleCharacterMischief(nextFormDef?.mischiefPool ?? troubleCharacterMischiefDefs);
               const application = applyTroubleCharacterMischief(players, candidate.id, mischief);
               players = application.players;
               log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
               troubleCharacterEventUpdate = {
+                troubleCharacterFormId: nextFormId,
+                troubleCharacterPossessionCount: baseCount + 1,
                 troubleCharacterAnnounceInfo: {
                   kind: "mischief",
                   playerId: candidate.id,

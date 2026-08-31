@@ -1,4 +1,12 @@
-import type { ActiveDebuff, MapData, Player, TroubleCharacterFormDef, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
+import type {
+  ActiveDebuff,
+  MapData,
+  Player,
+  TroubleCharacterFormDef,
+  TroubleCharacterFormId,
+  TroubleCharacterMischiefDef,
+  TroubleCharacterTransformStep,
+} from "@/types/game";
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { makeDebuffId } from "@/lib/game/engine";
 import { troubleCharacterFormDefs } from "@/data/troubleCharacterForms";
@@ -36,6 +44,86 @@ export function isTroubleCharacterFormId(value: unknown): value is TroubleCharac
  */
 export function getTroubleCharacterFormDef(formId: TroubleCharacterFormId): TroubleCharacterFormDef | undefined {
   return troubleCharacterFormDefs.find((f) => f.id === formId);
+}
+
+/** 初登場時・handoff成功時に必ず戻る基準(通常)形態のid。gameStore.ts側でリテラル"normal"を
+ *  複数箇所に直書きしないための共有定数(意味は同じだが、書き間違い防止のため1箇所にまとめる)。 */
+export const TROUBLE_CHARACTER_BASE_FORM_ID: TroubleCharacterFormId = "normal";
+
+/**
+ * 変身確率の段階表(TroubleCharacterTransformRule.probabilitySteps、atCount昇順を想定)から、
+ * 現在の憑依カウントに該当する確率を求める(S-3c)。countが最初の段階のatCountに満たない間は
+ * 0(抽選対象外)、最後の段階のatCount以上になった後はその段階の確率(通常は1=pity相当の上限)を
+ * 使い続ける。戻り値は念のため0〜1にクランプする(データ側の入力ミスで確率が範囲外でも
+ * 呼び出し元がクラッシュしない)。
+ */
+function resolveTransformProbability(steps: TroubleCharacterTransformStep[], count: number): number {
+  let probability = 0;
+  for (const step of steps) {
+    if (count >= step.atCount) probability = step.probability;
+  }
+  return Math.min(1, Math.max(0, probability));
+}
+
+export interface TroubleCharacterTransformDecisionInput {
+  /** 現在の形態の定義。transformが無ければこの形態を進化の終点として扱う。 */
+  formDef: TroubleCharacterFormDef;
+  /** 現在の形態で、所有者が実際に悪さを受けた回数。 */
+  possessionCount: number;
+  /** 変身判定を行う時点のゲームturn(暦月カウンタ、advanceToNextTurn()で既に繰り上げ済みの値)。 */
+  currentTurn: number;
+  /** ゲーム全体のturn数。 */
+  totalTurns: number;
+  /** 呼び出し側が注入する乱数値(0以上1未満を想定)。drawTroubleCharacterMischief()等の既存
+   *  draw系関数と異なり、この関数自体はMath.random()を呼ばない。呼び出し側(gameStore.ts)が
+   *  「変身対象になり得る形態のときだけMath.random()を消費する」という制御をできるようにし、
+   *  かつテストからrandom値を直接注入できるようにするため。 */
+  random: number;
+}
+
+export type TroubleCharacterTransformDecision =
+  | { transformed: false }
+  | { transformed: true; nextFormId: TroubleCharacterFormId };
+
+/**
+ * 現在の形態(formDef)から次の形態へ変身するかどうかを判定する純関数(S-3c)。
+ *
+ * formDef.transformが無い(進化の終点、現状のseagullKing想定)場合は常に{transformed:false}を
+ * 返す。
+ *
+ * minProgressRatio指定時はfail-closed(設定ミスで強い形態を誤って解禁しない)方針を取る:
+ * - minProgressRatio自体が`Number.isFinite(minProgressRatio) && 0 <= minProgressRatio <= 1`を
+ *   満たさない(負数・1超・NaN・±Infinity)場合、その時点で無条件に{transformed:false}を返す
+ *   (「終盤限定の強い形態」に設定ミスで負数が入っても、序盤から解禁されることはない)。
+ * - totalTurnsが0以下の異常値の場合も、minProgressRatioが指定されている限り無条件に
+ *   {transformed:false}を返す(進行度を計算できない=安全側でまだ未達扱いにする)。
+ * - 上記のどちらにも該当しない、通常の0〜1のratio指定であれば、currentTurn/totalTurnsの
+ *   進行割合がその値未満の間は{transformed:false}を返す。
+ *
+ * いずれのケースも例外は投げない。
+ */
+export function decideTroubleCharacterTransform(
+  input: TroubleCharacterTransformDecisionInput,
+): TroubleCharacterTransformDecision {
+  const { formDef, possessionCount, currentTurn, totalTurns, random } = input;
+  const rule = formDef.transform;
+  if (!rule) return { transformed: false };
+
+  if (rule.minProgressRatio !== undefined) {
+    const ratio = rule.minProgressRatio;
+    const isValidRatio = Number.isFinite(ratio) && ratio >= 0 && ratio <= 1;
+    if (!isValidRatio) return { transformed: false }; // fail-closed: 設定ミスは常に未解禁扱い
+    if (totalTurns <= 0) return { transformed: false }; // 進行度を計算できない=常に未達扱い
+
+    const progressRatio = currentTurn / totalTurns;
+    if (!(progressRatio >= ratio)) return { transformed: false };
+  }
+
+  const probability = resolveTransformProbability(rule.probabilitySteps, possessionCount);
+  if (random < probability) {
+    return { transformed: true, nextFormId: rule.targetFormId };
+  }
+  return { transformed: false };
 }
 
 /**

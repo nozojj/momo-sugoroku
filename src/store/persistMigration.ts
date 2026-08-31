@@ -106,6 +106,17 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
       : isTroubleCharacterFormId(state.troubleCharacterFormId)
         ? state.troubleCharacterFormId
         : "normal";
+  // 憑依カウント(S-3c)。owner未登場ならnull固定。owner登場済みなら、持ち越された値が
+  // 0以上の整数(旧セーブでのキー欠落・負数・NaN・小数はすべてここでfalseになる)であれば
+  // そのまま採用し、そうでなければ0へフォールバックする("count=0"は「今owner担当に
+  // なったばかり」と同義で安全な既定値)。form/ownerと同じく、ownerの確定結果を基準にする。
+  const persistedPossessionCount = state.troubleCharacterPossessionCount;
+  const resolvedTroubleCharacterPossessionCount: GameState["troubleCharacterPossessionCount"] =
+    resolvedTroubleCharacterOwnerId === null
+      ? null
+      : typeof persistedPossessionCount === "number" && Number.isInteger(persistedPossessionCount) && persistedPossessionCount >= 0
+        ? persistedPossessionCount
+        : 0;
 
   return {
     ...currentState,
@@ -131,6 +142,7 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     yearEventAnnounceInfo: state.yearEventAnnounceInfo ?? currentState.yearEventAnnounceInfo,
     troubleCharacterOwnerId: resolvedTroubleCharacterOwnerId,
     troubleCharacterFormId: resolvedTroubleCharacterFormId,
+    troubleCharacterPossessionCount: resolvedTroubleCharacterPossessionCount,
     // troubleCharacterAnnounceInfoはstatusとは独立した一時通知(yearEventAnnounceInfoと同じ設計)
     // なので、destinationArrived等のようなstatus連動のstale-guardは不要。欠落していても
     // 単に通知が出ないだけで操作不能にはならない。

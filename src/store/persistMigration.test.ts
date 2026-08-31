@@ -197,6 +197,113 @@ describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a
   });
 });
 
+describe("mergeGameState(): troubleCharacterPossessionCount のフォールバック(S-3c)", () => {
+  function baseCurrentState() {
+    return {
+      ...useGameStore.getState(),
+      troubleCharacterOwnerId: null,
+      troubleCharacterFormId: null,
+      troubleCharacterPossessionCount: null,
+    };
+  }
+
+  it("owner登場済み・0以上の整数のセーブはそのまま復元される", () => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: 5,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterPossessionCount).toBe(5);
+  });
+
+  it("owner登場済みでもcount=0のセーブは、そのまま0として復元される(0はフォールバック対象ではない)", () => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: 0,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterPossessionCount).toBe(0);
+  });
+
+  it("旧セーブ(troubleCharacterPossessionCount追加前、キー自体が無い)でも、owner登場済みなら0へ安全に復元される", () => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "normal",
+      // troubleCharacterPossessionCount キー自体を持たない旧セーブを模擬(意図的に省略)
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterPossessionCount).toBe(0);
+  });
+
+  it.each([
+    ["負数", -1],
+    ["NaN", NaN],
+    ["小数", 2.5],
+  ])("owner登場済みだが不正な値(%s)は0へフォールバックする", (_label, badValue) => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: badValue,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterPossessionCount).toBe(0);
+  });
+
+  it("owner未登場(null)なら、countにどんな値が残っていても強制的にnullへ揃える(owner/form/countの不整合を許さない)", () => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p999_no_such_player", // ownerはnullへフォールバックする不正値
+      troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: 5,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBeNull();
+    expect(merged.troubleCharacterFormId).toBeNull();
+    expect(merged.troubleCharacterPossessionCount).toBeNull();
+  });
+
+  it("旧セーブ(owner/form/countいずれのキーも無い)は、すべてnull(未登場)のまま復元される", () => {
+    const currentState = baseCurrentState();
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBeNull();
+    expect(merged.troubleCharacterFormId).toBeNull();
+    expect(merged.troubleCharacterPossessionCount).toBeNull();
+  });
+});
+
 describe("mergeGameState(): troubleCharacterAnnounceInfo のフォールバック(非ブロッキング通知)", () => {
   it("通知表示中(非null)のまま保存されたセーブは、そのまま復元される(statusには依存しない一時通知のため)", () => {
     const currentState = { ...useGameStore.getState(), troubleCharacterAnnounceInfo: null };

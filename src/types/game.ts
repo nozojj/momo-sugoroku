@@ -232,30 +232,60 @@ export type TroubleCharacterAnnounceInfo =
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
   | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string };
 
-/** 妨害キャラの形態(フォーム)id。S-3a時点では"normal"(通常形態)のみ存在する仮の1形態構成。
+/** 妨害キャラの形態(フォーム)id。S-3c時点では"normal"(通常形態)のみ存在する仮の1形態構成。
  *  将来「酒モンスター」「カモメ魔王」等を追加するときはここに1件足すだけでよい(既存の
  *  WarpScope/DebuffKind等と同じ「literal unionを拡張するだけ」の拡張パターン)。 */
 export type TroubleCharacterFormId = "normal";
 
-/** 妨害キャラの形態(フォーム)の定義(静的データ)。S-3aでは型と土台だけを用意し、複数形態の
- *  実データ(酒モンスター/カモメ魔王等)・変化抽選ロジックはまだ実装しない。演出面
- *  (CharacterSpriteのexpression/CharacterAnnouncerのテーマ等)はアダプター側(各Modal)の
- *  責務のままここには含めない(types/characterAnnouncer.tsとの依存を持たせず、
- *  GameState側の型は演出の都合から独立させる既存方針を維持する)。 */
+/** 変身確率テーブルの1段階(S-3c)。憑依カウント(TroubleCharacterFormDef.transformの対象形態で、
+ *  現在の形態のまま所有者が悪さを受け続けた回数)がatCount以上になった時点で、probabilityの
+ *  確率が適用される。atCount昇順で並べ、該当する最後の段階の値を採用する想定
+ *  (lib/game/troubleCharacter.tsのresolveTransformProbability()参照)。probability:1を
+ *  指定した段階に到達すると、以後はrandom値に関わらず必ず変身が成立する(pity相当の上限を
+ *  この表自体が兼ねる。別立てのpity専用stateは持たない)。 */
+export interface TroubleCharacterTransformStep {
+  atCount: number;
+  /** 0〜1の変身確率。 */
+  probability: number;
+}
+
+/** ある形態から次の形態への変身ルール(S-3c)。TroubleCharacterFormDef.transformが存在しない
+ *  形態は進化の終点を表す(現状のseagullKing想定)。 */
+export interface TroubleCharacterTransformRule {
+  /** 変身先の形態id。 */
+  targetFormId: TroubleCharacterFormId;
+  /** 0〜1のゲーム進行割合(currentTurn/totalTurns)。この値未満の間は変身抽選の対象に入らない。
+   *  省略時は制限なし。fail-closed方針: `Number.isFinite(minProgressRatio) && 0<=x<=1`を
+   *  満たさない値(負数・1超・NaN・±Infinity)を指定してしまった場合は、例外を投げる代わりに
+   *  常に未解禁(transformed:false)として扱う("終盤限定の強い形態"に設定ミスで負数が入っても、
+   *  誤って序盤から解禁されることがないようにするため)。totalTurns<=0で進行度を計算できない
+   *  場合も同様に常に未解禁として扱う。lib/game/troubleCharacter.tsの
+   *  decideTroubleCharacterTransform()参照。 */
+  minProgressRatio?: number;
+  /** 憑依カウントに応じた変身確率の段階表。atCount昇順で並べる。 */
+  probabilitySteps: TroubleCharacterTransformStep[];
+}
+
+/** 妨害キャラの形態(フォーム)の定義(静的データ)。S-3cで変身ルール(transform)を追加した。
+ *  演出面(CharacterSpriteのexpression/CharacterAnnouncerのテーマ等)はアダプター側(各Modal)の
+ *  責務のままここには含めない(types/characterAnnouncer.tsとの依存を持たせず、GameState側の
+ *  型は演出の都合から独立させる既存方針を維持する)。
+ *
+ *  S-3aで追加したweight(複数形態からの重み付き抽選を想定したフィールド)は、正式仕様が
+ *  「normal→sake→seagullKingの直線進化+確率段階表による判定」に決まりS-3cで不要と確認できた
+ *  ため削除した(兄弟形態同士で競合する抽選が発生しないため)。minTurnも「totalTurnsに対する
+ *  絶対ターン数」という意味づけのままでは1年/3年/5年ゲームで解禁タイミングが揃わない問題が
+ *  あったため、transform.minProgressRatio(0〜1の進行割合)へ置き換えた。 */
 export interface TroubleCharacterFormDef {
   id: TroubleCharacterFormId;
   /** 表示名。正式名称が決まるまでの仮名で構わない。 */
   displayName: string;
   /** CharacterSprite解決用のcharacterId(CHARACTER_ASSET_URLSのキーとして使う想定)。 */
   characterId: string;
-  /** 形態変化抽選に使う重み(yearEventDefsと同じ「合計100」慣習を想定)。S-3aでは形態が
-   *  1つしかないため抽選ロジック自体はまだ存在しない(この値もまだどこからも参照されない)。 */
-  weight: number;
-  /** この形態が変化抽選の対象に入るための最低ターン数。省略時は制限なし。 */
-  minTurn?: number;
-  /** この形態専用の「悪さ」プール。既存のtroubleCharacterMischiefDefs(単一プール)は
-   *  次段階で各形態のプールへ再編する想定で、この型はそれを見越した受け皿。 */
+  /** この形態専用の「悪さ」プール。 */
   mischiefPool: TroubleCharacterMischiefDef[];
+  /** 次の形態への変身ルール。省略時はこの形態が進化の終点(例: seagullKing想定)。 */
+  transform?: TroubleCharacterTransformRule;
 }
 
 /** カードの定義(静的データ)。 */
@@ -648,6 +678,12 @@ export interface GameState {
    *  gameStore.ts(初回登場時に両方を同じset()で書き込む)とpersistMigration.ts
    *  (owner解決後にform側もそれに合わせて解決する)の両方で維持する。 */
   troubleCharacterFormId: TroubleCharacterFormId | null;
+  /** 妨害キャラが現在の形態で、所有者へ実際に悪さを発動した回数(S-3c)。troubleCharacterOwnerId/
+   *  troubleCharacterFormIdと同じ不変条件を維持する: owner===nullのときは必ずnull、
+   *  owner!==nullのときは必ず0以上の整数。所有者がskipNextRollで手番を飛ばされ悪さが
+   *  発動しなかった回は変化せず、handoff成功時・形態変化成立時はどちらも0へリセットする
+   *  (「今の形態でどれだけ耐えたか」を表す値であって、生涯合計の値ではない)。 */
+  troubleCharacterPossessionCount: number | null;
   /** 妨害キャラの登場/所有者交代/悪さ発生を知らせる通知。monopolyAchievement/
    *  yearEventAnnounceInfoと同様、statusとは独立した一時通知(GameStatusは増やさない)。
    *  表示し終えたらdismissTroubleCharacterAnnounce()でnullに戻る。 */

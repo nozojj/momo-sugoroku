@@ -47,6 +47,11 @@ describe("ゲーム開始時", () => {
   it("形態(troubleCharacterFormId)もnull(未登場)である", () => {
     expect(useGameStore.getState().troubleCharacterFormId).toBeNull();
   });
+
+  // S-3c: 憑依カウント(troubleCharacterPossessionCount)も同じ不変条件でnullになる。
+  it("憑依カウント(troubleCharacterPossessionCount)もnull(未登場)である", () => {
+    expect(useGameStore.getState().troubleCharacterPossessionCount).toBeNull();
+  });
 });
 
 describe("初回所有者決定", () => {
@@ -70,6 +75,8 @@ describe("初回所有者決定", () => {
     // S-3a: 初登場は必ず通常形態("normal")から始まる。ownerId確定と同じset()で
     // 一緒に書き込まれるため、owner有り・form無しの中間状態は発生しない。
     expect(after.troubleCharacterFormId).toBe("normal");
+    // S-3c: 憑依カウントも初登場時は必ず0から始まる(同じset()内で確定させる)。
+    expect(after.troubleCharacterPossessionCount).toBe(0);
     expect(after.troubleCharacterAnnounceInfo).toEqual({
       kind: "appeared",
       ownerId: after.troubleCharacterOwnerId,
@@ -99,6 +106,7 @@ describe("初回所有者決定", () => {
       status: "rolling",
       troubleCharacterOwnerId: "p2", // 既に所有者が決まっている状態を模擬
       troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: 5, // 既にある程度耐えている状態を模擬
       troubleCharacterAnnounceInfo: null,
     }));
 
@@ -110,6 +118,7 @@ describe("初回所有者決定", () => {
     expect(after.status).toBe("destinationArrived");
     expect(after.troubleCharacterOwnerId).toBe("p2"); // 変わらない
     expect(after.troubleCharacterFormId).toBe("normal"); // 形態も上書きされない(S-3a)
+    expect(after.troubleCharacterPossessionCount).toBe(5); // 憑依カウントも上書きされない(S-3c)
     expect(after.troubleCharacterAnnounceInfo).toBeNull(); // 新規登場通知も出ない
   });
 });
@@ -128,6 +137,10 @@ describe("所有者交代(finishLandingAndEndTurn経由)", () => {
       destinationNodeId: DESTINATION,
       status: "rolling",
       troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "normal",
+      // S-3c: 既にある程度耐えていた状態(0ではない値)を模擬する。handoffで実際に0へ
+      // リセットされることを意味のある形で検証するため。
+      troubleCharacterPossessionCount: 5,
       troubleCharacterAnnounceInfo: null,
     }));
   }
@@ -142,6 +155,10 @@ describe("所有者交代(finishLandingAndEndTurn経由)", () => {
     const after = useGameStore.getState();
     expect(after.players[0].currentNodeId).toBe(DESTINATION);
     expect(after.troubleCharacterOwnerId).toBe("p1");
+    // S-3c: handoff成功時は形態・憑依カウントを必ず基準形態(normal)・0へリセットする
+    // (「早く他人へ押し付ければ助かる」というゲーム性を優先する正式仕様)。
+    expect(after.troubleCharacterFormId).toBe("normal");
+    expect(after.troubleCharacterPossessionCount).toBe(0);
     expect(after.troubleCharacterAnnounceInfo).toEqual({
       kind: "handoff",
       fromPlayerId: "p2",
@@ -161,20 +178,24 @@ describe("所有者交代(finishLandingAndEndTurn経由)", () => {
     const after = useGameStore.getState();
     expect(after.players[0].currentNodeId).not.toBe(DESTINATION); // 通過して別マスに停止している
     expect(after.troubleCharacterOwnerId).toBe("p2"); // 交代していない
+    expect(after.troubleCharacterPossessionCount).toBe(5); // handoffが起きていないのでリセットもされない
   });
 
   it.each([
     ["human", "cpu"],
     ["cpu", "human"],
     ["cpu", "cpu"],
-  ] as const)("controlledBy(owner=%s, mover=%s)によらず同じ結果になる", (ownerControl, moverControl) => {
+  ] as const)("controlledBy(owner=%s, mover=%s)によらず同じ結果になる(形態・憑依カウントのリセットを含む)", (ownerControl, moverControl) => {
     setupHandoffScenario(ownerControl, moverControl);
     mockSingleDiceFace(3);
 
     useGameStore.getState().rollDice();
     driveToLanding();
 
-    expect(useGameStore.getState().troubleCharacterOwnerId).toBe("p1");
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterOwnerId).toBe("p1");
+    expect(after.troubleCharacterFormId).toBe("normal");
+    expect(after.troubleCharacterPossessionCount).toBe(0);
   });
 });
 
@@ -236,7 +257,9 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
    *  (gameStore.tsのprivate関数には触れない)。この時点ではまだ advanceToNextTurn() は呼ばれていない。
    *  mockSingleDiceFace()がMath.randomを消費するため、悪さ抽選用のMath.random制御は
    *  この関数の外(呼び出し側がcontinueAfterDestinationFocus()を呼ぶ直前)で行う。 */
-  function arriveAtDestinationFocus(ownerId: "p1" | "p2"): void {
+  // startCount(S-3c): 呼び出し時点の憑依カウントを模擬する(既定0=初登場相当)。
+  // 「複数回の悪さで正しく増加する」ことを検証するテストは、これに非0の値を渡して使う。
+  function arriveAtDestinationFocus(ownerId: "p1" | "p2", startCount = 0): void {
     useGameStore.setState((s) => ({
       players: [
         { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
@@ -245,6 +268,8 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
       destinationNodeId: DESTINATION,
       status: "rolling",
       troubleCharacterOwnerId: ownerId,
+      troubleCharacterFormId: "normal",
+      troubleCharacterPossessionCount: startCount,
       troubleCharacterAnnounceInfo: null,
     }));
     mockSingleDiceFace(3);
@@ -271,11 +296,25 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.status).toBe("rolling");
     expect(after.troubleCharacterAnnounceInfo?.kind).toBe("mischief");
     expect(after.troubleCharacterAnnounceInfo).toMatchObject({ playerId: "p2", playerName: "P2" });
+    // S-3c: 初登場相当(count 0)から1回悪さを受けたので1になる。
+    expect(after.troubleCharacterPossessionCount).toBe(1);
+    // S-3cではsake実データがまだ無いため、悪さを受けても形態はnormalのまま変わらない。
+    expect(after.troubleCharacterFormId).toBe("normal");
 
     const p2After = after.players[1];
     const moneyChanged = p2After.money !== p2MoneyBefore;
     const debuffAdded = p2After.activeDebuffs.length > p2DebuffsBefore;
     expect(moneyChanged || debuffAdded).toBe(true); // 何らかの悪さが発生している
+  });
+
+  // S-3c: 複数回の悪さを受けても、憑依カウントは前回の値からリセットされずに続けて加算される。
+  it("複数回の悪さを受けると、憑依カウントは前回の値から続けて加算される", () => {
+    arriveAtDestinationFocus("p2", 4); // 既に4回受けている状態から開始
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo?.kind).toBe("mischief");
+    expect(after.troubleCharacterPossessionCount).toBe(5); // 4 -> 5(0へリセットされない)
   });
 
   it("非所有者のターンが開始しても悪さは発生しない", () => {
@@ -292,6 +331,8 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.players[1].activeDebuffs).toHaveLength(0);
     // p1(所有者だが今回手番を得ていない)にも変化がない
     expect(after.players[0].money).toBe(p1MoneyBefore);
+    // S-3c: 所有者(p1)の憑依カウントも、p1の手番が来ていないので変化しない(0のまま)。
+    expect(after.troubleCharacterPossessionCount).toBe(0);
   });
 
   it("所持金減少パターン(money)が正しく反映される", () => {
@@ -313,5 +354,37 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.troubleCharacterAnnounceInfo).toMatchObject({ kind: "mischief", mischiefKind: "debuff" });
     expect(after.players[1].activeDebuffs).toHaveLength(1);
     expect(after.players[1].activeDebuffs[0].kind).toBe("halveDiceNextRoll");
+  });
+});
+
+// S-3c: skipNextRollで所有者の手番が飛ばされる場合、悪さ・憑依カウントの加算・変身判定の
+// いずれも発生しないことを検証する。カード(お休みカード/card_debuff_skip)を使って、移動を
+// 一切介さずにskipNextRollを付与する(既存のgameStore.card.test.tsの
+// 「confirmTargetSelection(): 対象プレイヤーにデバフが付与され、カードが消費され、手番が進む」
+// テストと同じ経路: 2人プレイでは付与直後のadvanceToNextTurn()がそのままskipを検知して
+// 消費し、キャスター側の手番に戻ってくる)。
+describe("skipNextRollで所有者の手番が飛ばされる場合(S-3c)", () => {
+  it("悪さの発動・憑依カウントの加算・変身判定のいずれも発生しない", () => {
+    useGameStore.setState((s) => ({
+      players: s.players.map((p, i) => (i === 0 ? { ...p, cardIds: ["card_debuff_skip"] } : p)),
+      troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "normal",
+      // かなり危険な状態(閾値到達間近)を模擬しても、スキップされれば一切進行しないことを確認する。
+      troubleCharacterPossessionCount: 6,
+      troubleCharacterAnnounceInfo: null,
+    }));
+
+    useGameStore.getState().useCard("card_debuff_skip");
+    useGameStore.getState().confirmTargetSelection("p2"); // p2(所有者)へskipNextRollを付与
+
+    const after = useGameStore.getState();
+    // 2人プレイなので、p2のskipNextRollは付与直後のadvanceToNextTurn()内でそのまま消費され、
+    // p1(自分)の番に戻ってくる。
+    expect(after.currentPlayerIndex).toBe(0);
+    expect(after.status).toBe("rolling");
+    expect(after.troubleCharacterOwnerId).toBe("p2"); // 所有者は変わらない
+    expect(after.troubleCharacterFormId).toBe("normal"); // 変身判定も走っていない
+    expect(after.troubleCharacterPossessionCount).toBe(6); // 悪さが発動していないので増えない
+    expect(after.troubleCharacterAnnounceInfo).toBeNull(); // 悪さ通知も出ない(handoffも別途起きていない)
   });
 });

@@ -14,19 +14,21 @@ import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
  *
  * characterId: "troubleChar"は、TroubleCharacterAnnounceModal.tsxが元々ハードコードしていた
  * プレースホルダー用の仮IDをそのまま踏襲する(CHARACTER_ASSET_URLSに未登録のため、
- * CharacterSpriteは引き続き絵文字プレースホルダーへフォールバックする。S-3bでは見た目を
+ * CharacterSpriteは引き続き絵文字プレースホルダーへフォールバックする。S-3cでも見た目を
  * 一切変更しない)。
  *
- * weight/minTurnはまだどこからも参照されない(形態変化抽選の導入はS-3c以降)。将来の複数形態
- * 抽選のための静的データとして先行して持たせているだけで、この2つの値自体は今回の挙動に
- * 一切影響しない。weight:100は「今のところ形態がこれ1つしかない」ことを表すだけの仮値。
+ * S-3c: 正式仕様として「normal→sake→seagullKing」の直線進化+確率段階表(transform)が
+ * 決まったが、sake/seagullKingの実データはまだ追加しない(S-3d/S-3e以降)。そのため
+ * normalの`transform`フィールドは意図的に省略している=このデータからは絶対に変身が
+ * 発生しない(decideTroubleCharacterTransform()はtransformが無い形態を進化の終点として
+ * 常に{transformed:false}を返す)。バランス値(count 3=20%〜7=100%等)はlib/game/
+ * troubleCharacter.test.tsの合成データとしてのみ先行して検証している。
  */
 export const troubleCharacterFormDefs: TroubleCharacterFormDef[] = [
   {
     id: "normal",
     displayName: "妨害キャラ",
     characterId: "troubleChar",
-    weight: 100,
     mischiefPool: troubleCharacterMischiefDefs,
   },
 ];
