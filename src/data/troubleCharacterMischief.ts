@@ -12,6 +12,12 @@ import type { TroubleCharacterMischiefDef } from "@/types/game";
  * - debuff: 既存のActiveDebuff/DebuffKindをそのまま所有者自身へ付与する。新しいDebuffKindは
  *   追加しない。skipNextRoll(手番お休み、影響が大きい)はhalveDiceNextRoll(出目半減)より
  *   出現率を下げ、MVPでは過度に強くしすぎない。
+ *
+ * Polish Phase P1 S-3b: この配列は現在、data/troubleCharacterForms.tsの"normal"(通常形態)の
+ * mischiefPoolとして参照される(複製ではなく同じ配列をそのまま参照するので、内容・weight・
+ * 抽選確率はここまでと1件も変わらない)。将来「酒モンスター」「カモメ魔王」等の形態を追加する
+ * 場合は、このファイルを直接編集するのではなく、troubleCharacterForms.ts側に新しい形態エントリ
+ * (別のmischiefPool)を追加する形にする。
  */
 export const troubleCharacterMischiefDefs: TroubleCharacterMischiefDef[] = [
   {

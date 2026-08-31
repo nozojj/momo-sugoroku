@@ -1,6 +1,7 @@
-import type { ActiveDebuff, MapData, Player, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
+import type { ActiveDebuff, MapData, Player, TroubleCharacterFormDef, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { makeDebuffId } from "@/lib/game/engine";
+import { troubleCharacterFormDefs } from "@/data/troubleCharacterForms";
 
 /**
  * 妨害キャラ(仮称)まわりの判定・計算だけを集めた純関数ファイル。gameStore.ts本体
@@ -25,6 +26,16 @@ const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal"];
  *  呼び出し側(persistMigration.ts)が安全にfalse判定してフォールバックできるようにする。 */
 export function isTroubleCharacterFormId(value: unknown): value is TroubleCharacterFormId {
   return typeof value === "string" && (TROUBLE_CHARACTER_FORM_IDS as string[]).includes(value);
+}
+
+/**
+ * formIdに対応するTroubleCharacterFormDef(data/troubleCharacterForms.ts)を取得する。
+ * S-3b時点ではtroubleCharacterFormDefsに"normal"の1件しか無いため、有効なformIdを渡す限り
+ * 必ず見つかる想定だが、getCardDef/getYearEventDefと同じ「見つからなければundefined」規約に
+ * 揃え、呼び出し側(gameStore.ts)がフォールバックを選べるようにしておく。
+ */
+export function getTroubleCharacterFormDef(formId: TroubleCharacterFormId): TroubleCharacterFormDef | undefined {
+  return troubleCharacterFormDefs.find((f) => f.id === formId);
 }
 
 /**

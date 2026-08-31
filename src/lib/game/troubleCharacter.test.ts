@@ -8,10 +8,12 @@ import {
   drawTroubleCharacterMischief,
   applyTroubleCharacterMischief,
   isTroubleCharacterFormId,
+  getTroubleCharacterFormDef,
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
 } from "@/lib/game/troubleCharacter";
-import type { TroubleCharacterMischiefDef } from "@/types/game";
+import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
+import type { TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
 
 const MAP_ID = "shonan-full";
 
@@ -171,6 +173,57 @@ describe("isTroubleCharacterFormId()(S-3a)", () => {
     expect(isTroubleCharacterFormId(null)).toBe(false);
     expect(isTroubleCharacterFormId(undefined)).toBe(false);
     expect(isTroubleCharacterFormId(123)).toBe(false);
+  });
+});
+
+describe("getTroubleCharacterFormDef()(S-3b)", () => {
+  it("\"normal\"は必ず見つかり、S-3a未対応時のプレースホルダーcharacterId(\"troubleChar\")を維持する", () => {
+    const formDef = getTroubleCharacterFormDef("normal");
+
+    expect(formDef).toBeDefined();
+    expect(formDef!.id).toBe("normal");
+    expect(formDef!.characterId).toBe("troubleChar");
+  });
+
+  it("未知のformIdはundefinedを返す(将来形態を削除/リネームした場合の防御)", () => {
+    const formDef = getTroubleCharacterFormDef("no_such_form" as TroubleCharacterFormId);
+
+    expect(formDef).toBeUndefined();
+  });
+
+  it("\"normal\"のmischiefPoolは、既存のtroubleCharacterMischiefDefsと同一の配列参照である(複製していない)", () => {
+    const formDef = getTroubleCharacterFormDef("normal");
+
+    expect(formDef!.mischiefPool).toBe(troubleCharacterMischiefDefs);
+  });
+
+  it("\"normal\"のmischiefPoolは既存3種・weight 40/40/20を1件も変えずに維持している", () => {
+    const formDef = getTroubleCharacterFormDef("normal");
+    const pool = formDef!.mischiefPool;
+
+    expect(pool).toHaveLength(3);
+    expect(pool.map((m) => ({ id: m.id, weight: m.weight }))).toEqual([
+      { id: "trouble_money_pinch", weight: 40 },
+      { id: "trouble_debuff_halve", weight: 40 },
+      { id: "trouble_debuff_skip", weight: 20 },
+    ]);
+
+    const money = pool.find((m) => m.id === "trouble_money_pinch");
+    expect(money).toMatchObject({ kind: "money", amount: -50 });
+
+    const halve = pool.find((m) => m.id === "trouble_debuff_halve");
+    expect(halve).toMatchObject({ kind: "debuff", debuffKind: "halveDiceNextRoll" });
+
+    const skip = pool.find((m) => m.id === "trouble_debuff_skip");
+    expect(skip).toMatchObject({ kind: "debuff", debuffKind: "skipNextRoll" });
+  });
+
+  it("drawTroubleCharacterMischief()に\"normal\"のmischiefPoolを渡した抽選結果は、常にこの3種のいずれかになる", () => {
+    const formDef = getTroubleCharacterFormDef("normal")!;
+    for (let i = 0; i < 20; i++) {
+      const picked = drawTroubleCharacterMischief(formDef.mischiefPool);
+      expect(["trouble_money_pinch", "trouble_debuff_halve", "trouble_debuff_skip"]).toContain(picked.id);
+    }
   });
 });
 

@@ -23,6 +23,7 @@ import {
   checkTroubleCharacterHandoff as detectTroubleCharacterHandoff,
   drawTroubleCharacterMischief,
   applyTroubleCharacterMischief,
+  getTroubleCharacterFormDef,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
 import { mergeGameState } from "@/store/persistMigration";
@@ -353,7 +354,14 @@ export const useGameStore = create<GameStore>()(
           if (!skip) {
             // このプレイヤーが実際に手番を行う。妨害キャラ所有者ならここで悪さを1回だけ発生させる。
             if (candidate.id === state.troubleCharacterOwnerId) {
-              const mischief = drawTroubleCharacterMischief(troubleCharacterMischiefDefs);
+              // S-3b: 悪さの抽選プールは、現在の形態(troubleCharacterFormId)のmischiefPoolから
+              // 取る。ownerが登場済みならformも必ず非null(S-3aの不変条件)で、S-3b時点では
+              // "normal"しか存在しないため、実際の抽選対象は従来のtroubleCharacterMischiefDefs
+              // (weight 40/40/20の3件)と完全に同じ配列になる=挙動は一切変わらない。
+              // 万一formが解決できない(理論上到達しない防御的分岐)場合のみ、従来の共通プールへ
+              // フォールバックする。
+              const formDef = state.troubleCharacterFormId ? getTroubleCharacterFormDef(state.troubleCharacterFormId) : undefined;
+              const mischief = drawTroubleCharacterMischief(formDef?.mischiefPool ?? troubleCharacterMischiefDefs);
               const application = applyTroubleCharacterMischief(players, candidate.id, mischief);
               players = application.players;
               log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
