@@ -8,6 +8,7 @@ import { getMap } from "@/data/maps";
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { STARTING_MONEY } from "@/lib/game/engine";
 import { troubleCharacterMischiefSakeDefs } from "@/data/troubleCharacterMischiefSake";
+import { troubleCharacterMischiefSeagullKingDefs } from "@/data/troubleCharacterMischiefSeagullKing";
 import { mockSingleDiceFace, driveToLanding } from "./gameStore.testHelpers";
 
 const MAP_ID = "shonan-full";
@@ -299,7 +300,7 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.troubleCharacterAnnounceInfo).toMatchObject({ playerId: "p2", playerName: "P2" });
     // S-3c: 初登場相当(count 0)から1回悪さを受けたので1になる。
     expect(after.troubleCharacterPossessionCount).toBe(1);
-    // S-3cではsake実データがまだ無いため、悪さを受けても形態はnormalのまま変わらない。
+    // count閾値(atCount:3)未満のため、悪さを受けても形態はnormalのまま変わらない。
     expect(after.troubleCharacterFormId).toBe("normal");
 
     const p2After = after.players[1];
@@ -413,13 +414,13 @@ describe("normal→sake変身(advanceToNextTurn経由、実データ)(S-3d)", ()
     }
   });
 
-  it("sake状態で次の悪さが発動すると、変身せずcountが継続加算される(カモメ魔王の実データがまだ無いため)", () => {
+  it("sake状態で次の悪さが発動すると、変身せずcountが継続加算される(count閾値[atCount:3]未満のため)", () => {
     arriveAtDestinationFocus("p2", 2, "sake");
     vi.spyOn(Math, "random").mockReturnValue(0.05);
     advanceToNextPlayer();
 
     const after = useGameStore.getState();
-    expect(after.troubleCharacterFormId).toBe("sake"); // seagullKingの実データが無いため変身しない
+    expect(after.troubleCharacterFormId).toBe("sake"); // count閾値未満のため変身しない
     expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(通常通り加算)
   });
 
@@ -462,6 +463,131 @@ describe("normal→sake変身(advanceToNextTurn経由、実データ)(S-3d)", ()
       status: "rolling",
       troubleCharacterOwnerId: "p2",
       troubleCharacterFormId: "sake",
+      troubleCharacterPossessionCount: 5,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+
+    useGameStore.getState().rollDice();
+    driveToLanding();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterOwnerId).toBe("p1");
+    expect(after.troubleCharacterFormId).toBe("normal");
+    expect(after.troubleCharacterPossessionCount).toBe(0);
+  });
+});
+
+// S-3e: sake→seagullKing変身が、実データ(data/troubleCharacterForms.ts)を通じて実際に
+// 成立することを検証する。sake→seagullKingはminProgressRatio: 0.7を持つため、S-3dの
+// normal→sakeテストと異なりturn/totalTurnsを明示的に制御する必要がある
+// (startTwoPlayerGame()は1年ゲーム=totalTurns12がデフォルト)。
+describe("sake→seagullKing変身(advanceToNextTurn経由、実データ)(S-3e)", () => {
+  function arriveAtDestinationFocusAtTurn(
+    ownerId: "p1" | "p2",
+    startCount: number,
+    startForm: "sake" | "seagullKing",
+    turn: number,
+  ): void {
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
+        { ...s.players[1], currentNodeId: OTHER_HUB, moveHistory: [OTHER_HUB] },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      turn,
+      troubleCharacterOwnerId: ownerId,
+      troubleCharacterFormId: startForm,
+      troubleCharacterPossessionCount: startCount,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+    useGameStore.getState().rollDice();
+    driveToLanding();
+    useGameStore.getState().continueAfterArrival();
+  }
+
+  function advanceToNextPlayer(): void {
+    useGameStore.getState().continueAfterDestinationFocus();
+  }
+
+  it("進行度70%未満(turn5/12≒42%)では、count=8(100%段階)でもminProgressRatioゲートにより変身しない", () => {
+    arriveAtDestinationFocusAtTurn("p2", 8, "sake", 5);
+    vi.spyOn(Math, "random").mockReturnValue(0); // 変身判定に最も有利な値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("sake"); // ゲート未達のため変身しない
+    expect(after.troubleCharacterPossessionCount).toBe(9); // 8 -> 9(通常通り加算は続く)
+  });
+
+  it("進行度70%以上(turn9/12=75%)・count=8(100%段階)で確実にseagullKingへ変身し、seagullKingのmischiefPoolから悪さが抽選され、countは1になる", () => {
+    arriveAtDestinationFocusAtTurn("p2", 8, "sake", 9);
+    vi.spyOn(Math, "random").mockReturnValue(0.05); // 変身確率100%なのでどんな値でも成立する
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("seagullKing"); // 変身成立
+    expect(after.troubleCharacterPossessionCount).toBe(1); // 0へリセットされた直後の1回分
+    const info = after.troubleCharacterAnnounceInfo;
+    expect(info?.kind).toBe("mischief");
+    // seagullKingのmischiefPool由来のメッセージであることを、実データと突き合わせて確認する。
+    if (info?.kind === "mischief") {
+      const seagullKingMessages = troubleCharacterMischiefSeagullKingDefs.map((m) => m.message);
+      expect(seagullKingMessages).toContain(info.message);
+    }
+  });
+
+  it("seagullKing状態で次の悪さが発動しても、変身せずcountが継続加算される(最終形態のためtransformを持たない)", () => {
+    arriveAtDestinationFocusAtTurn("p2", 2, "seagullKing", 9);
+    vi.spyOn(Math, "random").mockReturnValue(0.05);
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("seagullKing"); // 進化先が無いため変身しない
+    expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(通常通り加算)
+  });
+
+  it("seagullKing状態でhandoffが成功すると、normal/count 0へリセットされる(最終形態のまま他人へ渡らない)", () => {
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
+        { ...s.players[1], currentNodeId: DESTINATION, moveHistory: [DESTINATION] },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "seagullKing",
+      troubleCharacterPossessionCount: 5,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+
+    useGameStore.getState().rollDice();
+    driveToLanding();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterOwnerId).toBe("p1");
+    expect(after.troubleCharacterFormId).toBe("normal"); // seagullKingのまま渡らない
+    expect(after.troubleCharacterPossessionCount).toBe(0);
+  });
+
+  it.each([
+    ["human", "cpu"],
+    ["cpu", "human"],
+    ["cpu", "cpu"],
+  ] as const)("seagullKing状態からのhandoffリセットはcontrolledBy(owner=%s, mover=%s)によらず同じ結果になる", (ownerControl, moverControl) => {
+    startTwoPlayerGame(["human", "human"]);
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY], controlledBy: moverControl },
+        { ...s.players[1], currentNodeId: DESTINATION, moveHistory: [DESTINATION], controlledBy: ownerControl },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "seagullKing",
       troubleCharacterPossessionCount: 5,
       troubleCharacterAnnounceInfo: null,
     }));

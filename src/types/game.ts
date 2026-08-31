@@ -217,12 +217,13 @@ export interface YearEventAnnounceInfo {
  *  ActiveDebuff/DebuffKindをそのまま所有者自身へ付与する(新しいDebuffKindは増やさない)。
  *  moneyNearby(S-3d)は所有者本人と、所有者からグラフ距離が近い他プレイヤー(巻き込み対象、
  *  lib/game/troubleCharacter.tsのTROUBLE_CHARACTER_NEARBY_MAX_DISTANCE参照)へ、それぞれ
- *  別々の金額を同時に適用する酒モンスター専用の効果種別。 */
-export type TroubleCharacterMischiefKind = "money" | "debuff" | "moneyNearby";
+ *  別々の金額を同時に適用する酒モンスター専用の効果種別。propertyLoss/cardDestroy(S-3e)は
+ *  カモメ魔王専用の効果種別で、それぞれ所有物件・所持カードを直接減らす。 */
+export type TroubleCharacterMischiefKind = "money" | "debuff" | "moneyNearby" | "propertyLoss" | "cardDestroy";
 
 /** troubleCharacterMischief.tsで定義する「悪さ」1件分。weightはyearEventDefsと同じ
- *  「合計100」慣習の重み付き抽選に使う。money/debuff/moneyNearbyいずれもmessageは付与時の
- *  ログ・通知にそのまま使うテキストで、ここでは金額や対象デバフ以外の計算ロジックは持たせない。 */
+ *  「合計100」慣習の重み付き抽選に使う。いずれの種別もmessageは付与時のログ・通知にそのまま
+ *  使うテキストで、ここでは金額や対象デバフ以外の計算ロジックは持たせない。 */
 export type TroubleCharacterMischiefDef =
   | { id: string; kind: "money"; weight: number; amount: number; message: string }
   | { id: string; kind: "debuff"; weight: number; debuffKind: DebuffKind; message: string }
@@ -236,6 +237,24 @@ export type TroubleCharacterMischiefDef =
        *  ownerAmountの適用自体は必ず発生する。 */
       nearbyAmount: number;
       message: string;
+    }
+  | {
+      id: string;
+      kind: "propertyLoss";
+      weight: number;
+      /** 所有者が物件を1件も所持していないときの代替効果(符号付き、万円)。 */
+      fallbackAmount: number;
+      message: string;
+    }
+  | {
+      id: string;
+      kind: "cardDestroy";
+      weight: number;
+      /** 破壊する最大枚数。所持数がこれより少なければ、持っている分だけ破壊する。 */
+      maxCount: number;
+      /** trueならCardDef.kind==="key"のカード(裏道パス等)を破壊候補から除外する。 */
+      excludeKeyCards: boolean;
+      message: string;
     };
 
 /** troubleCharacterAnnounceInfoが表示する通知の種類。monopolyAchievement/
@@ -246,10 +265,10 @@ export type TroubleCharacterAnnounceInfo =
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
   | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string };
 
-/** 妨害キャラの形態(フォーム)id。S-3dで"sake"(酒モンスター)を正式追加した。将来
- *  「カモメ魔王」を追加するときもここに1件足すだけでよい(既存のWarpScope/DebuffKind等と
- *  同じ「literal unionを拡張するだけ」の拡張パターン)。 */
-export type TroubleCharacterFormId = "normal" | "sake";
+/** 妨害キャラの形態(フォーム)id。S-3dで"sake"(酒モンスター)、S-3eで"seagullKing"
+ *  (カモメ魔王、最終形態)を正式追加した。既存のWarpScope/DebuffKind等と同じ
+ *  「literal unionを拡張するだけ」の拡張パターン。 */
+export type TroubleCharacterFormId = "normal" | "sake" | "seagullKing";
 
 /** 変身確率テーブルの1段階(S-3c)。憑依カウント(TroubleCharacterFormDef.transformの対象形態で、
  *  現在の形態のまま所有者が悪さを受け続けた回数)がatCount以上になった時点で、probabilityの

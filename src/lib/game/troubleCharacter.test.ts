@@ -13,9 +13,13 @@ import {
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
   TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE,
+  pickRandomDistinct,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
 import { troubleCharacterMischiefSakeDefs } from "@/data/troubleCharacterMischiefSake";
+import { troubleCharacterMischiefSeagullKingDefs } from "@/data/troubleCharacterMischiefSeagullKing";
+import { propertyDefs, getPropertyDef } from "@/data/properties";
+import { getCardDef } from "@/data/cards";
 import type { TroubleCharacterFormDef, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
 
 const MAP_ID = "shonan-full";
@@ -165,7 +169,7 @@ describe("drawTroubleCharacterMischief()", () => {
   });
 });
 
-describe("isTroubleCharacterFormId()(S-3a/S-3d)", () => {
+describe("isTroubleCharacterFormId()(S-3a/S-3d/S-3e)", () => {
   it("既知の形態id(\"normal\")はtrueを返す", () => {
     expect(isTroubleCharacterFormId("normal")).toBe(true);
   });
@@ -175,8 +179,13 @@ describe("isTroubleCharacterFormId()(S-3a/S-3d)", () => {
     expect(isTroubleCharacterFormId("sake")).toBe(true);
   });
 
+  // S-3e: "seagullKing"を正式な形態id(最終形態)として追加した。
+  it("既知の形態id(\"seagullKing\")もtrueを返す", () => {
+    expect(isTroubleCharacterFormId("seagullKing")).toBe(true);
+  });
+
   it("未知の文字列・null・undefined・数値等はfalseを返す(旧セーブ/消えたidの安全な判定)", () => {
-    expect(isTroubleCharacterFormId("seagullKing")).toBe(false); // まだ存在しない将来の形態id(S-3e予定)
+    expect(isTroubleCharacterFormId("phoenix")).toBe(false); // 存在しない架空の形態id
     expect(isTroubleCharacterFormId("no_such_form")).toBe(false);
     expect(isTroubleCharacterFormId(null)).toBe(false);
     expect(isTroubleCharacterFormId(undefined)).toBe(false);
@@ -235,7 +244,7 @@ describe("getTroubleCharacterFormDef()(S-3b)", () => {
   });
 });
 
-describe("troubleCharacterFormDefs(実データ)(S-3d)", () => {
+describe("troubleCharacterFormDefs(実データ)(S-3d/S-3e)", () => {
   it("normalの正式transform設定がcount3=20%〜7=100%・targetFormId=\"sake\"・minProgressRatio無しになっている", () => {
     const normal = getTroubleCharacterFormDef("normal")!;
     expect(normal.transform).toEqual({
@@ -250,13 +259,29 @@ describe("troubleCharacterFormDefs(実データ)(S-3d)", () => {
     });
   });
 
-  it("sakeが正式に登録されており、mischiefPoolのweight合計が既存慣習通り100、まだ次の進化先(transform)を持たない", () => {
+  it("sakeが正式に登録されており、mischiefPoolのweight合計が既存慣習通り100", () => {
     const sake = getTroubleCharacterFormDef("sake")!;
     expect(sake.id).toBe("sake");
     expect(sake.displayName).toBe("酒モンスター");
     expect(sake.mischiefPool.reduce((sum, m) => sum + m.weight, 0)).toBe(100);
-    // カモメ魔王(seagullKing)の実データはS-3d時点ではまだ無いため、sakeは進化の終点として振る舞う。
-    expect(sake.transform).toBeUndefined();
+  });
+
+  // S-3e: sakeの正式transform設定がcount3=10%〜8=100%・targetFormId="seagullKing"・
+  // minProgressRatio=0.7になっている(sakeはもはや進化の終点ではない)。
+  it("sakeの正式transform設定がcount3=10%〜8=100%・targetFormId=\"seagullKing\"・minProgressRatio=0.7になっている", () => {
+    const sake = getTroubleCharacterFormDef("sake")!;
+    expect(sake.transform).toEqual({
+      targetFormId: "seagullKing",
+      minProgressRatio: 0.7,
+      probabilitySteps: [
+        { atCount: 3, probability: 0.1 },
+        { atCount: 4, probability: 0.2 },
+        { atCount: 5, probability: 0.35 },
+        { atCount: 6, probability: 0.5 },
+        { atCount: 7, probability: 0.75 },
+        { atCount: 8, probability: 1 },
+      ],
+    });
   });
 
   it("sakeのmischiefPoolに、周囲巻き込み(kind: \"moneyNearby\")が1件以上含まれる", () => {
@@ -268,12 +293,33 @@ describe("troubleCharacterFormDefs(実データ)(S-3d)", () => {
     const sake = getTroubleCharacterFormDef("sake")!;
     expect(sake.mischiefPool).toBe(troubleCharacterMischiefSakeDefs);
   });
+
+  it("seagullKingが正式に登録されており、mischiefPoolのweight合計が既存慣習通り100、次の進化先(transform)を持たない(最終形態)", () => {
+    const seagullKing = getTroubleCharacterFormDef("seagullKing")!;
+    expect(seagullKing.id).toBe("seagullKing");
+    expect(seagullKing.displayName).toBe("カモメ魔王");
+    expect(seagullKing.mischiefPool.reduce((sum, m) => sum + m.weight, 0)).toBe(100);
+    expect(seagullKing.transform).toBeUndefined();
+  });
+
+  it("seagullKingのmischiefPoolに、propertyLoss/cardDestroyが1件ずつ含まれる", () => {
+    const seagullKing = getTroubleCharacterFormDef("seagullKing")!;
+    expect(seagullKing.mischiefPool.filter((m) => m.kind === "propertyLoss")).toHaveLength(1);
+    expect(seagullKing.mischiefPool.filter((m) => m.kind === "cardDestroy")).toHaveLength(1);
+  });
+
+  it("seagullKingのmischiefPoolはtroubleCharacterMischiefSeagullKingDefsと同一の配列参照である(複製していない)", () => {
+    const seagullKing = getTroubleCharacterFormDef("seagullKing")!;
+    expect(seagullKing.mischiefPool).toBe(troubleCharacterMischiefSeagullKingDefs);
+  });
 });
 
-// S-3c正式仕様の初期テスト値。normal→sakeはcount3=20%〜7=100%で、S-3dからdata/
-// troubleCharacterForms.tsの実データにも反映済み(上のtroubleCharacterFormDefs(実データ)
-// 参照)。sake→seagullKingは進行度70%以上限定でcount3=10%〜8=100%で、こちらはまだ
-// 合成データとしてのみ先行検証している(seagullKingの実データ追加はS-3e以降)。
+// 正式仕様の変身確率段階表。normal→sake(count3=20%〜7=100%)はS-3dから、
+// sake→seagullKing(進行度70%以上限定、count3=10%〜8=100%)はS-3eから、
+// data/troubleCharacterForms.tsの実データにも反映済み(上のtroubleCharacterFormDefs(実データ)
+// 参照)。decideTroubleCharacterTransform()自体は実データに依存しない純関数なので、
+// ここでは既存通り合成データとして独立に検証する(実データとの整合はtroubleCharacterFormDefs
+// (実データ)のテストが別途保証する)。
 const NORMAL_TO_SAKE_STEPS = [
   { atCount: 3, probability: 0.2 },
   { atCount: 4, probability: 0.4 },
@@ -286,15 +332,15 @@ const SAKE_TO_SEAGULL_KING_STEPS = [
   { atCount: 4, probability: 0.2 },
   { atCount: 5, probability: 0.35 },
   { atCount: 6, probability: 0.5 },
-  { atCount: 7, probability: 0.7 },
+  { atCount: 7, probability: 0.75 },
   { atCount: 8, probability: 1 },
 ];
 
 /** テスト用の合成TroubleCharacterFormDef。id/characterId/displayName自体は
  *  decideTroubleCharacterTransform()から一切参照されないため、実在するformId("normal")を
- *  流用しつつ、まだ実データに存在しない形態(sake/seagullKing)のtargetFormIdだけ
- *  `as TroubleCharacterFormId`でキャストする(isTroubleCharacterFormId()のS-3bテストと同じ
- *  「まだ存在しない将来の値を検証用にキャストする」手法)。 */
+ *  そのまま流用する(sake/seagullKingはS-3d/S-3eで実データ化済みで、targetFormIdの
+ *  `as TroubleCharacterFormId`キャストは技術的にはもう不要だが、この純関数のテストが実データに
+ *  依存しない合成データのままであることを明示する目的で残している)。 */
 function makeFormDef(overrides: Partial<TroubleCharacterFormDef> = {}): TroubleCharacterFormDef {
   return {
     id: "normal",
@@ -622,5 +668,315 @@ describe("applyTroubleCharacterMischief(): moneyNearby種別(S-3d、酒モンス
 
     expect(result.players[0].money).toBe(owner.money - 30);
     expect(result.logMessage).toContain("幸い巻き添えは出なかった");
+  });
+});
+
+describe("applyTroubleCharacterMischief(): propertyLoss種別(S-3e、カモメ魔王の物件被害)", () => {
+  const map = getMap(MAP_ID);
+  // 実データ(data/properties.ts)から動的に2件借用する(idをハードコードせず、既存テストと
+  // 同じ「都度計算する」方針に揃える)。
+  const [PROPERTY_A, PROPERTY_B] = propertyDefs.slice(0, 2).map((def) => def.id);
+
+  it("所有物件がある場合、そのうち1件がownedPropertyIdsから除去され未所有へ戻る(所持金は変化しない)", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A, PROPERTY_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    const updatedOwner = result.players[0];
+    expect(updatedOwner.ownedPropertyIds).toHaveLength(1); // 2件のうち1件だけ失う
+    expect([PROPERTY_A, PROPERTY_B]).toContain(updatedOwner.ownedPropertyIds[0]); // 残った方も既存2件のいずれか
+    expect(updatedOwner.money).toBe(owner.money); // 所持金には影響しない
+  });
+
+  // S-3e QA: Math.floor(Math.random() * length)によるindex選択を、固定random値でdeterministicに
+  // 検証する。random=0 -> floor(0*2)=index0(PROPERTY_A)、random=0.6 -> floor(1.2)=index1
+  // (PROPERTY_B)を狙い撃ちし、「狙った1件だけが消え、もう1件は残る」ことを確認する。
+  it("random=0(先頭寄り)のとき、必ず配列先頭(PROPERTY_A)が選ばれ、PROPERTY_Bは残る", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A, PROPERTY_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].ownedPropertyIds).toEqual([PROPERTY_B]);
+  });
+
+  it("random=0.6(末尾寄り)のとき、必ず配列末尾(PROPERTY_B)が選ばれ、PROPERTY_Aは残る", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.6); // floor(0.6 * 2) = 1(末尾index)
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A, PROPERTY_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].ownedPropertyIds).toEqual([PROPERTY_A]);
+  });
+
+  it("所有物件が1件だけの場合、その1件を失いownedPropertyIdsが空になる", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].ownedPropertyIds).toEqual([]);
+    expect(result.logMessage).toContain(getPropertyDef(PROPERTY_A)!.name);
+  });
+
+  it("所有物件が0件の場合、物件は失わずfallbackAmountが所持金に適用される", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX"); // ownedPropertyIds: []
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].ownedPropertyIds).toEqual([]);
+    expect(result.players[0].money).toBe(owner.money - 100);
+    expect(result.logMessage).toContain("-100万円");
+  });
+
+  it("所有者以外のプレイヤーの物件には影響しない", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A] };
+    const other = { ...createPlayer("other", "他プレイヤー", 1, "nodeY"), ownedPropertyIds: [PROPERTY_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner, other], "owner", mischief, map);
+
+    expect(result.players.find((p) => p.id === "other")!.ownedPropertyIds).toEqual([PROPERTY_B]);
+  });
+});
+
+describe("applyTroubleCharacterMischief(): cardDestroy種別(S-3e、カモメ魔王のカード大量破壊)", () => {
+  const map = getMap(MAP_ID);
+  // 実データ(data/cards.ts)から、usable種別(card_dice_again)とkey種別(card_shortcut)を
+  // それぞれ1つ実際の定義を確認した上で使う(文字列を推測しない)。
+  const USABLE_CARD_A = "card_dice_again";
+  const USABLE_CARD_B = "card_double_move";
+  const USABLE_CARD_C = "card_warp_anywhere";
+  const KEY_CARD = "card_shortcut";
+
+  it("破壊可能なカードが3枚を超える場合、ランダムに最大3枚(maxCount)だけ破壊され残りは維持される", () => {
+    const owner = {
+      ...createPlayer("owner", "所有者", 0, "nodeX"),
+      cardIds: [USABLE_CARD_A, USABLE_CARD_B, USABLE_CARD_C, USABLE_CARD_A],
+    };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].cardIds).toHaveLength(1); // 4枚のうち3枚だけ破壊される
+  });
+
+  it("破壊可能なカードがmaxCount未満の場合、持っている分だけ全て破壊される", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [USABLE_CARD_A] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].cardIds).toEqual([]);
+    expect(result.logMessage).toContain(getCardDef(USABLE_CARD_A)!.name);
+  });
+
+  it("手札が0枚の場合、実害なく安全に完了する", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX"); // cardIds: []
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].cardIds).toEqual([]);
+    expect(result.logMessage).toContain("実害は無かった");
+  });
+
+  it("excludeKeyCards: trueの場合、CardDef.kind===\"key\"のカード(裏道パス等)はrandom値に関わらず破壊対象に選ばれない(候補そのものから除外されるため)", () => {
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+    expect(getCardDef(KEY_CARD)!.kind).toBe("key"); // 前提: 実データでkey種別であることを確認
+
+    // keyカードはpickRandomDistinct()へ渡す候補配列を作る時点(excludeKeyCardsフィルタ)で
+    // 除外されるため、random値がどうであれ結果に影響しないはず、という前提を実Math.random()の
+    // 反復ではなく固定値(0/中間/1直前)でdeterministicに裏付ける。
+    for (const randomValue of [0, 0.5, 0.999999]) {
+      vi.spyOn(Math, "random").mockReturnValue(randomValue);
+      const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [KEY_CARD, USABLE_CARD_A] };
+      const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+      expect(result.players[0].cardIds).toContain(KEY_CARD); // keyカードは常に生き残る
+      expect(result.players[0].cardIds).not.toContain(USABLE_CARD_A); // usableは破壊される
+    }
+  });
+
+  it("破壊可能なカードがkeyカードのみの場合(excludeKeyCards: true)、破壊対象が無く実害なしで完了する", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [KEY_CARD] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].cardIds).toEqual([KEY_CARD]); // keyカードは維持される
+    expect(result.logMessage).toContain("実害は無かった");
+  });
+
+  it("excludeKeyCards: falseの場合、keyカードも破壊対象に含まれうる", () => {
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 1,
+      excludeKeyCards: false,
+      message: "テスト",
+    };
+
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [KEY_CARD] };
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].cardIds).toEqual([]); // 唯一のkeyカードも破壊される
+  });
+
+  // S-3e QA: TroubleCharacterMischiefDef.cardDestroy.maxCountはnumber型のため、データ側の
+  // 異常値(小数・NaN等)が混入しても、pickRandomDistinct()のfail-closed処理により
+  // 意図しない大量削除・例外が起きず「0枚破壊(実害なし)」に安全に倒れることを確認する。
+  it.each([
+    ["非整数(2.5)", 2.5],
+    ["NaN", NaN],
+  ])("maxCountが異常値(%s)の場合、例外を投げず0枚破壊(実害なし)に倒れる", (_label, badMaxCount) => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [USABLE_CARD_A, USABLE_CARD_B, USABLE_CARD_C] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: badMaxCount,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const call = () => applyTroubleCharacterMischief([owner], "owner", mischief, map);
+    expect(call).not.toThrow();
+    const result = call();
+    expect(result.players[0].cardIds).toEqual([USABLE_CARD_A, USABLE_CARD_B, USABLE_CARD_C]); // 1枚も減らない
+  });
+});
+
+// S-3e QA: pickRandomDistinct()の境界値監査。cardDestroy種別のmaxCountに異常なデータ
+// (非有限・非整数・負数等)が入っても、無限ループ・例外・意図しない大量削除が起きないことを
+// 直接検証する(applyTroubleCharacterMischief経由の間接検証だけでなく、この汎用ヘルパー自体を
+// 単体でも保証する)。
+describe("pickRandomDistinct()の境界値(S-3e QA)", () => {
+  it("items=[]なら、countがどんな値でも空配列を返す(例外・無限ループにならない)", () => {
+    expect(pickRandomDistinct([], 3)).toEqual([]);
+    expect(pickRandomDistinct([], 0)).toEqual([]);
+    expect(pickRandomDistinct([], -1)).toEqual([]);
+    expect(pickRandomDistinct([], Infinity)).toEqual([]);
+  });
+
+  it("count=0なら、items件数に関わらず空配列を返す", () => {
+    expect(pickRandomDistinct(["a", "b", "c"], 0)).toEqual([]);
+  });
+
+  it("count<0(負数)なら、fail-closedで0件選択になる", () => {
+    expect(pickRandomDistinct(["a", "b", "c"], -1)).toEqual([]);
+    expect(pickRandomDistinct(["a", "b", "c"], -100)).toEqual([]);
+  });
+
+  it("count>items.lengthなら、items.lengthへclampされ全件(順序はシャッフルされうる)を返す", () => {
+    const result = pickRandomDistinct(["a", "b", "c"], 10);
+    expect(result).toHaveLength(3);
+    expect([...result].sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("countが整数でない(小数)場合、fail-closedで0件選択になる(修正前は切り上げ相当で意図しない件数を返す不具合があった)", () => {
+    expect(pickRandomDistinct(["a", "b", "c", "d", "e"], 2.5)).toEqual([]);
+    expect(pickRandomDistinct(["a", "b", "c", "d", "e"], 2.1)).toEqual([]);
+    expect(pickRandomDistinct(["a", "b", "c", "d", "e"], 2.9)).toEqual([]);
+  });
+
+  it("countがNaNなら、fail-closedで0件選択になる", () => {
+    expect(pickRandomDistinct(["a", "b", "c"], NaN)).toEqual([]);
+  });
+
+  // Infinityは「有限な正の整数」ではない(Number.isInteger(Infinity)はfalse)ため、
+  // items.lengthへのclamp対象にはならず、fail-closedで0件選択になる(無限ループにはならない)。
+  it("countがInfinityなら、fail-closedで0件選択になる(無限ループにならない)", () => {
+    expect(pickRandomDistinct(["a", "b", "c"], Infinity)).toEqual([]);
+  });
+
+  it("countが-Infinityなら、fail-closedで0件選択になる", () => {
+    expect(pickRandomDistinct(["a", "b", "c"], -Infinity)).toEqual([]);
+  });
+
+  it("正常値(count=3、正の整数)の挙動は変更されていない: 3件の配列から重複無く3件全て選ばれる", () => {
+    const result = pickRandomDistinct(["a", "b", "c"], 3);
+    expect([...result].sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("正常値(count=2、items=5件)の挙動は変更されていない: 重複無く2件選ばれる", () => {
+    const result = pickRandomDistinct(["a", "b", "c", "d", "e"], 2);
+    expect(result).toHaveLength(2);
+    expect(new Set(result).size).toBe(2); // 重複が無い
   });
 });

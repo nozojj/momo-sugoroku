@@ -10,6 +10,8 @@ import type {
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { makeDebuffId } from "@/lib/game/engine";
 import { troubleCharacterFormDefs } from "@/data/troubleCharacterForms";
+import { getPropertyDef } from "@/data/properties";
+import { getCardDef } from "@/data/cards";
 
 /**
  * 妨害キャラ(仮称)まわりの判定・計算だけを集めた純関数ファイル。gameStore.ts本体
@@ -24,10 +26,10 @@ import { troubleCharacterFormDefs } from "@/data/troubleCharacterForms";
 export const TROUBLE_CHARACTER_SOURCE_ID = "troubleCharacter";
 export const TROUBLE_CHARACTER_SOURCE_NAME = "妨害キャラ";
 
-/** 既知の妨害キャラ形態idの一覧(S-3dで"sake"を追加)。新しい形態を追加するときは
- *  ここに1件足すだけでよく、isTroubleCharacterFormId()の呼び出し側(persistMigration.ts等)は
- *  変更不要。 */
-const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal", "sake"];
+/** 既知の妨害キャラ形態idの一覧(S-3dで"sake"、S-3eで"seagullKing"を追加)。新しい形態を
+ *  追加するときはここに1件足すだけでよく、isTroubleCharacterFormId()の呼び出し側
+ *  (persistMigration.ts等)は変更不要。 */
+const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal", "sake", "seagullKing"];
 
 /** 値が既知の妨害キャラ形態idかどうかを判定する型ガード。旧セーブ(このフィールド追加前、
  *  値がundefined)や、将来形態を削除/リネームした場合に消えたidが残っているケースを、
@@ -210,14 +212,45 @@ function findNearbyPlayerIds(map: MapData, owner: Player, players: Player[]): st
 }
 
 /**
+ * 配列から重複無くランダムにcount件選ぶ(Fisher-Yatesの部分シャッフルと同じ考え方: 毎回
+ * 残りの候補からランダムに1件抜き出し、候補から除いてから次を選ぶ。`sort(() => Math.random()
+ * - 0.5)`のような偏りのある擬似シャッフルは使わない)。countが配列長以上なら全件を
+ * (順序をシャッフルして)返す。cardDestroy種別(S-3e)の「最大N枚をランダムに壊す」で使う。
+ */
+export function pickRandomDistinct<T>(items: T[], count: number): T[] {
+  // fail-closed(S-3e QA): countが有限な正の整数でなければ0件として扱う。この正規化が無いと
+  // 例えば count=2.5 のとき「for (i=0; i<2.5; i++)」がi=0,1,2の3回走ってしまい
+  // (Math.min(2.5, pool.length)がそのままループ上限になり、整数比較の副作用で切り上げ相当の
+  // 挙動になる)、意図しない大量削除につながる。NaN/±Infinity/負数は既存のMath.min+ループ
+  // 条件だけでも安全に0件へ収束するが、非整数(小数)はこの明示的なガードが無いと収束しない
+  // ため、正規化を先に行う。items.lengthを超える値はMath.minでitems.lengthへclampする
+  // (この部分は元から安全に動作していたため挙動を変えない)。
+  const safeCount = Number.isInteger(count) && count > 0 ? count : 0;
+  const pool = [...items];
+  const picked: T[] = [];
+  const take = Math.min(safeCount, pool.length);
+  for (let i = 0; i < take; i++) {
+    const index = Math.floor(Math.random() * pool.length);
+    picked.push(pool[index]);
+    pool.splice(index, 1);
+  }
+  return picked;
+}
+
+/**
  * 抽選済みの悪さ(mischief)を所有者(ownerId)へ適用する。money種別は既存のmoney加減算と
  * 同じ形でその場でplayer.moneyを増減し、debuff種別は既存のActiveDebuff/DebuffKindの形で
  * そのまま所有者自身へ付与する(新しいDebuffKindは増やさない)。moneyNearby種別(S-3d)は
  * 所有者本人へownerAmount、findNearbyPlayerIds()で求めた巻き込み対象へ1人ずつnearbyAmountを
- * 同時に適用する。所持金がマイナスになることは既存ルール(moneyRoulette等)と同様に許容する
- * (フロア処理はしない)。
+ * 同時に適用する。propertyLoss種別(S-3e)は所有物件からランダムに1件選びownedPropertyIdsから
+ * 除去する(未所有へ戻すだけで、他プレイヤーへは移らない)。所有物件が無い場合のみ
+ * fallbackAmountをmoneyと同じ形で適用する。cardDestroy種別(S-3e)は所持カードのうち
+ * excludeKeyCardsがtrueならCardDef.kind==="key"のカード(裏道パス等)を除いた候補から、
+ * pickRandomDistinct()でmaxCount枚(所持数がそれ未満なら持っている分だけ)をランダムに選び
+ * cardIdsから除去する。所持金がマイナスになることは既存ルール(moneyRoulette等)と同様に
+ * 許容する(フロア処理はしない)。
  *
- * mapはmoneyNearby種別の巻き込み対象を求めるためだけに使う(money/debuff種別では未使用)。
+ * mapはmoneyNearby種別の巻き込み対象を求めるためだけに使う(他の種別では未使用)。
  * 呼び出し側を単純に保つため、常に必須の引数にしている(既存のCpuPreRollContext等、
  * 一部の分岐でしか使わないフィールドも含めて丸ごと渡す既存パターンと同じ考え方)。
  */
@@ -253,6 +286,51 @@ export function applyTroubleCharacterMischief(
     return {
       players: updated,
       logMessage: `${ownerName}さん: ${mischief.message}(${mischief.ownerAmount}万円、${nearbyPart})`,
+    };
+  }
+
+  if (mischief.kind === "propertyLoss") {
+    const ownedPropertyIds = owner?.ownedPropertyIds ?? [];
+    if (ownedPropertyIds.length === 0) {
+      const updated = players.map((p) => (p.id === ownerId ? { ...p, money: p.money + mischief.fallbackAmount } : p));
+      return {
+        players: updated,
+        logMessage: `${ownerName}さん: ${mischief.message}(所有物件が無かったため${mischief.fallbackAmount}万円の被害に切り替わった)`,
+      };
+    }
+    const lostPropertyId = ownedPropertyIds[Math.floor(Math.random() * ownedPropertyIds.length)];
+    const propertyName = getPropertyDef(lostPropertyId)?.name ?? lostPropertyId;
+    const updated = players.map((p) =>
+      p.id === ownerId ? { ...p, ownedPropertyIds: p.ownedPropertyIds.filter((id) => id !== lostPropertyId) } : p,
+    );
+    return {
+      players: updated,
+      logMessage: `${ownerName}さん: ${mischief.message}(${propertyName}が未所有に戻った)`,
+    };
+  }
+
+  if (mischief.kind === "cardDestroy") {
+    const ownedCardIds = owner?.cardIds ?? [];
+    // resolveCardOverflow()と同じ「id文字列ではなくindexで特定する」考え方。同名カードを
+    // 複数所持している場合でも、選ばれたスロットだけを正しく破壊できるようにするため。
+    const destroyableSlots = ownedCardIds
+      .map((cardId, index) => ({ cardId, index }))
+      .filter(({ cardId }) => !mischief.excludeKeyCards || getCardDef(cardId)?.kind !== "key");
+
+    if (destroyableSlots.length === 0) {
+      return { players, logMessage: `${ownerName}さん: ${mischief.message}(壊せるカードが無く実害は無かった)` };
+    }
+
+    const destroyedSlots = pickRandomDistinct(destroyableSlots, mischief.maxCount);
+    const destroyedIndexSet = new Set(destroyedSlots.map((s) => s.index));
+    const destroyedNames = destroyedSlots.map((s) => getCardDef(s.cardId)?.name ?? s.cardId);
+
+    const updated = players.map((p) =>
+      p.id === ownerId ? { ...p, cardIds: p.cardIds.filter((_, i) => !destroyedIndexSet.has(i)) } : p,
+    );
+    return {
+      players: updated,
+      logMessage: `${ownerName}さん: ${mischief.message}(${destroyedNames.join("・")}を失った)`,
     };
   }
 

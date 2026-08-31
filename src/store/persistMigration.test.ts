@@ -155,6 +155,23 @@ describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a
     expect(merged.troubleCharacterFormId).toBe("sake");
   });
 
+  // S-3e: "seagullKing"(最終形態)も正式な形態idになったので、旧セーブ由来のfallback対象では
+  // なくそのまま正しく復元される値であることを確認する。
+  it("owner登場済み・形態id\"seagullKing\"を持つセーブもそのまま復元される", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "seagullKing",
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterFormId).toBe("seagullKing");
+  });
+
   it("owner登場済みだが未知の形態id(将来削除/リネームされたid)は\"normal\"へフォールバックする", () => {
     const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
     const persisted = {
