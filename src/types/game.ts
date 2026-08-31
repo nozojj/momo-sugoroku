@@ -232,6 +232,32 @@ export type TroubleCharacterAnnounceInfo =
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
   | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string };
 
+/** 妨害キャラの形態(フォーム)id。S-3a時点では"normal"(通常形態)のみ存在する仮の1形態構成。
+ *  将来「酒モンスター」「カモメ魔王」等を追加するときはここに1件足すだけでよい(既存の
+ *  WarpScope/DebuffKind等と同じ「literal unionを拡張するだけ」の拡張パターン)。 */
+export type TroubleCharacterFormId = "normal";
+
+/** 妨害キャラの形態(フォーム)の定義(静的データ)。S-3aでは型と土台だけを用意し、複数形態の
+ *  実データ(酒モンスター/カモメ魔王等)・変化抽選ロジックはまだ実装しない。演出面
+ *  (CharacterSpriteのexpression/CharacterAnnouncerのテーマ等)はアダプター側(各Modal)の
+ *  責務のままここには含めない(types/characterAnnouncer.tsとの依存を持たせず、
+ *  GameState側の型は演出の都合から独立させる既存方針を維持する)。 */
+export interface TroubleCharacterFormDef {
+  id: TroubleCharacterFormId;
+  /** 表示名。正式名称が決まるまでの仮名で構わない。 */
+  displayName: string;
+  /** CharacterSprite解決用のcharacterId(CHARACTER_ASSET_URLSのキーとして使う想定)。 */
+  characterId: string;
+  /** 形態変化抽選に使う重み(yearEventDefsと同じ「合計100」慣習を想定)。S-3aでは形態が
+   *  1つしかないため抽選ロジック自体はまだ存在しない(この値もまだどこからも参照されない)。 */
+  weight: number;
+  /** この形態が変化抽選の対象に入るための最低ターン数。省略時は制限なし。 */
+  minTurn?: number;
+  /** この形態専用の「悪さ」プール。既存のtroubleCharacterMischiefDefs(単一プール)は
+   *  次段階で各形態のプールへ再編する想定で、この型はそれを見越した受け皿。 */
+  mischiefPool: TroubleCharacterMischiefDef[];
+}
+
 /** カードの定義(静的データ)。 */
 export type CardEffectType = "diceAgain" | "doubleMove";
 
@@ -615,6 +641,13 @@ export interface GameState {
    *  目的地へ到着したタイミングで初めて割り当てられる。Player側にはフラグを持たせず、
    *  この単一IDだけで所有状態を管理する(destinationNodeIdと同じ設計)。 */
   troubleCharacterOwnerId: string | null;
+  /** 妨害キャラの現在の形態(フォーム)id(S-3a)。troubleCharacterOwnerIdと表裏一体の値で、
+   *  「未登場(owner===null)」と「登場済み・特定の形態」を状態として曖昧にしないため、
+   *  troubleCharacterOwnerId===nullのときは必ずnull、owner!==nullのときは必ず非nullになる
+   *  (owner・form単独では成立しない、常にセットで整合させる不変条件)。この不変条件は
+   *  gameStore.ts(初回登場時に両方を同じset()で書き込む)とpersistMigration.ts
+   *  (owner解決後にform側もそれに合わせて解決する)の両方で維持する。 */
+  troubleCharacterFormId: TroubleCharacterFormId | null;
   /** 妨害キャラの登場/所有者交代/悪さ発生を知らせる通知。monopolyAchievement/
    *  yearEventAnnounceInfoと同様、statusとは独立した一時通知(GameStatusは増やさない)。
    *  表示し終えたらdismissTroubleCharacterAnnounce()でnullに戻る。 */

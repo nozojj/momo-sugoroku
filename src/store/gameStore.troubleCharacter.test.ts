@@ -41,6 +41,12 @@ describe("ゲーム開始時", () => {
   it("owner=null(未登場)である", () => {
     expect(useGameStore.getState().troubleCharacterOwnerId).toBeNull();
   });
+
+  // S-3a: 未登場の間は形態(troubleCharacterFormId)もownerと表裏一体でnullになる
+  // (owner=null・form=非nullという中間状態を許さない不変条件、types/game.ts参照)。
+  it("形態(troubleCharacterFormId)もnull(未登場)である", () => {
+    expect(useGameStore.getState().troubleCharacterFormId).toBeNull();
+  });
 });
 
 describe("初回所有者決定", () => {
@@ -61,6 +67,9 @@ describe("初回所有者決定", () => {
     const after = useGameStore.getState();
     expect(after.status).toBe("destinationArrived");
     expect(after.troubleCharacterOwnerId).not.toBeNull();
+    // S-3a: 初登場は必ず通常形態("normal")から始まる。ownerId確定と同じset()で
+    // 一緒に書き込まれるため、owner有り・form無しの中間状態は発生しない。
+    expect(after.troubleCharacterFormId).toBe("normal");
     expect(after.troubleCharacterAnnounceInfo).toEqual({
       kind: "appeared",
       ownerId: after.troubleCharacterOwnerId,
@@ -89,6 +98,7 @@ describe("初回所有者決定", () => {
       destinationNodeId: DESTINATION,
       status: "rolling",
       troubleCharacterOwnerId: "p2", // 既に所有者が決まっている状態を模擬
+      troubleCharacterFormId: "normal",
       troubleCharacterAnnounceInfo: null,
     }));
 
@@ -99,6 +109,7 @@ describe("初回所有者決定", () => {
     const after = useGameStore.getState();
     expect(after.status).toBe("destinationArrived");
     expect(after.troubleCharacterOwnerId).toBe("p2"); // 変わらない
+    expect(after.troubleCharacterFormId).toBe("normal"); // 形態も上書きされない(S-3a)
     expect(after.troubleCharacterAnnounceInfo).toBeNull(); // 新規登場通知も出ない
   });
 });

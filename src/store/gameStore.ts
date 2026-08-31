@@ -66,6 +66,7 @@ const IDLE_STATE: GameState = {
   currentYearEventId: "",
   yearEventAnnounceInfo: null,
   troubleCharacterOwnerId: null,
+  troubleCharacterFormId: null,
   troubleCharacterAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
@@ -178,6 +179,9 @@ export const useGameStore = create<GameStore>()(
                 const owner = result.players.find((p) => p.id === ownerId)!;
                 return {
                   troubleCharacterOwnerId: ownerId,
+                  // 初登場は必ず通常形態から(S-3a)。ownerId確定と同じset()にまとめることで
+                  // 「owner有り・form無し」という中間状態を1フレームも作らない。
+                  troubleCharacterFormId: "normal" as const,
                   troubleCharacterAnnounceInfo: {
                     kind: "appeared" as const,
                     ownerId,

@@ -2,6 +2,7 @@ import type { GameState } from "@/types/game";
 import type { GameStore } from "@/store/gameStore";
 import { maps } from "@/data/maps";
 import { getYearEventDef } from "@/lib/game/yearEvent";
+import { isTroubleCharacterFormId } from "@/lib/game/troubleCharacter";
 
 /**
  * persist(zustand)のmerge処理。gameStore.ts本体(ゲーム進行ロジック)から切り出した、
@@ -82,6 +83,30 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     (!state.targetSelectInfo || state.targetSelectInfo.options.length === 0);
   const targetSelectOverride = hasStaleTargetSelectInfo ? { status: "rolling" as const, targetSelectInfo: null } : {};
 
+  // 妨害キャラ(仮称)の所有者IDが、実在するプレイヤーIDを指しているかを検証する。旧セーブ
+  // (このフィールド追加前、キー自体が無い)・不正なID(プレイヤー人数が変わった等)のどちらも
+  // null(未登場)へ安全にフォールバックする。currentYearEventIdと同じ「値そのものを検証して
+  // フォールバックする」方針で、destOk/playersOk(検証失敗でセーブ全体を破棄する)とは異なる。
+  //
+  // 先にこの変数として確定させておき、直後の形態(troubleCharacterFormId)の解決にもそのまま使う:
+  // 「未登場(owner=null)なのに形態だけ残っている」「登場済みなのに形態が無い」という中間状態を
+  // 作らないため、owner・formは必ずこの確定結果を基準にセットで決める(S-3a、types/game.tsの
+  // GameState.troubleCharacterFormIdのコメント参照)。
+  const resolvedTroubleCharacterOwnerId =
+    state.troubleCharacterOwnerId && state.players?.some((p) => p.id === state.troubleCharacterOwnerId)
+      ? state.troubleCharacterOwnerId
+      : null;
+  // 形態(S-3a)。owner未登場ならnull固定。owner登場済みなら、持ち越された値が既知の形態idで
+  // あればそれをそのまま使い、そうでなければ(旧セーブ=このフィールド追加前でキー自体が無い、
+  // または将来形態を削除/リネームした場合の消えたid)"normal"へフォールバックする
+  // ("未登場"扱いにはしない: ownerが実在する以上、必ず何らかの形態を持たせる)。
+  const resolvedTroubleCharacterFormId: GameState["troubleCharacterFormId"] =
+    resolvedTroubleCharacterOwnerId === null
+      ? null
+      : isTroubleCharacterFormId(state.troubleCharacterFormId)
+        ? state.troubleCharacterFormId
+        : "normal";
+
   return {
     ...currentState,
     ...state,
@@ -104,14 +129,8 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // 依存しない一時通知なので演出が再度出るだけで操作不能にはならない(cardWarpInfo等と違い
     // stale-status防御は不要)。念のためundefined(旧セーブにキー自体が無い場合)だけ吸収する。
     yearEventAnnounceInfo: state.yearEventAnnounceInfo ?? currentState.yearEventAnnounceInfo,
-    // 妨害キャラ(仮称)の所有者IDが、実在するプレイヤーIDを指しているかを検証する。旧セーブ
-    // (このフィールド追加前、キー自体が無い)・不正なID(プレイヤー人数が変わった等)のどちらも
-    // null(未登場)へ安全にフォールバックする。currentYearEventIdと同じ「値そのものを検証して
-    // フォールバックする」方針で、destOk/playersOk(検証失敗でセーブ全体を破棄する)とは異なる。
-    troubleCharacterOwnerId:
-      state.troubleCharacterOwnerId && state.players?.some((p) => p.id === state.troubleCharacterOwnerId)
-        ? state.troubleCharacterOwnerId
-        : null,
+    troubleCharacterOwnerId: resolvedTroubleCharacterOwnerId,
+    troubleCharacterFormId: resolvedTroubleCharacterFormId,
     // troubleCharacterAnnounceInfoはstatusとは独立した一時通知(yearEventAnnounceInfoと同じ設計)
     // なので、destinationArrived等のようなstatus連動のstale-guardは不要。欠落していても
     // 単に通知が出ないだけで操作不能にはならない。

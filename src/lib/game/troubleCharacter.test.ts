@@ -7,6 +7,7 @@ import {
   checkTroubleCharacterHandoff,
   drawTroubleCharacterMischief,
   applyTroubleCharacterMischief,
+  isTroubleCharacterFormId,
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
 } from "@/lib/game/troubleCharacter";
@@ -156,6 +157,20 @@ describe("drawTroubleCharacterMischief()", () => {
     const { troubleCharacterMischiefDefs } = await import("@/data/troubleCharacterMischief");
     const picked = drawTroubleCharacterMischief(troubleCharacterMischiefDefs);
     expect(troubleCharacterMischiefDefs.map((m) => m.id)).toContain(picked.id);
+  });
+});
+
+describe("isTroubleCharacterFormId()(S-3a)", () => {
+  it("既知の形態id(\"normal\")はtrueを返す", () => {
+    expect(isTroubleCharacterFormId("normal")).toBe(true);
+  });
+
+  it("未知の文字列・null・undefined・数値等はfalseを返す(旧セーブ/消えたidの安全な判定)", () => {
+    expect(isTroubleCharacterFormId("sake")).toBe(false); // まだ存在しない将来の形態id
+    expect(isTroubleCharacterFormId("no_such_form")).toBe(false);
+    expect(isTroubleCharacterFormId(null)).toBe(false);
+    expect(isTroubleCharacterFormId(undefined)).toBe(false);
+    expect(isTroubleCharacterFormId(123)).toBe(false);
   });
 });
 

@@ -122,6 +122,81 @@ describe("mergeGameState(): troubleCharacterOwnerId のフォールバック", (
   });
 });
 
+describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a)", () => {
+  it("owner登場済み・既知の形態idを持つセーブはそのまま復元される", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "normal",
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterFormId).toBe("normal");
+  });
+
+  it("owner登場済みだが未知の形態id(将来削除/リネームされたid)は\"normal\"へフォールバックする", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "no_such_form_id",
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterFormId).toBe("normal");
+  });
+
+  it("旧セーブ(troubleCharacterFormId追加前、キー自体が無い)でも、owner登場済みなら\"normal\"へ安全に復元される", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      // troubleCharacterFormId キー自体を持たない旧セーブを模擬(意図的に省略)
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterFormId).toBe("normal");
+  });
+
+  it("owner未登場(null)なら、形態にどんな値が残っていても強制的にnullへ揃える(owner/formの不整合を許さない)", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p999_no_such_player", // ownerはnullへフォールバックする不正値
+      troubleCharacterFormId: "normal",
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBeNull();
+    expect(merged.troubleCharacterFormId).toBeNull();
+  });
+
+  it("旧セーブ(owner/formどちらのキーも無い)は、双方ともnull(未登場)のまま復元される", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBeNull();
+    expect(merged.troubleCharacterFormId).toBeNull();
+  });
+});
+
 describe("mergeGameState(): troubleCharacterAnnounceInfo のフォールバック(非ブロッキング通知)", () => {
   it("通知表示中(非null)のまま保存されたセーブは、そのまま復元される(statusには依存しない一時通知のため)", () => {
     const currentState = { ...useGameStore.getState(), troubleCharacterAnnounceInfo: null };

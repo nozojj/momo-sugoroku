@@ -1,4 +1,4 @@
-import type { ActiveDebuff, MapData, Player, TroubleCharacterMischiefDef } from "@/types/game";
+import type { ActiveDebuff, MapData, Player, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { makeDebuffId } from "@/lib/game/engine";
 
@@ -14,6 +14,18 @@ import { makeDebuffId } from "@/lib/game/engine";
  *  実在プレイヤーIDと衝突しない固定文字列(既存プレイヤーIDは常に"p1"/"p2"...の形)。 */
 export const TROUBLE_CHARACTER_SOURCE_ID = "troubleCharacter";
 export const TROUBLE_CHARACTER_SOURCE_NAME = "妨害キャラ";
+
+/** 既知の妨害キャラ形態idの一覧(S-3a時点では"normal"のみ)。新しい形態を追加するときは
+ *  ここに1件足すだけでよく、isTroubleCharacterFormId()の呼び出し側(persistMigration.ts等)は
+ *  変更不要。 */
+const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal"];
+
+/** 値が既知の妨害キャラ形態idかどうかを判定する型ガード。旧セーブ(このフィールド追加前、
+ *  値がundefined)や、将来形態を削除/リネームした場合に消えたidが残っているケースを、
+ *  呼び出し側(persistMigration.ts)が安全にfalse判定してフォールバックできるようにする。 */
+export function isTroubleCharacterFormId(value: unknown): value is TroubleCharacterFormId {
+  return typeof value === "string" && (TROUBLE_CHARACTER_FORM_IDS as string[]).includes(value);
+}
 
 /**
  * ゲーム最初の目的地到着時、新しく決定された次の目的地(destinationNodeId)から最も遠い
