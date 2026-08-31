@@ -12,8 +12,10 @@ import {
   decideTroubleCharacterTransform,
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
+  TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
+import { troubleCharacterMischiefSakeDefs } from "@/data/troubleCharacterMischiefSake";
 import type { TroubleCharacterFormDef, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
 
 const MAP_ID = "shonan-full";
@@ -163,13 +165,18 @@ describe("drawTroubleCharacterMischief()", () => {
   });
 });
 
-describe("isTroubleCharacterFormId()(S-3a)", () => {
+describe("isTroubleCharacterFormId()(S-3a/S-3d)", () => {
   it("既知の形態id(\"normal\")はtrueを返す", () => {
     expect(isTroubleCharacterFormId("normal")).toBe(true);
   });
 
+  // S-3d: "sake"を正式な形態idとして追加した。
+  it("既知の形態id(\"sake\")もtrueを返す", () => {
+    expect(isTroubleCharacterFormId("sake")).toBe(true);
+  });
+
   it("未知の文字列・null・undefined・数値等はfalseを返す(旧セーブ/消えたidの安全な判定)", () => {
-    expect(isTroubleCharacterFormId("sake")).toBe(false); // まだ存在しない将来の形態id
+    expect(isTroubleCharacterFormId("seagullKing")).toBe(false); // まだ存在しない将来の形態id(S-3e予定)
     expect(isTroubleCharacterFormId("no_such_form")).toBe(false);
     expect(isTroubleCharacterFormId(null)).toBe(false);
     expect(isTroubleCharacterFormId(undefined)).toBe(false);
@@ -228,9 +235,45 @@ describe("getTroubleCharacterFormDef()(S-3b)", () => {
   });
 });
 
-// S-3c正式仕様の初期テスト値(ユーザー承認済み・まだ実データ(troubleCharacterForms.ts)には
-// 反映していない設計基準)。normal→sakeはcount3=20%〜7=100%、sake→seagullKingは進行度70%以上
-// 限定でcount3=10%〜8=100%(いずれもatCount昇順・確率のみが上昇する段階表)。
+describe("troubleCharacterFormDefs(実データ)(S-3d)", () => {
+  it("normalの正式transform設定がcount3=20%〜7=100%・targetFormId=\"sake\"・minProgressRatio無しになっている", () => {
+    const normal = getTroubleCharacterFormDef("normal")!;
+    expect(normal.transform).toEqual({
+      targetFormId: "sake",
+      probabilitySteps: [
+        { atCount: 3, probability: 0.2 },
+        { atCount: 4, probability: 0.4 },
+        { atCount: 5, probability: 0.6 },
+        { atCount: 6, probability: 0.8 },
+        { atCount: 7, probability: 1 },
+      ],
+    });
+  });
+
+  it("sakeが正式に登録されており、mischiefPoolのweight合計が既存慣習通り100、まだ次の進化先(transform)を持たない", () => {
+    const sake = getTroubleCharacterFormDef("sake")!;
+    expect(sake.id).toBe("sake");
+    expect(sake.displayName).toBe("酒モンスター");
+    expect(sake.mischiefPool.reduce((sum, m) => sum + m.weight, 0)).toBe(100);
+    // カモメ魔王(seagullKing)の実データはS-3d時点ではまだ無いため、sakeは進化の終点として振る舞う。
+    expect(sake.transform).toBeUndefined();
+  });
+
+  it("sakeのmischiefPoolに、周囲巻き込み(kind: \"moneyNearby\")が1件以上含まれる", () => {
+    const sake = getTroubleCharacterFormDef("sake")!;
+    expect(sake.mischiefPool.some((m) => m.kind === "moneyNearby")).toBe(true);
+  });
+
+  it("sakeのmischiefPoolはtroubleCharacterMischiefSakeDefsと同一の配列参照である(複製していない)", () => {
+    const sake = getTroubleCharacterFormDef("sake")!;
+    expect(sake.mischiefPool).toBe(troubleCharacterMischiefSakeDefs);
+  });
+});
+
+// S-3c正式仕様の初期テスト値。normal→sakeはcount3=20%〜7=100%で、S-3dからdata/
+// troubleCharacterForms.tsの実データにも反映済み(上のtroubleCharacterFormDefs(実データ)
+// 参照)。sake→seagullKingは進行度70%以上限定でcount3=10%〜8=100%で、こちらはまだ
+// 合成データとしてのみ先行検証している(seagullKingの実データ追加はS-3e以降)。
 const NORMAL_TO_SAKE_STEPS = [
   { atCount: 3, probability: 0.2 },
   { atCount: 4, probability: 0.4 },
@@ -465,7 +508,9 @@ describe("applyTroubleCharacterMischief()", () => {
     const other = createPlayer("other", "他プレイヤー", 1, "nodeY");
     const mischief: TroubleCharacterMischiefDef = { id: "m", kind: "money", weight: 1, amount: -50, message: "テスト" };
 
-    const result = applyTroubleCharacterMischief([owner, other], "owner", mischief);
+    // money種別はmap引数を一切参照しないため、実マップをそのまま渡せば十分(nodeX/nodeYは
+    // 実マップ上のノードではないが、findNearbyPlayerIds()はmoneyNearby種別でしか呼ばれない)。
+    const result = applyTroubleCharacterMischief([owner, other], "owner", mischief, getMap(MAP_ID));
 
     const updatedOwner = result.players.find((p) => p.id === "owner")!;
     const updatedOther = result.players.find((p) => p.id === "other")!;
@@ -478,7 +523,7 @@ describe("applyTroubleCharacterMischief()", () => {
     const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), money: 10 };
     const mischief: TroubleCharacterMischiefDef = { id: "m", kind: "money", weight: 1, amount: -50, message: "テスト" };
 
-    const result = applyTroubleCharacterMischief([owner], "owner", mischief);
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, getMap(MAP_ID));
 
     expect(result.players[0].money).toBe(-40);
   });
@@ -493,7 +538,7 @@ describe("applyTroubleCharacterMischief()", () => {
       message: "テスト",
     };
 
-    const result = applyTroubleCharacterMischief([owner], "owner", mischief);
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, getMap(MAP_ID));
 
     const updatedOwner = result.players.find((p) => p.id === "owner")!;
     expect(updatedOwner.activeDebuffs).toHaveLength(1);
@@ -503,5 +548,79 @@ describe("applyTroubleCharacterMischief()", () => {
       sourceCardName: TROUBLE_CHARACTER_SOURCE_NAME,
     });
     expect(typeof updatedOwner.activeDebuffs[0].id).toBe("string");
+  });
+});
+
+describe("applyTroubleCharacterMischief(): moneyNearby種別(S-3d、酒モンスターの周囲巻き込み)", () => {
+  const map = getMap(MAP_ID);
+  const OWNER_NODE = "wp_komachi2";
+  // 実マップ上、OWNER_NODEから直結(道路グラフ上1 edge)のノードを動的に取得する
+  // (座標や特定ノードIDをハードコードせず、既存テストと同じ「都度計算する」方針に揃える)。
+  const NEARBY_NODE = map.nodes.find((n) => n.id === OWNER_NODE)!.connections[0].to;
+  // gameStore.troubleCharacter.test.tsで検証済み: wp_komachi2からhub_kamakuraまでは3マス
+  // (TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE=1を明確に超える「範囲外」の例として使う)。
+  const FAR_NODE = "hub_kamakura";
+
+  it("TROUBLE_CHARACTER_NEARBY_MAX_DISTANCEは1(同じマス/隣接1マスまでが対象)である", () => {
+    expect(TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE).toBe(1);
+  });
+
+  it("所有者からグラフ距離1以内(隣接1マス)のプレイヤーはnearbyAmountの影響を受け、範囲外(距離3)のプレイヤーは影響を受けない", () => {
+    const owner = createPlayer("owner", "所有者", 0, OWNER_NODE);
+    const nearby = createPlayer("nearby", "近くの人", 1, NEARBY_NODE);
+    const far = createPlayer("far", "遠くの人", 2, FAR_NODE);
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "moneyNearby",
+      weight: 1,
+      ownerAmount: -30,
+      nearbyAmount: -10,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner, nearby, far], "owner", mischief, map);
+
+    const updatedOwner = result.players.find((p) => p.id === "owner")!;
+    const updatedNearby = result.players.find((p) => p.id === "nearby")!;
+    const updatedFar = result.players.find((p) => p.id === "far")!;
+    expect(updatedOwner.money).toBe(owner.money - 30);
+    expect(updatedNearby.money).toBe(nearby.money - 10);
+    expect(updatedFar.money).toBe(far.money); // 範囲外は影響を受けない
+    expect(result.logMessage).toContain("近くの人");
+    expect(result.logMessage).not.toContain("遠くの人");
+  });
+
+  it("所有者と同じマス(距離0)にいるプレイヤーも巻き込み対象になる", () => {
+    const owner = createPlayer("owner", "所有者", 0, OWNER_NODE);
+    const sameSpot = createPlayer("sameSpot", "同じマスの人", 1, OWNER_NODE);
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "moneyNearby",
+      weight: 1,
+      ownerAmount: -30,
+      nearbyAmount: -10,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner, sameSpot], "owner", mischief, map);
+
+    expect(result.players.find((p) => p.id === "sameSpot")!.money).toBe(sameSpot.money - 10);
+  });
+
+  it("巻き添えが0人でも所有者への効果は適用され、例外にならない", () => {
+    const owner = createPlayer("owner", "所有者", 0, OWNER_NODE);
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "moneyNearby",
+      weight: 1,
+      ownerAmount: -30,
+      nearbyAmount: -10,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.players[0].money).toBe(owner.money - 30);
+    expect(result.logMessage).toContain("幸い巻き添えは出なかった");
   });
 });

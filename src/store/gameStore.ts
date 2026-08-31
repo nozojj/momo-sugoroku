@@ -377,10 +377,10 @@ export const useGameStore = create<GameStore>()(
               const currentFormDef = getTroubleCharacterFormDef(currentFormId);
               const currentCount = state.troubleCharacterPossessionCount ?? 0;
 
-              // 変身ルール(formDef.transform)が無い形態(S-3c時点ではnormalがこれに該当。
-              // sake/seagullKingの実データはまだ無いため必ずここに来る)ではMath.random()自体を
-              // 消費しない: 既存テストがMath.random()をモックして悪さの抽選結果を検証している
-              // ため、不要な乱数消費で既存テストに影響を与えないようにする。
+              // 変身ルール(formDef.transform)が無い形態(S-3d時点ではsakeがこれに該当。
+              // カモメ魔王[seagullKing]の実データはまだ無いため、sakeの手番では必ずここに来る)
+              // ではMath.random()自体を消費しない: 既存テストがMath.random()をモックして悪さの
+              // 抽選結果を検証しているため、不要な乱数消費で既存テストに影響を与えないようにする。
               const decision = currentFormDef?.transform
                 ? decideTroubleCharacterTransform({
                     formDef: currentFormDef,
@@ -398,7 +398,11 @@ export const useGameStore = create<GameStore>()(
               const baseCount = decision.transformed ? 0 : currentCount;
 
               const mischief = drawTroubleCharacterMischief(nextFormDef?.mischiefPool ?? troubleCharacterMischiefDefs);
-              const application = applyTroubleCharacterMischief(players, candidate.id, mischief);
+              // mapはmoneyNearby種別(S-3d、酒モンスターの「周囲巻き込み」)の対象範囲計算にのみ
+              // 使われる(money/debuff種別では未使用)。checkDestinationArrival()等の既存箇所と
+              // 同じ「必要になった箇所でgetMap(state.mapId)を呼ぶ」パターンをそのまま踏襲する。
+              const map = getMap(state.mapId);
+              const application = applyTroubleCharacterMischief(players, candidate.id, mischief, map);
               players = application.players;
               log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
               troubleCharacterEventUpdate = {

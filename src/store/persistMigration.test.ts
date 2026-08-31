@@ -122,7 +122,7 @@ describe("mergeGameState(): troubleCharacterOwnerId のフォールバック", (
   });
 });
 
-describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a)", () => {
+describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a/S-3d)", () => {
   it("owner登場済み・既知の形態idを持つセーブはそのまま復元される", () => {
     const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
     const persisted = {
@@ -136,6 +136,23 @@ describe("mergeGameState(): troubleCharacterFormId のフォールバック(S-3a
 
     expect(merged.troubleCharacterOwnerId).toBe("p1");
     expect(merged.troubleCharacterFormId).toBe("normal");
+  });
+
+  // S-3d: "sake"が正式な形態idになったので、旧セーブ由来のfallback対象ではなく
+  // そのまま正しく復元される値であることを確認する。
+  it("owner登場済み・形態id\"sake\"を持つセーブもそのまま復元される", () => {
+    const currentState = { ...useGameStore.getState(), troubleCharacterOwnerId: null, troubleCharacterFormId: null };
+    const persisted = {
+      mapId: defaultMapId,
+      players: [{ id: "p1", currentNodeId: currentState.players[0]?.currentNodeId ?? "hub_fujisawa", moveHistory: [] }],
+      troubleCharacterOwnerId: "p1",
+      troubleCharacterFormId: "sake",
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterOwnerId).toBe("p1");
+    expect(merged.troubleCharacterFormId).toBe("sake");
   });
 
   it("owner登場済みだが未知の形態id(将来削除/リネームされたid)は\"normal\"へフォールバックする", () => {

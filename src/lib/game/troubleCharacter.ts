@@ -24,10 +24,10 @@ import { troubleCharacterFormDefs } from "@/data/troubleCharacterForms";
 export const TROUBLE_CHARACTER_SOURCE_ID = "troubleCharacter";
 export const TROUBLE_CHARACTER_SOURCE_NAME = "妨害キャラ";
 
-/** 既知の妨害キャラ形態idの一覧(S-3a時点では"normal"のみ)。新しい形態を追加するときは
+/** 既知の妨害キャラ形態idの一覧(S-3dで"sake"を追加)。新しい形態を追加するときは
  *  ここに1件足すだけでよく、isTroubleCharacterFormId()の呼び出し側(persistMigration.ts等)は
  *  変更不要。 */
-const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal"];
+const TROUBLE_CHARACTER_FORM_IDS: TroubleCharacterFormId[] = ["normal", "sake"];
 
 /** 値が既知の妨害キャラ形態idかどうかを判定する型ガード。旧セーブ(このフィールド追加前、
  *  値がundefined)や、将来形態を削除/リネームした場合に消えたidが残っているケースを、
@@ -186,16 +186,46 @@ export interface TroubleCharacterMischiefApplication {
   logMessage: string;
 }
 
+/** 「周囲巻き込み」mischief(kind: "moneyNearby")が対象とみなす、所有者からのグラフ距離
+ *  (edge数)の上限(S-3d)。mapGraph.tsのshortestDistance()はshortestPath()がBFSで求めた
+ *  ノード列の長さ-1を返すため、返り値は正確に最短経路のedge数と一致する(座標上の距離や
+ *  ワープカードのNEARBY_WARP_RADIUS[coordinate半径]とは別の指標)。0=所有者と同じマス、
+ *  1=隣接1マスまでを対象とする。 */
+export const TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE = 1;
+
+/**
+ * 所有者からTROUBLE_CHARACTER_NEARBY_MAX_DISTANCE以内(所有者自身は除く)にいるプレイヤーの
+ * idを求める。距離は所有者のcardIds基準で計算する(所有者の立ち位置から見た到達可能性。
+ * ぶっとびカードのnearbyスコープ判定等と同じ「起点側のcardIdsで測る」考え方)。距離が
+ * 計算できない(到達不能、null)プレイヤーは対象に含めない。
+ */
+function findNearbyPlayerIds(map: MapData, owner: Player, players: Player[]): string[] {
+  return players
+    .filter((p) => p.id !== owner.id)
+    .filter((p) => {
+      const distance = shortestDistance(map, owner.currentNodeId, p.currentNodeId, owner.cardIds);
+      return distance !== null && distance <= TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE;
+    })
+    .map((p) => p.id);
+}
+
 /**
  * 抽選済みの悪さ(mischief)を所有者(ownerId)へ適用する。money種別は既存のmoney加減算と
  * 同じ形でその場でplayer.moneyを増減し、debuff種別は既存のActiveDebuff/DebuffKindの形で
- * そのまま所有者自身へ付与する(新しいDebuffKindは増やさない)。所持金がマイナスになることは
- * 既存ルール(moneyRoulette等)と同様に許容する(フロア処理はしない)。
+ * そのまま所有者自身へ付与する(新しいDebuffKindは増やさない)。moneyNearby種別(S-3d)は
+ * 所有者本人へownerAmount、findNearbyPlayerIds()で求めた巻き込み対象へ1人ずつnearbyAmountを
+ * 同時に適用する。所持金がマイナスになることは既存ルール(moneyRoulette等)と同様に許容する
+ * (フロア処理はしない)。
+ *
+ * mapはmoneyNearby種別の巻き込み対象を求めるためだけに使う(money/debuff種別では未使用)。
+ * 呼び出し側を単純に保つため、常に必須の引数にしている(既存のCpuPreRollContext等、
+ * 一部の分岐でしか使わないフィールドも含めて丸ごと渡す既存パターンと同じ考え方)。
  */
 export function applyTroubleCharacterMischief(
   players: Player[],
   ownerId: string,
   mischief: TroubleCharacterMischiefDef,
+  map: MapData,
 ): TroubleCharacterMischiefApplication {
   const owner = players.find((p) => p.id === ownerId);
   const ownerName = owner?.name ?? "";
@@ -205,6 +235,24 @@ export function applyTroubleCharacterMischief(
     return {
       players: updated,
       logMessage: `${ownerName}さん: ${mischief.message}(${mischief.amount}万円)`,
+    };
+  }
+
+  if (mischief.kind === "moneyNearby") {
+    const nearbyIds = owner ? findNearbyPlayerIds(map, owner, players) : [];
+    const updated = players.map((p) => {
+      if (p.id === ownerId) return { ...p, money: p.money + mischief.ownerAmount };
+      if (nearbyIds.includes(p.id)) return { ...p, money: p.money + mischief.nearbyAmount };
+      return p;
+    });
+    const nearbyNames = players.filter((p) => nearbyIds.includes(p.id)).map((p) => p.name);
+    const nearbyPart =
+      nearbyNames.length > 0
+        ? `巻き添えで${nearbyNames.join("・")}さんも${mischief.nearbyAmount}万円`
+        : "幸い巻き添えは出なかった";
+    return {
+      players: updated,
+      logMessage: `${ownerName}さん: ${mischief.message}(${mischief.ownerAmount}万円、${nearbyPart})`,
     };
   }
 

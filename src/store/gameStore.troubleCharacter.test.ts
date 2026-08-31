@@ -7,6 +7,7 @@ import { useGameStore } from "@/store/gameStore";
 import { getMap } from "@/data/maps";
 import { shortestDistance } from "@/lib/game/mapGraph";
 import { STARTING_MONEY } from "@/lib/game/engine";
+import { troubleCharacterMischiefSakeDefs } from "@/data/troubleCharacterMischiefSake";
 import { mockSingleDiceFace, driveToLanding } from "./gameStore.testHelpers";
 
 const MAP_ID = "shonan-full";
@@ -354,6 +355,125 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.troubleCharacterAnnounceInfo).toMatchObject({ kind: "mischief", mischiefKind: "debuff" });
     expect(after.players[1].activeDebuffs).toHaveLength(1);
     expect(after.players[1].activeDebuffs[0].kind).toBe("halveDiceNextRoll");
+  });
+});
+
+// S-3d: normal→sake変身が、実データ(data/troubleCharacterForms.ts)を通じて実際に成立する
+// ことを検証する。上の「悪さ発生」describeと同じ「目的地到着→destinationFocus→
+// advanceToNextTurn」経路を使う(private関数には触れない)。
+describe("normal→sake変身(advanceToNextTurn経由、実データ)(S-3d)", () => {
+  function arriveAtDestinationFocus(ownerId: "p1" | "p2", startCount: number, startForm: "normal" | "sake" = "normal"): void {
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
+        { ...s.players[1], currentNodeId: OTHER_HUB, moveHistory: [OTHER_HUB] },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: ownerId,
+      troubleCharacterFormId: startForm,
+      troubleCharacterPossessionCount: startCount,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+    useGameStore.getState().rollDice();
+    driveToLanding();
+    useGameStore.getState().continueAfterArrival();
+  }
+
+  function advanceToNextPlayer(): void {
+    useGameStore.getState().continueAfterDestinationFocus();
+  }
+
+  it("count閾値未満(count<3)では、変身判定に最も有利なrandom値でもnormalのまま(countは通常通り加算される)", () => {
+    arriveAtDestinationFocus("p2", 2); // 閾値(atCount:3)未満
+    vi.spyOn(Math, "random").mockReturnValue(0); // 変身判定・悪さ抽選のどちらにも最も有利な値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("normal"); // 変身しない
+    expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(加算自体は通常通り)
+  });
+
+  it("count=7(100%段階)に到達すると、次の所有者ターンで確実にsakeへ変身し、sakeのmischiefPoolから悪さが抽選され、countは1になる", () => {
+    arriveAtDestinationFocus("p2", 7);
+    vi.spyOn(Math, "random").mockReturnValue(0.05); // 変身確率100%なのでどんな値でも成立する
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("sake"); // 変身成立
+    expect(after.troubleCharacterPossessionCount).toBe(1); // 0へリセットされた直後の1回分
+    const info = after.troubleCharacterAnnounceInfo;
+    expect(info?.kind).toBe("mischief");
+    // sakeのmischiefPool由来のメッセージであることを、実データと突き合わせて確認する
+    // (normal側のメッセージは一切含まれないことも同時に保証する)。
+    if (info?.kind === "mischief") {
+      const sakeMessages = troubleCharacterMischiefSakeDefs.map((m) => m.message);
+      expect(sakeMessages).toContain(info.message);
+    }
+  });
+
+  it("sake状態で次の悪さが発動すると、変身せずcountが継続加算される(カモメ魔王の実データがまだ無いため)", () => {
+    arriveAtDestinationFocus("p2", 2, "sake");
+    vi.spyOn(Math, "random").mockReturnValue(0.05);
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterFormId).toBe("sake"); // seagullKingの実データが無いため変身しない
+    expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(通常通り加算)
+  });
+
+  it("sake状態でhandoffが成功すると、normal/count 0へリセットされる(強い形態のまま他人へ渡らない)", () => {
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
+        { ...s.players[1], currentNodeId: DESTINATION, moveHistory: [DESTINATION] },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "sake",
+      troubleCharacterPossessionCount: 5,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+
+    useGameStore.getState().rollDice();
+    driveToLanding();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterOwnerId).toBe("p1");
+    expect(after.troubleCharacterFormId).toBe("normal"); // sakeのまま渡らない
+    expect(after.troubleCharacterPossessionCount).toBe(0);
+  });
+
+  it.each([
+    ["human", "cpu"],
+    ["cpu", "human"],
+    ["cpu", "cpu"],
+  ] as const)("sake状態からのhandoffリセットはcontrolledBy(owner=%s, mover=%s)によらず同じ結果になる", (ownerControl, moverControl) => {
+    startTwoPlayerGame(["human", "human"]);
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY], controlledBy: moverControl },
+        { ...s.players[1], currentNodeId: DESTINATION, moveHistory: [DESTINATION], controlledBy: ownerControl },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: "p2",
+      troubleCharacterFormId: "sake",
+      troubleCharacterPossessionCount: 5,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+
+    useGameStore.getState().rollDice();
+    driveToLanding();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterOwnerId).toBe("p1");
+    expect(after.troubleCharacterFormId).toBe("normal");
+    expect(after.troubleCharacterPossessionCount).toBe(0);
   });
 });
 
