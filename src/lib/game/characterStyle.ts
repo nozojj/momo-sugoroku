@@ -24,7 +24,16 @@ type CharacterAssetEntry = Partial<Record<CharacterExpression, string>> & { defa
  *  CharacterSpriteはプレースホルダー絵文字の代わりにその画像を描画する。
  *  navi(湘南すごろく案内キャラ、momotetu-main-kyara.png基準)は現状happyのみ用意済みなので、
  *  defaultにも同じ画像を登録し、未実装のnormal/surprised/troubledはhappyで代用する。
- *  各表情の画像を追加したら、そのexpressionキーを登録するだけで自動的にそちらが優先される。 */
+ *  各表情の画像を追加したら、そのexpressionキーを登録するだけで自動的にそちらが優先される。
+ *
+ *  troubleChar/troubleChar_sake/troubleChar_seagullKing(Polish Phase P1 S-3f-1)は
+ *  形態(troubleCharacterFormId)ごとに1枚だけ用意済みで、表情差分はまだ無いため、naviと同じく
+ *  defaultのみ登録する(troubled/surprised等どの表情で呼ばれてもdefaultへフォールバックする)。
+ *  元PNG(public/characters/troubleChar/{normal,sake,seagullKing}.png)はマスターとして保持し、
+ *  配信にはscripts/generate-character-webp.mjsで生成した同寸法・透過維持のWebPを使う。 */
 export const CHARACTER_ASSET_URLS: Partial<Record<string, CharacterAssetEntry>> = {
   navi: { default: "/characters/navi/happy.webp", happy: "/characters/navi/happy.webp" },
+  troubleChar: { default: "/characters/troubleChar/normal.webp" },
+  troubleChar_sake: { default: "/characters/troubleChar/sake.webp" },
+  troubleChar_seagullKing: { default: "/characters/troubleChar/seagullKing.webp" },
 };
