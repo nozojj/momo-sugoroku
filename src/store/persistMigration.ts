@@ -147,6 +147,11 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // なので、destinationArrived等のようなstatus連動のstale-guardは不要。欠落していても
     // 単に通知が出ないだけで操作不能にはならない。
     troubleCharacterAnnounceInfo: state.troubleCharacterAnnounceInfo ?? currentState.troubleCharacterAnnounceInfo,
+    // troubleCharacterPendingMischiefAnnounceInfo(S-3f-2)も同じ「一時通知、stale-guard不要」
+    // 方針(欠落していれば単にmischiefの続きが表示されないだけで操作不能にはならない)。旧セーブ
+    // (このフィールド追加前、キー自体が無い)はcurrentState由来のnullへ自然にフォールバックする。
+    troubleCharacterPendingMischiefAnnounceInfo:
+      state.troubleCharacterPendingMischiefAnnounceInfo ?? currentState.troubleCharacterPendingMischiefAnnounceInfo,
     netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
     pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
     activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,

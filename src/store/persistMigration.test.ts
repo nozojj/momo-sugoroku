@@ -359,6 +359,52 @@ describe("mergeGameState(): troubleCharacterAnnounceInfo のフォールバッ�
   });
 });
 
+// S-3f-2: troubleCharacterPendingMischiefAnnounceInfoもtroubleCharacterAnnounceInfoと同じ
+// 「一時通知、stale-guard不要」方針で持ち越す。旧セーブ(このフィールド追加前)を読み込んでも
+// クラッシュせず、単にpending側が無いだけの状態(=transform表示中でなければ何も変わらない、
+// transform表示中だったセーブなら「変身アナウンスは出るがmischiefへは進まない」だけ)に
+// 安全にフォールバックすることを確認する。
+describe("mergeGameState(): troubleCharacterPendingMischiefAnnounceInfo のフォールバック(非ブロッキング通知)", () => {
+  it("transform表示中・pending mischiefありのまま保存されたセーブは、両方ともそのまま復元される", () => {
+    const currentState = {
+      ...useGameStore.getState(),
+      troubleCharacterAnnounceInfo: null,
+      troubleCharacterPendingMischiefAnnounceInfo: null,
+    };
+    const transformInfo = { kind: "transform" as const, fromFormId: "normal" as const, toFormId: "sake" as const };
+    const pendingMischief = {
+      kind: "mischief" as const,
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money" as const,
+      message: "なにかが起きた",
+    };
+    const persisted = {
+      mapId: defaultMapId,
+      troubleCharacterAnnounceInfo: transformInfo,
+      troubleCharacterPendingMischiefAnnounceInfo: pendingMischief,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterAnnounceInfo).toEqual(transformInfo);
+    expect(merged.troubleCharacterPendingMischiefAnnounceInfo).toEqual(pendingMischief);
+  });
+
+  it("キー自体が存在しない旧セーブ(S-3f-2追加前)は、currentState側の値(既定null)へフォールバックする(操作不能にならない)", () => {
+    const currentState = {
+      ...useGameStore.getState(),
+      troubleCharacterAnnounceInfo: null,
+      troubleCharacterPendingMischiefAnnounceInfo: null,
+    };
+    const persisted = { mapId: defaultMapId };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
+  });
+});
+
 describe("mergeGameState(): yearEventAnnounceInfo のフォールバック", () => {
   it("演出表示中(非null)のまま保存されたセーブは、そのまま復元される(statusには依存しない一時通知のため)", () => {
     const currentState = { ...useGameStore.getState(), yearEventAnnounceInfo: null };

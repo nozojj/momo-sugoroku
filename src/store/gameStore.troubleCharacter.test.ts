@@ -307,6 +307,15 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     const moneyChanged = p2After.money !== p2MoneyBefore;
     const debuffAdded = p2After.activeDebuffs.length > p2DebuffsBefore;
     expect(moneyChanged || debuffAdded).toBe(true); // 何らかの悪さが発生している
+
+    // S-3f-2: 変身が起きていないので保留(pending)は使われず、mischiefだけがそのまま
+    // troubleCharacterAnnounceInfoに入る。dismissTroubleCharacterAnnounce()を1回呼べば
+    // 従来通りnullへ戻り、pendingが存在しないので何も昇格しない。
+    expect(after.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterDismiss = useGameStore.getState();
+    expect(afterDismiss.troubleCharacterAnnounceInfo).toBeNull();
+    expect(afterDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
   });
 
   // S-3c: 複数回の悪さを受けても、憑依カウントは前回の値からリセットされずに続けて加算される。
@@ -404,14 +413,51 @@ describe("normal→sake変身(advanceToNextTurn経由、実データ)(S-3d)", ()
     const after = useGameStore.getState();
     expect(after.troubleCharacterFormId).toBe("sake"); // 変身成立
     expect(after.troubleCharacterPossessionCount).toBe(1); // 0へリセットされた直後の1回分
-    const info = after.troubleCharacterAnnounceInfo;
-    expect(info?.kind).toBe("mischief");
+    // S-3f-2: 変身が成立したターンは、まずtransformアナウンスがtroubleCharacterAnnounceInfoへ
+    // 入り、mischief自体は抽選・適用済みのままtroubleCharacterPendingMischiefAnnounceInfoへ
+    // 保留される(mischiefの抽選・適用タイミング自体は変更していない)。
+    expect(after.troubleCharacterAnnounceInfo).toEqual({ kind: "transform", fromFormId: "normal", toFormId: "sake" });
+    const pending = after.troubleCharacterPendingMischiefAnnounceInfo;
+    expect(pending?.kind).toBe("mischief");
     // sakeのmischiefPool由来のメッセージであることを、実データと突き合わせて確認する
     // (normal側のメッセージは一切含まれないことも同時に保証する)。
-    if (info?.kind === "mischief") {
+    if (pending?.kind === "mischief") {
       const sakeMessages = troubleCharacterMischiefSakeDefs.map((m) => m.message);
-      expect(sakeMessages).toContain(info.message);
+      expect(sakeMessages).toContain(pending.message);
     }
+  });
+
+  // S-3f-2: dismissTroubleCharacterAnnounce()を1回呼ぶとtransformが閉じ、保留中のmischiefが
+  // troubleCharacterAnnounceInfoへ昇格する。もう1回呼ぶとそのmischiefも閉じ、pendingは
+  // 既にnullなのでtroubleCharacterAnnounceInfoはそのままnullへ戻る(二重表示・消失のどちらも
+  // 起きない、close連打で壊れないことの確認)。
+  it("transformを閉じるとpending mischiefがtroubleCharacterAnnounceInfoへ昇格し、pendingはnullに戻る", () => {
+    arriveAtDestinationFocus("p2", 7);
+    vi.spyOn(Math, "random").mockReturnValue(0.05);
+    advanceToNextPlayer();
+
+    const afterTransform = useGameStore.getState();
+    expect(afterTransform.troubleCharacterAnnounceInfo?.kind).toBe("transform");
+    const pendingBeforeDismiss = afterTransform.troubleCharacterPendingMischiefAnnounceInfo;
+    expect(pendingBeforeDismiss?.kind).toBe("mischief");
+
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterFirstDismiss = useGameStore.getState();
+    // 昇格後のtroubleCharacterAnnounceInfoは、閉じる直前のpendingとまったく同じ中身になる
+    // (transformを閉じただけで、mischiefの内容自体は一切変わらない)。
+    expect(afterFirstDismiss.troubleCharacterAnnounceInfo).toEqual(pendingBeforeDismiss);
+    expect(afterFirstDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull(); // 保留は消費済み
+
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterSecondDismiss = useGameStore.getState();
+    expect(afterSecondDismiss.troubleCharacterAnnounceInfo).toBeNull(); // mischiefも閉じられた
+    expect(afterSecondDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull(); // pendingは再発生しない
+
+    // close連打(3回目)しても状態は壊れず、nullのままを維持する。
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterThirdDismiss = useGameStore.getState();
+    expect(afterThirdDismiss.troubleCharacterAnnounceInfo).toBeNull();
+    expect(afterThirdDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
   });
 
   it("sake状態で次の悪さが発動すると、変身せずcountが継続加算される(count閾値[atCount:3]未満のため)", () => {
@@ -422,6 +468,9 @@ describe("normal→sake変身(advanceToNextTurn経由、実データ)(S-3d)", ()
     const after = useGameStore.getState();
     expect(after.troubleCharacterFormId).toBe("sake"); // count閾値未満のため変身しない
     expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(通常通り加算)
+    // S-3f-2: 変身しなかったターンはpendingが使われない(mischiefのみ即座に表示、従来通り)。
+    expect(after.troubleCharacterAnnounceInfo?.kind).toBe("mischief");
+    expect(after.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
   });
 
   it("sake状態でhandoffが成功すると、normal/count 0へリセットされる(強い形態のまま他人へ渡らない)", () => {
@@ -530,12 +579,15 @@ describe("sake→seagullKing変身(advanceToNextTurn経由、実データ)(S-3e)
     const after = useGameStore.getState();
     expect(after.troubleCharacterFormId).toBe("seagullKing"); // 変身成立
     expect(after.troubleCharacterPossessionCount).toBe(1); // 0へリセットされた直後の1回分
-    const info = after.troubleCharacterAnnounceInfo;
-    expect(info?.kind).toBe("mischief");
+    // S-3f-2: sake→seagullKingも同じ順序(transformを先にtroubleCharacterAnnounceInfoへ、
+    // mischiefはtroubleCharacterPendingMischiefAnnounceInfoへ保留)になる。
+    expect(after.troubleCharacterAnnounceInfo).toEqual({ kind: "transform", fromFormId: "sake", toFormId: "seagullKing" });
+    const pending = after.troubleCharacterPendingMischiefAnnounceInfo;
+    expect(pending?.kind).toBe("mischief");
     // seagullKingのmischiefPool由来のメッセージであることを、実データと突き合わせて確認する。
-    if (info?.kind === "mischief") {
+    if (pending?.kind === "mischief") {
       const seagullKingMessages = troubleCharacterMischiefSeagullKingDefs.map((m) => m.message);
-      expect(seagullKingMessages).toContain(info.message);
+      expect(seagullKingMessages).toContain(pending.message);
     }
   });
 
@@ -547,6 +599,30 @@ describe("sake→seagullKing変身(advanceToNextTurn経由、実データ)(S-3e)
     const after = useGameStore.getState();
     expect(after.troubleCharacterFormId).toBe("seagullKing"); // 進化先が無いため変身しない
     expect(after.troubleCharacterPossessionCount).toBe(3); // 2 -> 3(通常通り加算)
+    // S-3f-2: 変身しなかったターンはpendingが使われない(mischiefのみ即座に表示、従来通り)。
+    expect(after.troubleCharacterAnnounceInfo?.kind).toBe("mischief");
+    expect(after.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
+  });
+
+  it("transformを閉じるとpending mischiefがtroubleCharacterAnnounceInfoへ昇格する(sake→seagullKing)", () => {
+    arriveAtDestinationFocusAtTurn("p2", 8, "sake", 9);
+    vi.spyOn(Math, "random").mockReturnValue(0.05);
+    advanceToNextPlayer();
+
+    const afterTransform = useGameStore.getState();
+    expect(afterTransform.troubleCharacterAnnounceInfo?.kind).toBe("transform");
+    const pendingBeforeDismiss = afterTransform.troubleCharacterPendingMischiefAnnounceInfo;
+    expect(pendingBeforeDismiss?.kind).toBe("mischief");
+
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterFirstDismiss = useGameStore.getState();
+    expect(afterFirstDismiss.troubleCharacterAnnounceInfo).toEqual(pendingBeforeDismiss);
+    expect(afterFirstDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
+
+    useGameStore.getState().dismissTroubleCharacterAnnounce();
+    const afterSecondDismiss = useGameStore.getState();
+    expect(afterSecondDismiss.troubleCharacterAnnounceInfo).toBeNull();
+    expect(afterSecondDismiss.troubleCharacterPendingMischiefAnnounceInfo).toBeNull();
   });
 
   it("seagullKing状態でhandoffが成功すると、normal/count 0へリセットされる(最終形態のまま他人へ渡らない)", () => {

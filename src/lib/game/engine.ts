@@ -172,6 +172,7 @@ export function createInitialState(
     troubleCharacterFormId: null,
     troubleCharacterPossessionCount: null,
     troubleCharacterAnnounceInfo: null,
+    troubleCharacterPendingMischiefAnnounceInfo: null,
     netWorthHistory: [],
     log: [
       {

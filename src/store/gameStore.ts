@@ -72,6 +72,7 @@ const IDLE_STATE: GameState = {
   troubleCharacterFormId: null,
   troubleCharacterPossessionCount: null,
   troubleCharacterAnnounceInfo: null,
+  troubleCharacterPendingMischiefAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
   winnerIds: null,
@@ -338,6 +339,7 @@ export const useGameStore = create<GameStore>()(
           troubleCharacterFormId: GameState["troubleCharacterFormId"];
           troubleCharacterPossessionCount: GameState["troubleCharacterPossessionCount"];
           troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"];
+          troubleCharacterPendingMischiefAnnounceInfo: GameState["troubleCharacterPendingMischiefAnnounceInfo"];
         } | null = null;
 
         for (let i = 0; i < players.length; i++) {
@@ -405,17 +407,35 @@ export const useGameStore = create<GameStore>()(
               const application = applyTroubleCharacterMischief(players, candidate.id, mischief, map);
               players = application.players;
               log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
-              troubleCharacterEventUpdate = {
-                troubleCharacterFormId: nextFormId,
-                troubleCharacterPossessionCount: baseCount + 1,
-                troubleCharacterAnnounceInfo: {
-                  kind: "mischief",
-                  playerId: candidate.id,
-                  playerName: candidate.name,
-                  mischiefKind: mischief.kind,
-                  message: mischief.message,
-                },
+
+              const mischiefAnnounceInfo: Extract<GameState["troubleCharacterAnnounceInfo"], { kind: "mischief" }> = {
+                kind: "mischief",
+                playerId: candidate.id,
+                playerName: candidate.name,
+                mischiefKind: mischief.kind,
+                message: mischief.message,
               };
+              // 変身が成立したターンは、mischiefの抽選・適用(=ゲームロジック側)は従来通り
+              // このset()内で確定させたまま、UI側の通知だけを「transformを先に見せ、閉じたら
+              // 既に確定済みのmischiefを見せる」順序にする(S-3f-2)。mischiefAnnounceInfoは
+              // troubleCharacterPendingMischiefAnnounceInfoへ一旦保留し、
+              // dismissTroubleCharacterAnnounce()がtransform側を閉じたタイミングで
+              // troubleCharacterAnnounceInfoへ昇格させる。変身しなかった場合は従来通り
+              // mischiefAnnounceInfoをそのままtroubleCharacterAnnounceInfoへ入れ、pending側は
+              // 必ずnullにしておく(前ターンの値が残らないよう、このset()内で毎回確定させる)。
+              troubleCharacterEventUpdate = decision.transformed
+                ? {
+                    troubleCharacterFormId: nextFormId,
+                    troubleCharacterPossessionCount: baseCount + 1,
+                    troubleCharacterAnnounceInfo: { kind: "transform", fromFormId: currentFormId, toFormId: nextFormId },
+                    troubleCharacterPendingMischiefAnnounceInfo: mischiefAnnounceInfo,
+                  }
+                : {
+                    troubleCharacterFormId: nextFormId,
+                    troubleCharacterPossessionCount: baseCount + 1,
+                    troubleCharacterAnnounceInfo: mischiefAnnounceInfo,
+                    troubleCharacterPendingMischiefAnnounceInfo: null,
+                  };
             }
             break;
           }
@@ -942,7 +962,18 @@ export const useGameStore = create<GameStore>()(
 
         dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
 
-        dismissTroubleCharacterAnnounce: () => set({ troubleCharacterAnnounceInfo: null }),
+        // S-3f-2: 保留中のmischief通知(troubleCharacterPendingMischiefAnnounceInfo)があれば、
+        // それをtroubleCharacterAnnounceInfoへ昇格させて表示を引き継ぐ(transform→mischiefの
+        // 連続表示)。保留が無ければ(mischief単独発生・appeared・handoffの従来ケース)、
+        // 従来通りtroubleCharacterAnnounceInfoをそのままnullへ戻すだけ。
+        dismissTroubleCharacterAnnounce: () => {
+          const pending = get().troubleCharacterPendingMischiefAnnounceInfo;
+          if (pending) {
+            set({ troubleCharacterAnnounceInfo: pending, troubleCharacterPendingMischiefAnnounceInfo: null });
+            return;
+          }
+          set({ troubleCharacterAnnounceInfo: null });
+        },
 
         continueAfterArrival: () => {
           const state = get();

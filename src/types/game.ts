@@ -259,11 +259,18 @@ export type TroubleCharacterMischiefDef =
 
 /** troubleCharacterAnnounceInfoが表示する通知の種類。monopolyAchievement/
  *  yearEventAnnounceInfoと同じ「statusとは独立した一時通知」(GameStatusは増やさない)。
- *  1フィールドで登場/交代/悪さ発生の3種類をまとめて表現し、UI側はkindで出し分ける。 */
+ *  1フィールドで登場/交代/悪さ発生/変身の4種類をまとめて表現し、UI側はkindで出し分ける。
+ *
+ *  kind:"transform"(Polish Phase P1 S-3f-2)はfromFormId/toFormIdだけを持つ最小限の形にしている。
+ *  変身後のcharacterId/displayNameはdata/troubleCharacterForms.ts(getTroubleCharacterFormDef())
+ *  から導出可能なため、ここでは重複保持しない(型安全性を保ったまま情報源を1箇所に保つ)。
+ *  ownerId/ownerNameも持たせていない: 既存の演出案(TroubleCharacterAnnounceModal.tsx)が
+ *  プレイヤー名を出さない文言のため、現時点で必要なフィールドだけに絞っている。 */
 export type TroubleCharacterAnnounceInfo =
   | { kind: "appeared"; ownerId: string; ownerName: string }
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
-  | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string };
+  | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string }
+  | { kind: "transform"; fromFormId: TroubleCharacterFormId; toFormId: TroubleCharacterFormId };
 
 /** 妨害キャラの形態(フォーム)id。S-3dで"sake"(酒モンスター)、S-3eで"seagullKing"
  *  (カモメ魔王、最終形態)を正式追加した。既存のWarpScope/DebuffKind等と同じ
@@ -717,10 +724,20 @@ export interface GameState {
    *  発動しなかった回は変化せず、handoff成功時・形態変化成立時はどちらも0へリセットする
    *  (「今の形態でどれだけ耐えたか」を表す値であって、生涯合計の値ではない)。 */
   troubleCharacterPossessionCount: number | null;
-  /** 妨害キャラの登場/所有者交代/悪さ発生を知らせる通知。monopolyAchievement/
+  /** 妨害キャラの登場/所有者交代/悪さ発生/変身を知らせる通知。monopolyAchievement/
    *  yearEventAnnounceInfoと同様、statusとは独立した一時通知(GameStatusは増やさない)。
    *  表示し終えたらdismissTroubleCharacterAnnounce()でnullに戻る。 */
   troubleCharacterAnnounceInfo: TroubleCharacterAnnounceInfo | null;
+  /** 変身が発生したターンで、変身アナウンスの直後に表示するmischief通知を一時的に保留する
+   *  1件だけの最小限のキュー(Polish Phase P1 S-3f-2)。汎用的なイベントキューは作らない:
+   *  「同一ターンにtransform→mischiefの2件を連続表示する」というこの1ケースのためだけの
+   *  仕組みで、troubleCharacterAnnounceInfoとは独立したフィールドとして持つ(kindを重ねて
+   *  1フィールドに詰め込むとdismiss側の分岐が複雑になるため)。
+   *  非nullなのは「advanceToNextTurn()で変身+mischiefが同時に確定した直後、変身アナウンスが
+   *  まだ閉じられていない間」だけ。dismissTroubleCharacterAnnounce()はこの値が非nullなら
+   *  troubleCharacterAnnounceInfoへ昇格させてnullに戻し、nullなら従来通りtroubleCharacter
+   *  AnnounceInfoをそのままnullにする(mischief単独発生時は従来通り一度も使われない)。 */
+  troubleCharacterPendingMischiefAnnounceInfo: Extract<TroubleCharacterAnnounceInfo, { kind: "mischief" }> | null;
   /** 年度ごとの総資産スナップショットの履歴(資産推移グラフ用)。決算のたびに1件追加される。 */
   netWorthHistory: NetWorthHistoryEntry[];
   log: LogEntry[];
