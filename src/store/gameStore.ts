@@ -25,6 +25,7 @@ import {
   applyTroubleCharacterMischief,
   getTroubleCharacterFormDef,
   decideTroubleCharacterTransform,
+  mischiefHighlightAmount,
   TROUBLE_CHARACTER_BASE_FORM_ID,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
@@ -408,12 +409,18 @@ export const useGameStore = create<GameStore>()(
               players = application.players;
               log = [...log, { id: makeLogId(), turn, message: application.logMessage }];
 
+              // highlightAmount(Polish Phase P1 S-3f-4): money/moneyNearby種別のみ、所有者本人が
+              // 実際に受けた金額(mischiefHighlightAmount()、上のapplyTroubleCharacterMischief()に
+              // 渡したmischief定義そのものから読むだけで再計算はしない)をTroubleCharacterAnnounceModal.tsx
+              // 側のCharacterLine.highlightへ渡す。debuff/propertyLoss/cardDestroyはundefinedのまま
+              // (S-3f-4のスコープ外、非金額mischiefの演出強化はS-3f-5候補)。
               const mischiefAnnounceInfo: Extract<GameState["troubleCharacterAnnounceInfo"], { kind: "mischief" }> = {
                 kind: "mischief",
                 playerId: candidate.id,
                 playerName: candidate.name,
                 mischiefKind: mischief.kind,
                 message: mischief.message,
+                highlightAmount: mischiefHighlightAmount(mischief),
               };
               // 変身が成立したターンは、mischiefの抽選・適用(=ゲームロジック側)は従来通り
               // このset()内で確定させたまま、UI側の通知だけを「transformを先に見せ、閉じたら

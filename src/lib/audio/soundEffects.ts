@@ -19,6 +19,10 @@
  *
  * Polish Phase P1 S-3f-3で追加(妨害キャラの変身、TroubleCharacterAnnounceModal.tsxの
  * kind:"transform"専用): trouble_transform(通常進化)/trouble_transform_final(最終進化)。
+ *
+ * Polish Phase P1 S-3f-4で追加(妨害キャラの悪さ、TroubleCharacterAnnounceModal.tsxの
+ * kind:"mischief"専用): trouble_mischief。毎ターン鳴る可能性がある高頻度SEのため、
+ * trouble_transform_finalのような大げさな尺・音量にはせず、短く軽い「被害確定」の合図に留める。
  */
 export type SoundEffectId =
   | "dice_roll"
@@ -37,7 +41,8 @@ export type SoundEffectId =
   | "ui_select"
   | "elimination_out"
   | "trouble_transform"
-  | "trouble_transform_final";
+  | "trouble_transform_final"
+  | "trouble_mischief";
 
 export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Phase10/P10-4-1: 手続き的生成(scripts/generate-se.mjs)によるWAV。他の未配置idとの
@@ -65,4 +70,6 @@ export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Polish Phase P1 S-3f-3: 同じくscripts/generate-se.mjsによるWAV。
   trouble_transform: "/sounds/trouble_transform.wav",
   trouble_transform_final: "/sounds/trouble_transform_final.wav",
+  // Polish Phase P1 S-3f-4: 同じくscripts/generate-se.mjsによるWAV。
+  trouble_mischief: "/sounds/trouble_mischief.wav",
 };

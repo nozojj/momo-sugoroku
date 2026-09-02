@@ -1,26 +1,26 @@
 // 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張、
 // P11-3-B2b-3でelimination_outを追加、Polish Phase P1 S-3f-3でtrouble_transform/
-// trouble_transform_finalを追加)。
+// trouble_transform_finalを追加、S-3f-4でtrouble_mischiefを追加)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、全17種のSE(高頻度SE、money系、card/property系、
-// monopoly系、destination系、game_over_fanfare、ui_select、elimination_out、trouble_transform系)を、
-// 外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+
-// ホワイトノイズ、線形アタック+指数ディケイのエンベロープ、複数音を重ねる和音合成)のみで、
-// 外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
+// 目的: 「出所不明の音源は使わない」方針のもと、全18種のSE(高頻度SE、money系、card/property系、
+// monopoly系、destination系、game_over_fanfare、ui_select、elimination_out、trouble_transform系、
+// trouble_mischief)を、外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成
+// (矩形波/三角波/正弦波+ホワイトノイズ、線形アタック+指数ディケイのエンベロープ、複数音を重ねる
+// 和音合成)のみで、外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
 // public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため権利上の懸念なし)。
 //
 // 実行方法: `node scripts/generate-se.mjs`
 // 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
 //        card_get,card_use,property_buy,monopoly_group,monopoly_region,
 //        destination_arrive,destination_reveal,game_over_fanfare,ui_select,
-//        elimination_out,trouble_transform,trouble_transform_final}.wav
+//        elimination_out,trouble_transform,trouble_transform_final,trouble_mischief}.wav
 //        (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
-// P10-4-1/P10-4-2/P10-4-3/P10-4-4/P11-3-B2b-3で作成した既存15音の定義・生成コードは
-// S-3f-3でも一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-4で
-// SHA256ハッシュ比較により確認済み。S-3f-3実施時にも同様に既存15音のハッシュ不変を確認した)。
+// P10-4-1/P10-4-2/P10-4-3/P10-4-4/P11-3-B2b-3/S-3f-3で作成した既存17音の定義・生成コードは
+// S-3f-4でも一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-4で
+// SHA256ハッシュ比較により確認済み。S-3f-3/S-3f-4実施時にも同様に既存音のハッシュ不変を確認した)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -396,6 +396,25 @@ const SOUND_DEFS = {
         renderTone({ waveform: "square", freqStart: 220, durationMs: 120, peak: 0.28, attackMs: 1, decayExp: 5 }),
         renderNoise({ durationMs: 50, peak: 0.35, decayExp: 7, seed: 13 }),
       ]),
+    ]),
+
+  // Polish Phase P1 S-3f-4: 妨害キャラの「悪さ」(TroubleCharacterAnnounceModal.tsx、
+  // kind:"mischief")専用SE。毎ターン所有者の手番開始時に鳴る可能性がある高頻度SEのため、
+  // trouble_transform(約400ms、コミカルな3段構成)/trouble_transform_final(約880ms、予兆+
+  // 三重和音の衝撃)のどちらよりも明確に短く軽くする。「ピシッ(被害onset、ノイズ)→
+  // ゲシッ(矩形波の短い下降、警告的な軋み)→ズン(低い矩形波の着地、被害確定)」という
+  // 2音構成(trouble_transformの3段"ポン→ボワーン→ドン"より要素を1つ減らし、テンポを
+  // 優先した最短構成)で、合計約330ms。
+  // 既存SEとの聞き分け: money_loss(三角波1本の連続下降スイープ、320ms)とは(a)矩形波である点
+  // (三角波より角の立った硬い音色)、(b)連続スイープではなく2つの独立したトーンである点、
+  // (c)頭のノイズonsetの質感(seedが異なる)の3点で区別できる。trouble_transform/
+  // trouble_transform_finalとは尺・波形構成の両方で明確に短く軽い。
+  trouble_mischief: () =>
+    concat([
+      renderNoise({ durationMs: 10, peak: 0.25, decayExp: 9, seed: 17 }), // ピシッ(被害onset)
+      renderTone({ waveform: "square", freqStart: 420, freqEnd: 260, durationMs: 150, peak: 0.36, attackMs: 1, decayExp: 5 }), // ゲシッ(短い下降)
+      silence(20),
+      renderTone({ waveform: "square", freqStart: 180, durationMs: 150, peak: 0.34, attackMs: 1, decayExp: 4.5 }), // ズン(低い着地、被害確定)
     ]),
 };
 

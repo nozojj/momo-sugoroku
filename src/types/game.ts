@@ -265,11 +265,27 @@ export type TroubleCharacterMischiefDef =
  *  変身後のcharacterId/displayNameはdata/troubleCharacterForms.ts(getTroubleCharacterFormDef())
  *  から導出可能なため、ここでは重複保持しない(型安全性を保ったまま情報源を1箇所に保つ)。
  *  ownerId/ownerNameも持たせていない: 既存の演出案(TroubleCharacterAnnounceModal.tsx)が
- *  プレイヤー名を出さない文言のため、現時点で必要なフィールドだけに絞っている。 */
+ *  プレイヤー名を出さない文言のため、現時点で必要なフィールドだけに絞っている。
+ *
+ *  kind:"mischief"のhighlightAmount(Polish Phase P1 S-3f-4)は、TroubleCharacterAnnounceModal.tsxが
+ *  CharacterLine.highlight(既存のDestinationCelebrationScreen等と同じ演出強調機構)へそのまま
+ *  渡すための、所有者本人が実際に受けた金額(符号付き、万円)。gameStore.ts側で
+ *  applyTroubleCharacterMischief()に渡すmischief定義(kind:"money"のamount、kind:"moneyNearby"の
+ *  ownerAmount)からそのまま読むだけで、ここでもUI側でも再計算はしない。money/moneyNearby以外
+ *  (debuff/propertyLoss/cardDestroy)はundefinedのままにし、その場合TroubleCharacterAnnounceModal.tsxは
+ *  highlightを一切追加しない(S-3f-4のスコープは「金額系mischiefの底上げ」のみで、
+ *  被害規模・種別ごとの演出差分はS-3f-5候補として残す)。 */
 export type TroubleCharacterAnnounceInfo =
   | { kind: "appeared"; ownerId: string; ownerName: string }
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
-  | { kind: "mischief"; playerId: string; playerName: string; mischiefKind: TroubleCharacterMischiefKind; message: string }
+  | {
+      kind: "mischief";
+      playerId: string;
+      playerName: string;
+      mischiefKind: TroubleCharacterMischiefKind;
+      message: string;
+      highlightAmount?: number;
+    }
   | { kind: "transform"; fromFormId: TroubleCharacterFormId; toFormId: TroubleCharacterFormId };
 
 /** 妨害キャラの形態(フォーム)id。S-3dで"sake"(酒モンスター)、S-3eで"seagullKing"

@@ -65,6 +65,24 @@ export function isFinalTroubleCharacterForm(formId: TroubleCharacterFormId): boo
 export const TROUBLE_CHARACTER_BASE_FORM_ID: TroubleCharacterFormId = "normal";
 
 /**
+ * mischief定義から、TroubleCharacterAnnounceInfo(kind:"mischief")のhighlightAmountへ渡す値を
+ * 導出する(Polish Phase P1 S-3f-4)。applyTroubleCharacterMischief()が実際に所有者の所持金へ
+ * 適用する値(kind:"money"のamount、kind:"moneyNearby"のownerAmount)をそのまま返すだけで、
+ * ここでも呼び出し側(gameStore.ts)でも計算はしない(「gameStore側で既に確定している実際の
+ * 被害額をそのまま渡す、表示側で再計算しない」という要件を、値の発生源を1箇所に保つことで
+ * 保証する)。moneyNearby種別の巻き込み対象(nearbyAmount)はこのアナウンス自体が所有者本人
+ * 向けの通知であるため含めない(所有者本人が受けた金額のみを表す値、という意味を曖昧にしない)。
+ * debuff/propertyLoss/cardDestroyは金額を持たないためundefinedを返し、呼び出し側は
+ * highlightAmountフィールド自体を省略する(S-3f-4のスコープは金額系mischiefの底上げのみ、
+ * 非金額mischiefの演出強化はS-3f-5候補)。
+ */
+export function mischiefHighlightAmount(mischief: TroubleCharacterMischiefDef): number | undefined {
+  if (mischief.kind === "money") return mischief.amount;
+  if (mischief.kind === "moneyNearby") return mischief.ownerAmount;
+  return undefined;
+}
+
+/**
  * 変身確率の段階表(TroubleCharacterTransformRule.probabilitySteps、atCount昇順を想定)から、
  * 現在の憑依カウントに該当する確率を求める(S-3c)。countが最初の段階のatCountに満たない間は
  * 0(抽選対象外)、最後の段階のatCount以上になった後はその段階の確率(通常は1=pity相当の上限)を

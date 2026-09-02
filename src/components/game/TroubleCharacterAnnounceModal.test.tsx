@@ -179,7 +179,153 @@ describe("TroubleCharacterAnnounceModal: 変身SE(Polish Phase P1 S-3f-3)", () =
     const mischiefInfo: TroubleCharacterAnnounceInfo = { kind: "mischief", playerId: "p1", playerName: "プレイヤー1", mischiefKind: "money", message: "なにかが起きた" };
     rerender(<TroubleCharacterAnnounceModal info={mischiefInfo} onDismiss={() => {}} />);
 
+    // Polish Phase P1 S-3f-4: mischief側でtrouble_transform(_final)が再発火しないのは従来通りだが、
+    // mischief専用SE(trouble_mischief)は新たに1回だけ鳴る(下のS-3f-4テストで詳細に検証)。
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_transform");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_transform_final");
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief");
+  });
+});
+
+// Polish Phase P1 S-3f-4: mischief(妨害キャラの悪さ)専用SE(trouble_mischief)と、金額系mischiefの
+// highlight表示(既存CharacterLine.highlight/shakeOnHighlight機構の再利用)。S-3f-3のtransform
+// 演出(SE分岐・impactFlash・warnRing)は一切変更していない(上のdescribeで検証済みのまま)。
+describe("TroubleCharacterAnnounceModal: mischief専用SE(Polish Phase P1 S-3f-4)", () => {
+  it("kind:moneyのmischiefはマウント時にplaySE(\"trouble_mischief\")を1回だけ呼ぶ", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布から少しお金が消えた",
+      highlightAmount: -50,
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief");
+  });
+
+  it("highlightAmountを持たない非金額mischief(例: debuff)でもplaySE(\"trouble_mischief\")は1回だけ鳴る", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "debuff",
+      message: "次の手番はお休みになりそう",
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief");
+  });
+
+  it("appearedではtrouble_mischiefを鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "appeared", ownerId: "p1", ownerName: "プレイヤー1" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
     expect(playSEMock).not.toHaveBeenCalled();
+  });
+
+  it("handoffではtrouble_mischiefを鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "handoff",
+      fromPlayerId: "p1",
+      fromPlayerName: "プレイヤー1",
+      toPlayerId: "p2",
+      toPlayerName: "プレイヤー2",
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalled();
+  });
+
+  it("transformではtrouble_mischiefを鳴らさない(S-3f-3のtransform SEのみ従来通り鳴る)", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "normal", toFormId: "sake" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_transform");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_mischief");
+  });
+
+  it("同一infoでの再レンダーだけではtrouble_mischiefが再発火しない(依存配列[info]が参照不変のため)", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布から少しお金が消えた",
+      highlightAmount: -50,
+    };
+    const { rerender } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+
+    rerender(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("TroubleCharacterAnnounceModal: mischiefの金額highlight/shakeOnHighlight(Polish Phase P1 S-3f-4、phase:\"line\"まで進めて確認)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** entering→line遷移だけ進める(highlightDelayMs前、AnnouncerEffectLayer/highlightはまだ発火していない状態)。 */
+  function advanceToLine(): void {
+    act(() => {
+      vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.slideInMs + CHARACTER_ANNOUNCER_TIMING.bounceMs);
+    });
+  }
+
+  /** highlightDelayMs分だけ追加で進める(shakeOnHighlightが発火するタイミング)。 */
+  function advanceToHighlightDelay(): void {
+    act(() => {
+      vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.highlightDelayMs);
+    });
+  }
+
+  it("kind:moneyのmischiefは金額(-50万円)がhighlightとして表示され、highlightDelayMs後にshakeが発火する", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布から少しお金が消えた",
+      highlightAmount: -50,
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.textContent).toContain("-50万円");
+    expect(container.querySelector(".animate-character-shake")).toBeNull(); // highlightDelayMs経過前はまだ発火しない
+
+    advanceToHighlightDelay();
+    expect(container.querySelector(".animate-character-shake")).not.toBeNull();
+  });
+
+  it("highlightAmountを持たない非金額mischief(例: debuff)はhighlight金額を表示せず、shake/impactFlash/warnRingのいずれも追加されない", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "debuff",
+      message: "次の手番はお休みになりそう",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+    advanceToHighlightDelay();
+
+    expect(container.textContent).not.toContain("万円");
+    expect(container.querySelector(".animate-character-shake")).toBeNull();
+    expect(container.querySelector(".animate-announcer-impact-flash")).toBeNull();
+    expect(container.querySelector(".animate-announcer-warn-ring")).toBeNull();
   });
 });
 

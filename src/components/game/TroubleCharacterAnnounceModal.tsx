@@ -53,6 +53,15 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
       };
 
     case "mischief":
+      // highlightAmount(Polish Phase P1 S-3f-4): money/moneyNearby種別のmischiefのみ、
+      // gameStore.ts側で既に確定済みの被害額(info.highlightAmount、troubleCharacter.tsの
+      // mischiefHighlightAmount()参照)をCharacterLine.highlightへそのまま渡す(ここでは
+      // 再計算しない)。DestinationCelebrationScreen.tsxの到着ボーナス表示と同じ、既存の
+      // highlight機構をそのまま再利用しているだけで、演出コンポーネント自体は追加していない。
+      // 同じ1行にhighlightを載せる(行を増やさない)ことで、highlightHoldExtraMs分だけ
+      // 保持時間が伸びる以外はテンポに影響しない。debuff/propertyLoss/cardDestroy等
+      // highlightAmountが無い(undefined)種別は、highlightフィールド自体を付けない
+      // (S-3f-4のスコープは金額系mischiefの底上げのみ、非金額mischiefの演出強化はS-3f-5候補)。
       return {
         characterId: TROUBLE_CHARACTER_ID,
         expression: "troubled",
@@ -60,7 +69,13 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
         side: "left",
         animationType: "slide",
         theme: "negative",
-        lines: [{ text: `${info.playerName}さん: ${info.message}`, expression: "troubled" }],
+        lines: [
+          {
+            text: `${info.playerName}さん: ${info.message}`,
+            expression: "troubled",
+            ...(info.highlightAmount !== undefined ? { highlight: { amount: info.highlightAmount } } : {}),
+          },
+        ],
       };
 
     case "transform": {
@@ -97,25 +112,32 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
 }
 
 export function TroubleCharacterAnnounceModal({ info, onDismiss }: TroubleCharacterAnnounceModalProps) {
-  // 変身SE(Polish Phase P1 S-3f-3)。MonopolyAnnounceModal.tsxと同じ「マウント/依存値変化時に
-  // 直接playSE()」パターンで、gameStore.tsからは呼ばない(soundManager.tsの方針)。
+  // 変身SE(Polish Phase P1 S-3f-3)+悪さSE(Polish Phase P1 S-3f-4)。MonopolyAnnounceModal.tsxと
+  // 同じ「マウント/依存値変化時に直接playSE()」パターンで、gameStore.tsからは呼ばない
+  // (soundManager.tsの方針)。
   //
   // 依存配列を[info]にする(kindやtoFormIdだけでなく、objectそのもの)ことで、gameStore.ts側が
   // 新しいtroubleCharacterAnnounceInfoをset()するたび(=新しい変身/mischief/appeared/handoffが
   // 発生するたび)にだけ実行され、無関係な再レンダーでは再実行されない。これはS-3f-2で追加された
   // 「transform→mischief切り替え時、troubleCharacterAnnounceInfoがnullを経由せず直接次のkindへ
-  // 差し替わる」経路(gameStore.ts参照)でも、infoの参照が変わるため正しく検知できる。
+  // 差し替わる」経路(gameStore.ts参照)でも、infoの参照が変わるため正しく検知できる
+  // (transform→mischiefの直接切り替えでは、この1つのuseEffectがinfo変化のたびに再実行され、
+  // 1回目はtransform分岐でtrouble_transform(_final)を、2回目はmischief分岐でtrouble_mischiefを
+  // それぞれ1回ずつ鳴らす。グローバルなフラグ等の追加状態管理は持たない)。
   //
-  // kind:"transform"以外(appeared/handoff/mischief)ではreturnするだけで何も鳴らさない
-  // (今回のスコープ外、既存の無音のまま)。transform→mischiefへ切り替わった瞬間もこの分岐で
-  // 弾かれるため、mischiefでtransform用SEが誤って再発火することはない。
+  // kind:"appeared"/"handoff"では何も鳴らさない(S-3f-4のスコープ外、既存の無音のまま)。
   //
   // React StrictMode(開発モードのみ)によるeffectの二重実行はsoundManager.tsの
   // isDuplicateWithinSameTick()が既に吸収するため、ここでは追加のガードを持たない
   // (MonopolyAnnounceModal.tsxと同じ)。
   useEffect(() => {
-    if (info.kind !== "transform") return;
-    playSE(isFinalTroubleCharacterForm(info.toFormId) ? "trouble_transform_final" : "trouble_transform");
+    if (info.kind === "transform") {
+      playSE(isFinalTroubleCharacterForm(info.toFormId) ? "trouble_transform_final" : "trouble_transform");
+      return;
+    }
+    if (info.kind === "mischief") {
+      playSE("trouble_mischief");
+    }
   }, [info]);
 
   // kindごとにkeyを分けることで、troubleCharacterAnnounceInfoがnullを経由せず直接別のkindへ

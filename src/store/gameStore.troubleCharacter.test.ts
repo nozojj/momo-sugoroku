@@ -356,6 +356,19 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.players[1].money).toBeLessThan(STARTING_MONEY);
   });
 
+  // Polish Phase P1 S-3f-4: kind:"money"のmischiefは、実際に所持金へ適用された金額
+  // (trouble_money_pinch: -50万円)が、再計算ではなくそのままhighlightAmountへ渡される。
+  it("kind:moneyのmischiefは、実際に減った所持金と一致するhighlightAmountを持つ", () => {
+    arriveAtDestinationFocus("p2");
+    const p2MoneyBefore = useGameStore.getState().players[1].money;
+    vi.spyOn(Math, "random").mockReturnValue(0.1); // money側(trouble_money_pinch、amount:-50)になる値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo).toMatchObject({ kind: "mischief", mischiefKind: "money", highlightAmount: -50 });
+    expect(after.players[1].money).toBe(p2MoneyBefore - 50);
+  });
+
   it("デバフ付与パターン(debuff)が既存ActiveDebuffの形で正しく反映される", () => {
     arriveAtDestinationFocus("p2");
     vi.spyOn(Math, "random").mockReturnValue(0.5); // weight配分でhalveDiceNextRoll側になる値
@@ -365,6 +378,20 @@ describe("悪さ発生(advanceToNextTurn経由)", () => {
     expect(after.troubleCharacterAnnounceInfo).toMatchObject({ kind: "mischief", mischiefKind: "debuff" });
     expect(after.players[1].activeDebuffs).toHaveLength(1);
     expect(after.players[1].activeDebuffs[0].kind).toBe("halveDiceNextRoll");
+  });
+
+  // Polish Phase P1 S-3f-4: kind:"debuff"は金額を持たないため、highlightAmountはundefinedのまま
+  // (TroubleCharacterAnnounceModal.tsx側でhighlight表示を追加しない判定に使われる)。
+  it("kind:debuffのmischiefはhighlightAmountを持たない(undefined)", () => {
+    arriveAtDestinationFocus("p2");
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo).toMatchObject({ kind: "mischief", mischiefKind: "debuff" });
+    if (after.troubleCharacterAnnounceInfo?.kind === "mischief") {
+      expect(after.troubleCharacterAnnounceInfo.highlightAmount).toBeUndefined();
+    }
   });
 });
 
