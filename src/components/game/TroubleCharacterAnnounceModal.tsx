@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import type { TroubleCharacterAnnounceInfo } from "@/types/game";
 import type { CharacterAnnouncement } from "@/types/characterAnnouncer";
-import { getTroubleCharacterFormDef } from "@/lib/game/troubleCharacter";
+import { getTroubleCharacterFormDef, isFinalTroubleCharacterForm } from "@/lib/game/troubleCharacter";
+import { playSE } from "@/lib/audio/soundManager";
 import { CharacterAnnouncer } from "./CharacterAnnouncer";
 
 interface TroubleCharacterAnnounceModalProps {
@@ -71,10 +73,11 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
       const toCharacterId = toFormDef?.characterId ?? TROUBLE_CHARACTER_ID;
       const toDisplayName = toFormDef?.displayName ?? "妨害キャラ";
       // これ以上の進化先を持たない(=transformが無い)形態への変身を「最終形態」とみなし、
-      // sake→seagullKingのような最終変身をnormal→sakeより明確に強い演出にする。新テーマは
-      // 追加せず、既存のnegativeテーマ(shakeOnHighlight既定)にwarnRingを重ねるだけに留める
-      // (既存effect flagの組み合わせの範囲内、S-3f-2の設計制約)。
-      const isFinalForm = !toFormDef?.transform;
+      // sake→seagullKingのような最終変身をnormal→sakeより明確に強い演出にする(Polish Phase
+      // P1 S-3f-3でisFinalTroubleCharacterForm()へ切り出し。"seagullKing"という具体的な
+      // formId文字列には一切依存しない)。最終形態はwarnRingに加えてimpactFlash(一瞬の閃光、
+      // AnnouncerEffectLayer.tsx参照)を重ね、通常進化(warnRingのみ)より明確に強い演出にする。
+      const isFinalForm = isFinalTroubleCharacterForm(info.toFormId);
 
       return {
         characterId: toCharacterId,
@@ -83,7 +86,7 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
         side: "left",
         animationType: "slide",
         theme: isFinalForm ? "negative" : "warning",
-        ...(isFinalForm ? { effect: { warnRing: true } } : {}),
+        ...(isFinalForm ? { effect: { warnRing: true, impactFlash: true } } : {}),
         lines: [
           { text: isFinalForm ? "な、なんだこの気配は……!" : "ん……? 様子がおかしいぞ……" },
           { text: `${fromDisplayName}が ${toDisplayName} に変身した!`, expression: "troubled" },
@@ -94,6 +97,27 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
 }
 
 export function TroubleCharacterAnnounceModal({ info, onDismiss }: TroubleCharacterAnnounceModalProps) {
+  // 変身SE(Polish Phase P1 S-3f-3)。MonopolyAnnounceModal.tsxと同じ「マウント/依存値変化時に
+  // 直接playSE()」パターンで、gameStore.tsからは呼ばない(soundManager.tsの方針)。
+  //
+  // 依存配列を[info]にする(kindやtoFormIdだけでなく、objectそのもの)ことで、gameStore.ts側が
+  // 新しいtroubleCharacterAnnounceInfoをset()するたび(=新しい変身/mischief/appeared/handoffが
+  // 発生するたび)にだけ実行され、無関係な再レンダーでは再実行されない。これはS-3f-2で追加された
+  // 「transform→mischief切り替え時、troubleCharacterAnnounceInfoがnullを経由せず直接次のkindへ
+  // 差し替わる」経路(gameStore.ts参照)でも、infoの参照が変わるため正しく検知できる。
+  //
+  // kind:"transform"以外(appeared/handoff/mischief)ではreturnするだけで何も鳴らさない
+  // (今回のスコープ外、既存の無音のまま)。transform→mischiefへ切り替わった瞬間もこの分岐で
+  // 弾かれるため、mischiefでtransform用SEが誤って再発火することはない。
+  //
+  // React StrictMode(開発モードのみ)によるeffectの二重実行はsoundManager.tsの
+  // isDuplicateWithinSameTick()が既に吸収するため、ここでは追加のガードを持たない
+  // (MonopolyAnnounceModal.tsxと同じ)。
+  useEffect(() => {
+    if (info.kind !== "transform") return;
+    playSE(isFinalTroubleCharacterForm(info.toFormId) ? "trouble_transform_final" : "trouble_transform");
+  }, [info]);
+
   // kindごとにkeyを分けることで、troubleCharacterAnnounceInfoがnullを経由せず直接別のkindへ
   // 差し替わった場合(S-3f-2: transformを閉じた瞬間、保留中のmischiefへ即座に切り替わるケース)
   // でもCharacterAnnouncerを強制的に再マウントし、phase("entering"→"line"→"exiting")や

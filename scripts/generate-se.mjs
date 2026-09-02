@@ -1,9 +1,10 @@
 // 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張、
-// P11-3-B2b-3でelimination_outを追加)。
+// P11-3-B2b-3でelimination_outを追加、Polish Phase P1 S-3f-3でtrouble_transform/
+// trouble_transform_finalを追加)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、全15種のSE(高頻度SE、money系、card/property系、
-// monopoly系、destination系、game_over_fanfare、ui_select、elimination_out)を、外部素材に
-// 一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+
+// 目的: 「出所不明の音源は使わない」方針のもと、全17種のSE(高頻度SE、money系、card/property系、
+// monopoly系、destination系、game_over_fanfare、ui_select、elimination_out、trouble_transform系)を、
+// 外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成(矩形波/三角波/正弦波+
 // ホワイトノイズ、線形アタック+指数ディケイのエンベロープ、複数音を重ねる和音合成)のみで、
 // 外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
 // public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため権利上の懸念なし)。
@@ -12,13 +13,14 @@
 // 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
 //        card_get,card_use,property_buy,monopoly_group,monopoly_region,
 //        destination_arrive,destination_reveal,game_over_fanfare,ui_select,
-//        elimination_out}.wav
+//        elimination_out,trouble_transform,trouble_transform_final}.wav
 //        (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
-// P10-4-1/P10-4-2/P10-4-3/P10-4-4で作成した既存14音の定義・生成コードは今回も一切変更していない
-// (再実行してもバイト単位で同一の出力になることをP10-4-4でもSHA256ハッシュ比較により確認済み)。
+// P10-4-1/P10-4-2/P10-4-3/P10-4-4/P11-3-B2b-3で作成した既存15音の定義・生成コードは
+// S-3f-3でも一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-4で
+// SHA256ハッシュ比較により確認済み。S-3f-3実施時にも同様に既存15音のハッシュ不変を確認した)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -355,6 +357,45 @@ const SOUND_DEFS = {
       renderTone({ waveform: "triangle", freqStart: 480, freqEnd: 300, durationMs: 90, peak: 0.34, attackMs: 2, decayExp: 3 }),
       renderTone({ waveform: "triangle", freqStart: 380, freqEnd: 170, durationMs: 160, peak: 0.32, attackMs: 2, decayExp: 3.5 }),
       renderNoise({ durationMs: 60, peak: 0.16, decayExp: 8, seed: 11 }),
+    ]),
+
+  // Polish Phase P1 S-3f-3: 妨害キャラの変身(TroubleCharacterAnnounceModal.tsx、kind:"transform")
+  // 専用SEの通常進化側(例: normal→sake)。「ポン(小さな驚き)→ボワーン(コミカルに揺れながら
+  // 沈む、三角波を上げてから下げる山型で表現)→ドン(低い矩形波の着地)」という3段構成にすることで、
+  // 「なにかがコミカルに、でも少し不穏に変わってしまった」を約400msの短い尺で伝える。
+  // 単調な下降1本のmoney_loss、下降が2段だが末尾ノイズ付きのelimination_outとは輪郭が異なる
+  // (これは上昇→山型の揺れ→低音着地という他のどのSEとも違う形)。
+  // 最終形態用のtrouble_transform_final(重く長い)より明確に短く軽い扱いにする(尺・音域の
+  // 両方で格差を付け、最終進化の重量感を相対的に際立たせる設計)。
+  trouble_transform: () =>
+    concat([
+      renderTone({ waveform: "square", freqStart: 660, durationMs: 35, peak: 0.4, attackMs: 1, decayExp: 6 }), // ポン
+      silence(12),
+      renderTone({ waveform: "triangle", freqStart: 260, freqEnd: 340, durationMs: 80, peak: 0.32, attackMs: 3, decayExp: 2 }), // ボ(揺れ上がり)
+      renderTone({ waveform: "triangle", freqStart: 340, freqEnd: 220, durationMs: 110, peak: 0.34, attackMs: 2, decayExp: 2.5 }), // ワーン(揺れ下がり)
+      silence(15),
+      renderTone({ waveform: "square", freqStart: 196, durationMs: 150, peak: 0.42, attackMs: 2, decayExp: 4 }), // ドン(低い着地)
+    ]),
+
+  // Polish Phase P1 S-3f-3: 妨害キャラの変身SEの最終形態側(例: sake→seagullKing)。
+  // 「低い予兆(緩やかにスウェルする低音、attackMsを長くして"溜め"を作る)→短い静寂→
+  // 重い衝撃(低い矩形波の長い減衰音・中音域の短いクラック・ノイズを同時に重ねた三重和音)」の
+  // 2段構成、合計約880ms。game_over_fanfare/elimination_outと同じ「重要イベント」の音域(80Hz
+  // 台の低音を使うのはこのSEが全SE中で最も低い)に位置付けつつ、game_over_fanfareほど長い
+  // ファンファーレにはせず(仕様の「長すぎない」制約)、衝撃音1発で完結させる。
+  // trouble_transformとは(a)予兆となる長いattackMsのスウェルがある、(b)矩形波/三角波/ノイズの
+  // 3声を同時に重ねる、(c)音域が全体的に1オクターブ以上低い、の3点すべてで明確に区別される。
+  trouble_transform_final: () =>
+    concat([
+      // 予兆: 緩やかにスウェルする低い唸り(attackMs=250でゆっくり音量が立ち上がる"溜め")。
+      renderTone({ waveform: "triangle", freqStart: 90, freqEnd: 110, durationMs: 300, peak: 0.3, attackMs: 250, decayExp: 0.8 }),
+      silence(30),
+      // 衝撃: 低い矩形波の長い着地音+中音域のクラック+ノイズを同時に重ねた三重和音。
+      mix([
+        renderTone({ waveform: "square", freqStart: 55, durationMs: 550, peak: 0.42, attackMs: 2, decayExp: 2 }),
+        renderTone({ waveform: "square", freqStart: 220, durationMs: 120, peak: 0.28, attackMs: 1, decayExp: 5 }),
+        renderNoise({ durationMs: 50, peak: 0.35, decayExp: 7, seed: 13 }),
+      ]),
     ]),
 };
 

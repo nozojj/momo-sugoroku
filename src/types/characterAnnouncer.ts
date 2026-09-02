@@ -34,6 +34,10 @@ export interface AnnouncerEffectConfig {
   warnRing?: boolean;
   /** highlight表示時にキャラクターを軽くshakeさせる(negativeテーマの既定演出) */
   shakeOnHighlight?: boolean;
+  /** キャラクター周辺で一瞬だけ強く光ってすぐ消える「衝撃」演出。どのテーマにも既定値は
+   *  持たせず(Polish Phase P1 S-3f-3時点では妨害キャラの最終形態変身のみが明示的に指定する)、
+   *  必ずCharacterAnnouncement.effectでの個別指定を必要とする。 */
+  impactFlash?: boolean;
 }
 
 export interface CharacterLine {

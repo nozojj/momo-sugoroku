@@ -12,10 +12,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
 import type { TroubleCharacterAnnounceInfo } from "@/types/game";
 import { CHARACTER_ANNOUNCER_TIMING } from "@/lib/game/characterAnnouncerTiming";
+import { playSE } from "@/lib/audio/soundManager";
 import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
+
+// Polish Phase P1 S-3f-3: 変身SE(playSE)の発火有無だけを検証したいので、実際の音声再生
+// (soundManager.tsのHTMLAudioElement周り)はMonopolyAnnounceModal.test.tsx等と同じくモック化する。
+vi.mock("@/lib/audio/soundManager", () => ({
+  playSE: vi.fn(),
+}));
+const playSEMock = vi.mocked(playSE);
 
 afterEach(() => {
   cleanup();
+  playSEMock.mockClear();
 });
 
 // jsdomはwindow.matchMediaを実装していない(既知の既定動作)。CharacterAnnouncerが使う
@@ -103,5 +112,114 @@ describe("TroubleCharacterAnnounceModal: 既存kindの描画に回帰が無い",
       expect(imgSrc(container)).toBe("/characters/troubleChar/normal.webp");
       unmount();
     }
+  });
+});
+
+describe("TroubleCharacterAnnounceModal: 変身SE(Polish Phase P1 S-3f-3)", () => {
+  it("normal→sake(通常進化)はマウント時にplaySE(\"trouble_transform\")を1回だけ呼ぶ", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "normal", toFormId: "sake" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_transform");
+  });
+
+  it("sake→seagullKing(最終形態、formDef.transform不在から導出)はマウント時にplaySE(\"trouble_transform_final\")を1回だけ呼ぶ", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "sake", toFormId: "seagullKing" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_transform_final");
+  });
+
+  it("同じinfoでの再レンダーだけでは再発火しない(依存配列[info]が参照不変のため)", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "normal", toFormId: "sake" };
+    const { rerender } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+
+    rerender(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("mischiefでは変身SE(trouble_transform/trouble_transform_final)のどちらも鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "mischief", playerId: "p1", playerName: "プレイヤー1", mischiefKind: "money", message: "なにかが起きた" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_transform");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_transform_final");
+  });
+
+  it("appearedでは変身SEを鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "appeared", ownerId: "p1", ownerName: "プレイヤー1" };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalled();
+  });
+
+  it("handoffでは変身SEを鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "handoff",
+      fromPlayerId: "p1",
+      fromPlayerName: "プレイヤー1",
+      toPlayerId: "p2",
+      toPlayerName: "プレイヤー2",
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalled();
+  });
+
+  it("transform→mischiefへinfoが直接差し替わった場合(S-3f-2のtransform→mischiefのつなぎ)、mischief側ではtransform用SEが再発火しない", () => {
+    const transformInfo: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "normal", toFormId: "sake" };
+    const { rerender } = render(<TroubleCharacterAnnounceModal info={transformInfo} onDismiss={() => {}} />);
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    playSEMock.mockClear();
+
+    const mischiefInfo: TroubleCharacterAnnounceInfo = { kind: "mischief", playerId: "p1", playerName: "プレイヤー1", mischiefKind: "money", message: "なにかが起きた" };
+    rerender(<TroubleCharacterAnnounceModal info={mischiefInfo} onDismiss={() => {}} />);
+
+    expect(playSEMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("TroubleCharacterAnnounceModal: 変身演出の強度差(Polish Phase P1 S-3f-3、phase:\"line\"まで進めて確認)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** entering→line遷移(bounce演出込み)だけ進める。AnnouncerEffectLayerはphase:"line"でのみ描画される。 */
+  function advanceToLine(): void {
+    act(() => {
+      vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.slideInMs + CHARACTER_ANNOUNCER_TIMING.bounceMs);
+    });
+  }
+
+  it("normal→sakeはimpactFlashなし、warnRingはwarningテーマのオレンジ系のまま", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "normal", toFormId: "sake" };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.querySelector(".animate-announcer-impact-flash")).toBeNull();
+    const ring = container.querySelector(".animate-announcer-warn-ring");
+    expect(ring).not.toBeNull();
+    expect(ring!.className).toContain("border-orange-400");
+    expect(ring!.className).not.toContain("border-rose-400");
+  });
+
+  it("sake→seagullKingはimpactFlashあり、warnRingはnegativeテーマのローズ/赤系になる", () => {
+    const info: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "sake", toFormId: "seagullKing" };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.querySelector(".animate-announcer-impact-flash")).not.toBeNull();
+    const ring = container.querySelector(".animate-announcer-warn-ring");
+    expect(ring).not.toBeNull();
+    expect(ring!.className).toContain("border-rose-400");
+    expect(ring!.className).not.toContain("border-orange-400");
   });
 });

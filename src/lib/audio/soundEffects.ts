@@ -16,6 +16,9 @@
  *
  * P11-3-B2b-3で追加(最終順位発表演出の脱落コースアウト専用): elimination_out。
  * 既存destination_revealはholding(順位発表)側に流用するのみで新規追加していない。
+ *
+ * Polish Phase P1 S-3f-3で追加(妨害キャラの変身、TroubleCharacterAnnounceModal.tsxの
+ * kind:"transform"専用): trouble_transform(通常進化)/trouble_transform_final(最終進化)。
  */
 export type SoundEffectId =
   | "dice_roll"
@@ -32,7 +35,9 @@ export type SoundEffectId =
   | "destination_reveal"
   | "game_over_fanfare"
   | "ui_select"
-  | "elimination_out";
+  | "elimination_out"
+  | "trouble_transform"
+  | "trouble_transform_final";
 
 export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Phase10/P10-4-1: 手続き的生成(scripts/generate-se.mjs)によるWAV。他の未配置idとの
@@ -57,4 +62,7 @@ export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   ui_select: "/sounds/ui_select.wav",
   // P11-3-B2b-3: 同じくscripts/generate-se.mjsによるWAV。
   elimination_out: "/sounds/elimination_out.wav",
+  // Polish Phase P1 S-3f-3: 同じくscripts/generate-se.mjsによるWAV。
+  trouble_transform: "/sounds/trouble_transform.wav",
+  trouble_transform_final: "/sounds/trouble_transform_final.wav",
 };

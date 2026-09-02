@@ -48,6 +48,18 @@ export function getTroubleCharacterFormDef(formId: TroubleCharacterFormId): Trou
   return troubleCharacterFormDefs.find((f) => f.id === formId);
 }
 
+/**
+ * formIdが「これ以上の進化先を持たない最終形態」かどうかを判定する(Polish Phase P1 S-3f-3で
+ * TroubleCharacterAnnounceModal.tsxから切り出し)。判定基準はdecideTroubleCharacterTransform()と
+ * 同じく「transformフィールドの有無」のみで、"seagullKing"のような具体的なformId文字列には
+ * 一切依存しない。将来さらに形態を追加してもこの関数の呼び出し側(演出テーマ・SE選択)は
+ * 変更不要になる。formIdが未知(理論上到達しない)の場合もtrue側にfail-closeし、見つからない
+ * 形態を「まだ先がある」と誤判定して演出を弱めにしないようにする。
+ */
+export function isFinalTroubleCharacterForm(formId: TroubleCharacterFormId): boolean {
+  return !getTroubleCharacterFormDef(formId)?.transform;
+}
+
 /** 初登場時・handoff成功時に必ず戻る基準(通常)形態のid。gameStore.ts側でリテラル"normal"を
  *  複数箇所に直書きしないための共有定数(意味は同じだが、書き間違い防止のため1箇所にまとめる)。 */
 export const TROUBLE_CHARACTER_BASE_FORM_ID: TroubleCharacterFormId = "normal";

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CharacterAnnouncement, CharacterEnterDirection, CharacterExpression } from "@/types/characterAnnouncer";
 import { CHARACTER_ANNOUNCER_TIMING } from "@/lib/game/characterAnnouncerTiming";
-import { resolveAnnouncerEffect } from "@/lib/game/characterAnnouncerTheme";
+import { resolveAnnouncerEffect, resolveWarnRingClass } from "@/lib/game/characterAnnouncerTheme";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { CharacterSprite } from "./CharacterSprite";
@@ -43,6 +43,7 @@ export function CharacterAnnouncer({ announcement, onComplete }: CharacterAnnoun
   const { lines, side, enterDirection } = announcement;
   const theme = announcement.theme ?? "normal";
   const effectConfig = resolveAnnouncerEffect(theme, announcement.effect);
+  const warnRingClass = resolveWarnRingClass(theme);
   const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsMobileViewport();
 
@@ -157,7 +158,7 @@ export function CharacterAnnouncer({ announcement, onComplete }: CharacterAnnoun
           {/* 紙吹雪/キラキラ/警告リングはこのキャラクター周辺の枠内に限定し、盤面全体は覆わない。
               key=lineIndexで行が進むたびに演出を再生し直す(highlight表示の行でも確実に発火する)。 */}
           {phase === "line" && !reduceMotion && (
-            <AnnouncerEffectLayer key={lineIndex} effect={effectConfig} mobile={isMobile} />
+            <AnnouncerEffectLayer key={lineIndex} effect={effectConfig} mobile={isMobile} warnRingClass={warnRingClass} />
           )}
         </div>
         {isOnscreen && currentLine && <SpeechBubble line={currentLine} side={side} theme={theme} />}

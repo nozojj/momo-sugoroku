@@ -229,6 +229,29 @@ body {
   animation: announcer-warn-ring 1500ms ease-out infinite;
 }
 
+/* Polish Phase P1 S-3f-3: 妨害キャラの最終形態変身専用(AnnouncerEffectConfig.impactFlash)。
+   キャラクターの足元付近(warnRingと同じ-inset領域)を中心に一瞬だけ強く光ってすぐ消える
+   「衝撃」演出。mix-blend-mode:screenで暗い部分を透かすため、白一色で塗りつぶしてキャラクター
+   本番画像(カモメ魔王等)を隠さない。confetti-fall/vehicle-transform-flashと同じ「一度きり
+   なのでinfiniteではなくboth」の方針。 */
+@keyframes announcer-impact-flash {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(1.05);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+.animate-announcer-impact-flash {
+  animation: announcer-impact-flash 380ms ease-out both;
+}
+
 @keyframes spotlight-glow {
   0% {
     transform: scale(0.85);
@@ -555,6 +578,7 @@ body {
   .animate-highlight-slam,
   .animate-announcer-sparkle,
   .animate-announcer-warn-ring,
+  .animate-announcer-impact-flash,
   .animate-confetti-fall,
   .animate-spotlight-glow,
   .animate-spotlight-pop,

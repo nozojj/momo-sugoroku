@@ -9,6 +9,7 @@ import {
   applyTroubleCharacterMischief,
   isTroubleCharacterFormId,
   getTroubleCharacterFormDef,
+  isFinalTroubleCharacterForm,
   decideTroubleCharacterTransform,
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
@@ -241,6 +242,21 @@ describe("getTroubleCharacterFormDef()(S-3b)", () => {
       const picked = drawTroubleCharacterMischief(formDef.mischiefPool);
       expect(["trouble_money_pinch", "trouble_debuff_halve", "trouble_debuff_skip"]).toContain(picked.id);
     }
+  });
+});
+
+describe("isFinalTroubleCharacterForm()(Polish Phase P1 S-3f-3)", () => {
+  it("normal/sake(transformを持つ形態)はfalseを返す", () => {
+    expect(isFinalTroubleCharacterForm("normal")).toBe(false);
+    expect(isFinalTroubleCharacterForm("sake")).toBe(false);
+  });
+
+  it("seagullKing(transformを持たない最終形態)はtrueを返す", () => {
+    expect(isFinalTroubleCharacterForm("seagullKing")).toBe(true);
+  });
+
+  it("未知のformIdはtrue側にfail-closeする(見つからない形態を通常進化扱いにして演出を弱めない)", () => {
+    expect(isFinalTroubleCharacterForm("no_such_form" as TroubleCharacterFormId)).toBe(true);
   });
 });
 
