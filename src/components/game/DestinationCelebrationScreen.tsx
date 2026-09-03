@@ -51,7 +51,7 @@ function buildCelebrationLines(arrivalInfo: ArrivalInfo): CharacterLine[] {
   return [
     { text: "おめでとうございます!" },
     { text: `${arrivalInfo.playerName}さんが「${arrivalInfo.destinationName}」に到着しました!` },
-    { text: "到着援助金!", highlight: { amount: arrivalInfo.bonus } },
+    { text: "到着援助金!", highlight: { kind: "money", amount: arrivalInfo.bonus } },
     { text: "それでは次の目的地を決めましょう!" },
   ];
 }

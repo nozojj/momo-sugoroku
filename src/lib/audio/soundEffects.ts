@@ -23,6 +23,12 @@
  * Polish Phase P1 S-3f-4で追加(妨害キャラの悪さ、TroubleCharacterAnnounceModal.tsxの
  * kind:"mischief"専用): trouble_mischief。毎ターン鳴る可能性がある高頻度SEのため、
  * trouble_transform_finalのような大げさな尺・音量にはせず、短く軽い「被害確定」の合図に留める。
+ *
+ * Polish Phase P1 S-3f-5で追加(重大mischief専用): trouble_mischief_heavy。severity判定
+ * (lib/game/troubleCharacter.tsのjudgeMischiefSeverity())が"heavy"のときだけ、trouble_mischiefの
+ * 代わりにこちらを鳴らす(二者択一、二重再生はしない)。trouble_mischiefより一段重い音にしつつ、
+ * trouble_transform_final(最終進化専用、約880ms)よりは明確に短く、毎ターン発生しうる高頻度SEの
+ * 尺には収める。
  */
 export type SoundEffectId =
   | "dice_roll"
@@ -42,7 +48,8 @@ export type SoundEffectId =
   | "elimination_out"
   | "trouble_transform"
   | "trouble_transform_final"
-  | "trouble_mischief";
+  | "trouble_mischief"
+  | "trouble_mischief_heavy";
 
 export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   // Phase10/P10-4-1: 手続き的生成(scripts/generate-se.mjs)によるWAV。他の未配置idとの
@@ -72,4 +79,6 @@ export const SOUND_EFFECT_SRC: Record<SoundEffectId, string> = {
   trouble_transform_final: "/sounds/trouble_transform_final.wav",
   // Polish Phase P1 S-3f-4: 同じくscripts/generate-se.mjsによるWAV。
   trouble_mischief: "/sounds/trouble_mischief.wav",
+  // Polish Phase P1 S-3f-5: 同じくscripts/generate-se.mjsによるWAV。
+  trouble_mischief_heavy: "/sounds/trouble_mischief_heavy.wav",
 };

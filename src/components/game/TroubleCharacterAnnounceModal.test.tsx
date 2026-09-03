@@ -369,3 +369,253 @@ describe("TroubleCharacterAnnounceModal: 変身演出の強度差(Polish Phase P
     expect(ring!.className).not.toContain("border-orange-400");
   });
 });
+
+// Polish Phase P1 S-3f-5: mischiefのseverityによる演出の強弱(重大なmischiefのみheavy専用SE
+// [trouble_mischief_heavy]・impactFlashを追加する)。severityは実際の被害結果から判定済みの値を
+// info.severityとしてそのまま受け取るだけで、ここでは再計算しない(troubleCharacter.test.tsの
+// judgeMischiefSeverity()側で判定ロジック自体は検証済み)。warnRingは追加しない(ループが長く、
+// 毎ターン発生しうるmischiefには過剰なため)。既存のS-3f-4 LIGHT/MEDIUM演出(highlightAmount・
+// shakeOnHighlight)は一切変更していない。
+describe("TroubleCharacterAnnounceModal: mischiefのseverity演出(Polish Phase P1 S-3f-5)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function advanceToLine(): void {
+    act(() => {
+      vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.slideInMs + CHARACTER_ANNOUNCER_TIMING.bounceMs);
+    });
+  }
+
+  function advanceToHighlightDelay(): void {
+    act(() => {
+      vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.highlightDelayMs);
+    });
+  }
+
+  it("severity:heavyのkind:moneyは、trouble_mischief_heavyを1回だけ鳴らし、trouble_mischiefは鳴らさない", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布ごと吹き飛ばされてしまった",
+      highlightAmount: -150,
+      severity: "heavy",
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_mischief");
+  });
+
+  it("severity省略(S-3f-4以前と同じ)のkind:moneyは、従来通りtrouble_mischiefのまま(trouble_mischief_heavyは鳴らない)", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布から少しお金が消えた",
+      highlightAmount: -50,
+    };
+    render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_mischief_heavy");
+  });
+
+  it("severity:heavyのkind:moneyは、金額highlightに加えてimpactFlashが追加され、highlightDelayMs後にshakeも発火する(warnRingは追加しない)", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布ごと吹き飛ばされてしまった",
+      highlightAmount: -150,
+      severity: "heavy",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.textContent).toContain("-150万円");
+    expect(container.querySelector(".animate-announcer-impact-flash")).not.toBeNull();
+    expect(container.querySelector(".animate-announcer-warn-ring")).toBeNull();
+    expect(container.querySelector(".animate-character-shake")).toBeNull(); // highlightDelayMs経過前はまだ発火しない
+
+    advanceToHighlightDelay();
+    expect(container.querySelector(".animate-character-shake")).not.toBeNull();
+  });
+
+  it("severity:heavyのkind:propertyLossは、実際に失った物件名を含むtextがhighlightとして表示され、heavy SE・impactFlash・shakeも発火する", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "propertyLoss",
+      message: "カモメ魔王が羽を広げ、所有物件の1つを丸ごと奪い去ってしまった",
+      highlightText: "湘南セントラル百貨店を失った!",
+      severity: "heavy",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.textContent).toContain("湘南セントラル百貨店を失った!");
+    expect(container.querySelector(".animate-announcer-impact-flash")).not.toBeNull();
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy");
+
+    advanceToHighlightDelay();
+    expect(container.querySelector(".animate-character-shake")).not.toBeNull();
+  });
+
+  it("severity:heavyのkind:cardDestroyは、実際に破壊された枚数を含むtextがhighlightとして表示され、heavy SE・impactFlashも発火する", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "cardDestroy",
+      message: "カモメ魔王の強烈な一睨みで、手札の一部が粉々に破壊されてしまった",
+      highlightText: "カードを3枚失った!",
+      severity: "heavy",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.textContent).toContain("カードを3枚失った!");
+    expect(container.querySelector(".animate-announcer-impact-flash")).not.toBeNull();
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy");
+  });
+
+  it("severity:medium(例: cardDestroy1枚)は、highlight無し・trouble_mischief(通常SE)のまま・impactFlashも追加されない(S-3f-4のLIGHT/MEDIUM演出を変えない)", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "cardDestroy",
+      message: "カモメ魔王の強烈な一睨みで、手札の一部が粉々に破壊されてしまった",
+      severity: "medium",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+    advanceToHighlightDelay();
+
+    expect(container.textContent).not.toContain("枚失った");
+    expect(container.querySelector(".animate-announcer-impact-flash")).toBeNull();
+    expect(container.querySelector(".animate-character-shake")).toBeNull();
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_mischief_heavy");
+  });
+
+  it("severity:heavyのkind:moneyNearbyは、S-3f-4通り所有者本人の金額だけがhighlightされ、heavy SE・impactFlashが追加される(二重highlightにはならない)", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "moneyNearby",
+      message: "カモメ魔王が巻き起こす嵐に、周りにいたプレイヤーまで巻き込まれた",
+      highlightAmount: -80,
+      severity: "heavy",
+    };
+    const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    advanceToLine();
+
+    expect(container.textContent).toContain("-80万円");
+    expect(container.querySelectorAll(".animate-highlight-slam")).toHaveLength(1); // highlightは1つだけ
+    expect(container.querySelector(".animate-announcer-impact-flash")).not.toBeNull();
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy");
+  });
+
+  it("同一info(severity:heavy)での再レンダーだけではtrouble_mischief_heavyが再発火しない", () => {
+    const info: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布ごと吹き飛ばされてしまった",
+      highlightAmount: -150,
+      severity: "heavy",
+    };
+    const { rerender } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+
+    rerender(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("transform→heavy mischiefへinfoが直接差し替わった場合、transform用SEが1回・trouble_mischief_heavyが1回だけ鳴り、trouble_mischief(通常)は鳴らない", () => {
+    const transformInfo: TroubleCharacterAnnounceInfo = { kind: "transform", fromFormId: "sake", toFormId: "seagullKing" };
+    const { rerender } = render(<TroubleCharacterAnnounceModal info={transformInfo} onDismiss={() => {}} />);
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_transform_final");
+    playSEMock.mockClear();
+
+    const heavyMischiefInfo: TroubleCharacterAnnounceInfo = {
+      kind: "mischief",
+      playerId: "p1",
+      playerName: "プレイヤー1",
+      mischiefKind: "money",
+      message: "財布ごと吹き飛ばされてしまった",
+      highlightAmount: -150,
+      severity: "heavy",
+    };
+    rerender(<TroubleCharacterAnnounceModal info={heavyMischiefInfo} onDismiss={() => {}} />);
+
+    expect(playSEMock).toHaveBeenCalledTimes(1);
+    expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy");
+    expect(playSEMock).not.toHaveBeenCalledWith("trouble_mischief");
+  });
+
+  describe("reduced-motion時(S-3f-5)", () => {
+    let originalMatchMedia: typeof window.matchMedia;
+
+    beforeEach(() => {
+      originalMatchMedia = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+    });
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it("severity:heavyでもshake/impactFlashは無効化されるが、highlight表示・heavy SEは維持される", () => {
+      const info: TroubleCharacterAnnounceInfo = {
+        kind: "mischief",
+        playerId: "p1",
+        playerName: "プレイヤー1",
+        mischiefKind: "money",
+        message: "財布ごと吹き飛ばされてしまった",
+        highlightAmount: -150,
+        severity: "heavy",
+      };
+      const { container } = render(<TroubleCharacterAnnounceModal info={info} onDismiss={() => {}} />);
+
+      // reduced-motion時はbounce待ちが無いため、slideInMs分だけ進めればline phaseに入る。
+      act(() => {
+        vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.slideInMs);
+      });
+      act(() => {
+        vi.advanceTimersByTime(CHARACTER_ANNOUNCER_TIMING.highlightDelayMs);
+      });
+
+      expect(playSEMock).toHaveBeenCalledWith("trouble_mischief_heavy"); // SEは維持される
+      expect(container.textContent).toContain("-150万円"); // highlight表示は維持される
+      expect(container.querySelector(".animate-announcer-impact-flash")).toBeNull(); // impactFlashは無効化
+      expect(container.querySelector(".animate-character-shake")).toBeNull(); // shakeも無効化
+    });
+  });
+});

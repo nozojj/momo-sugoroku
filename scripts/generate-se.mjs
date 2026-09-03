@@ -1,10 +1,10 @@
 // 効果音(SE)の手続き的生成スクリプト(Phase10/P10-4-1で新設、P10-4-2/P10-4-3/P10-4-4で拡張、
 // P11-3-B2b-3でelimination_outを追加、Polish Phase P1 S-3f-3でtrouble_transform/
-// trouble_transform_finalを追加、S-3f-4でtrouble_mischiefを追加)。
+// trouble_transform_finalを追加、S-3f-4でtrouble_mischiefを追加、S-3f-5でtrouble_mischief_heavyを追加)。
 //
-// 目的: 「出所不明の音源は使わない」方針のもと、全18種のSE(高頻度SE、money系、card/property系、
+// 目的: 「出所不明の音源は使わない」方針のもと、全19種のSE(高頻度SE、money系、card/property系、
 // monopoly系、destination系、game_over_fanfare、ui_select、elimination_out、trouble_transform系、
-// trouble_mischief)を、外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成
+// trouble_mischief系)を、外部素材に一切依存せずこのスクリプトだけで再現可能な形で生成する。波形合成
 // (矩形波/三角波/正弦波+ホワイトノイズ、線形アタック+指数ディケイのエンベロープ、複数音を重ねる
 // 和音合成)のみで、外部ライブラリ・サンプル音源は使用していない。ライセンス上の扱いは
 // public/sounds/LICENSES.md を参照(自作・パラメータ手続き生成のため権利上の懸念なし)。
@@ -13,14 +13,15 @@
 // 出力: public/sounds/{dice_roll,step_move,roulette_tick,money_gain,money_loss,
 //        card_get,card_use,property_buy,monopoly_group,monopoly_region,
 //        destination_arrive,destination_reveal,game_over_fanfare,ui_select,
-//        elimination_out,trouble_transform,trouble_transform_final,trouble_mischief}.wav
+//        elimination_out,trouble_transform,trouble_transform_final,trouble_mischief,
+//        trouble_mischief_heavy}.wav
 //        (44.1kHz, 16bit, mono PCM WAV)
 //
 // 各音のパラメータは下部のSOUND_DEFS内にすべて記述している。生成方式を変えずに音を調整したい
 // 場合は、このファイルの数値(周波数/尺/音量/減衰)だけを編集して再実行すればよい。
-// P10-4-1/P10-4-2/P10-4-3/P10-4-4/P11-3-B2b-3/S-3f-3で作成した既存17音の定義・生成コードは
-// S-3f-4でも一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-4で
-// SHA256ハッシュ比較により確認済み。S-3f-3/S-3f-4実施時にも同様に既存音のハッシュ不変を確認した)。
+// P10-4-1/P10-4-2/P10-4-3/P10-4-4/P11-3-B2b-3/S-3f-3/S-3f-4で作成した既存18音の定義・生成コードは
+// S-3f-5でも一切変更していない(再実行してもバイト単位で同一の出力になることをP10-4-4で
+// SHA256ハッシュ比較により確認済み。S-3f-3/S-3f-4/S-3f-5実施時にも同様に既存音のハッシュ不変を確認した)。
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -415,6 +416,29 @@ const SOUND_DEFS = {
       renderTone({ waveform: "square", freqStart: 420, freqEnd: 260, durationMs: 150, peak: 0.36, attackMs: 1, decayExp: 5 }), // ゲシッ(短い下降)
       silence(20),
       renderTone({ waveform: "square", freqStart: 180, durationMs: 150, peak: 0.34, attackMs: 1, decayExp: 4.5 }), // ズン(低い着地、被害確定)
+    ]),
+
+  // Polish Phase P1 S-3f-5: 妨害キャラの「重大な悪さ」(severity==="heavy"のmischiefのみ)専用SE。
+  // trouble_mischief(約330ms、矩形波2音)より明確に一段重い衝撃にしつつ、trouble_transform_final
+  // (約880ms、最終進化専用)より短く保つことで「最終進化そのもの」と「重大被害が発生した瞬間」を
+  // 尺・音の作りの両方で聞き分けられるようにする(仕様のtrouble_transform_finalより必ずしも派手に
+  // する必要はない、という要件に対応)。毎ターン発生しうる高頻度SEのため長尺化は避け、目安の
+  // 350〜550msに収まるよう合計約424msに設計している。
+  // 構成: (1) ドシュッ(trouble_mischiefのピシッより強いノイズonset)→(2) ゴシャッ(trouble_mischiefの
+  // ゲシッより深く・長く落ちる下降、420→260Hzに対し480→220Hz/150msに対し170ms)→(3) 短い静寂→
+  // (4) ドスン(trouble_mischiefのズン[180Hz]より低い130Hzの着地)にノイズの「砕ける」質感を
+  // mix()で重ねる(trouble_mischiefには無い、trouble_transform_finalの三重和音を短く軽量化した
+  // 程度の厚み)。trouble_mischiefとは(a)ノイズonsetの強さ、(b)下降の深さ・尺、(c)着地音の
+  // 低さ、(d)着地にノイズが重なる(mix)かどうか、の4点すべてで区別できる。
+  trouble_mischief_heavy: () =>
+    concat([
+      renderNoise({ durationMs: 14, peak: 0.32, decayExp: 8, seed: 19 }), // ドシュッ(重い被害onset)
+      renderTone({ waveform: "square", freqStart: 480, freqEnd: 220, durationMs: 170, peak: 0.4, attackMs: 1, decayExp: 4.5 }), // ゴシャッ(深く落ちる下降)
+      silence(20),
+      mix([
+        renderTone({ waveform: "square", freqStart: 130, durationMs: 220, peak: 0.4, attackMs: 1, decayExp: 3 }), // ドスン(低い着地)
+        renderNoise({ durationMs: 60, peak: 0.18, decayExp: 6, seed: 23 }), // 着地に重なる砕けるノイズ
+      ]),
     ]),
 };
 

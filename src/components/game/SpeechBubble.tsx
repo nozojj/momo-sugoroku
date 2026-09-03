@@ -33,8 +33,14 @@ export function SpeechBubble({ line, side, theme }: SpeechBubbleProps) {
           className={`animate-highlight-slam mt-1 text-2xl font-black sm:text-3xl ${themeStyle.accentTextClass}`}
           style={{ animationDelay: `${CHARACTER_ANNOUNCER_TIMING.highlightDelayMs}ms` }}
         >
-          {line.highlight.label ? `${line.highlight.label} ` : ""}
-          {formatMoneyDelta(line.highlight.amount)}
+          {line.highlight.kind === "money" ? (
+            <>
+              {line.highlight.label ? `${line.highlight.label} ` : ""}
+              {formatMoneyDelta(line.highlight.amount)}
+            </>
+          ) : (
+            line.highlight.text
+          )}
         </p>
       )}
       <div

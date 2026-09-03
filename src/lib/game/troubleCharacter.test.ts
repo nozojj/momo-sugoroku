@@ -11,9 +11,12 @@ import {
   getTroubleCharacterFormDef,
   isFinalTroubleCharacterForm,
   decideTroubleCharacterTransform,
+  judgeMischiefSeverity,
+  deriveMischiefAnnounceHighlight,
   TROUBLE_CHARACTER_SOURCE_ID,
   TROUBLE_CHARACTER_SOURCE_NAME,
   TROUBLE_CHARACTER_NEARBY_MAX_DISTANCE,
+  TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD,
   pickRandomDistinct,
 } from "@/lib/game/troubleCharacter";
 import { troubleCharacterMischiefDefs } from "@/data/troubleCharacterMischief";
@@ -21,7 +24,12 @@ import { troubleCharacterMischiefSakeDefs } from "@/data/troubleCharacterMischie
 import { troubleCharacterMischiefSeagullKingDefs } from "@/data/troubleCharacterMischiefSeagullKing";
 import { propertyDefs, getPropertyDef } from "@/data/properties";
 import { getCardDef } from "@/data/cards";
-import type { TroubleCharacterFormDef, TroubleCharacterFormId, TroubleCharacterMischiefDef } from "@/types/game";
+import type {
+  TroubleCharacterFormDef,
+  TroubleCharacterFormId,
+  TroubleCharacterMischiefDef,
+  TroubleCharacterMischiefOutcome,
+} from "@/types/game";
 
 const MAP_ID = "shonan-full";
 
@@ -994,5 +1002,311 @@ describe("pickRandomDistinct()の境界値(S-3e QA)", () => {
     const result = pickRandomDistinct(["a", "b", "c", "d", "e"], 2);
     expect(result).toHaveLength(2);
     expect(new Set(result).size).toBe(2); // 重複が無い
+  });
+});
+
+// Polish Phase P1 S-3f-5: applyTroubleCharacterMischief()の各分岐が、実際に適用した結果を
+// TroubleCharacterMischiefOutcomeとして正しく構造化して返すことを確認する。severity/highlight
+// はこのoutcomeだけを入力に判定するため、ここでoutcomeの正しさを担保しておくことが重要。
+describe("applyTroubleCharacterMischief(): outcome(実結果の構造化データ、Polish Phase P1 S-3f-5)", () => {
+  const map = getMap(MAP_ID);
+  const [PROPERTY_A, PROPERTY_B] = propertyDefs.slice(0, 2).map((def) => def.id);
+  const USABLE_CARD_A = "card_dice_again";
+  const USABLE_CARD_B = "card_double_move";
+
+  it("money種別: outcomeは実際に適用した金額をそのまま持つ", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX");
+    const mischief: TroubleCharacterMischiefDef = { id: "m", kind: "money", weight: 1, amount: -150, message: "テスト" };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({ kind: "money", amount: -150 });
+  });
+
+  it("moneyNearby種別: outcomeは実際に巻き込まれたプレイヤーだけをnearbyへ含める(範囲外は含まない)", () => {
+    const OWNER_NODE = "wp_komachi2";
+    const NEARBY_NODE = map.nodes.find((n) => n.id === OWNER_NODE)!.connections[0].to;
+    const FAR_NODE = "hub_kamakura";
+    const owner = createPlayer("owner", "所有者", 0, OWNER_NODE);
+    const nearby = createPlayer("nearby", "近くの人", 1, NEARBY_NODE);
+    const far = createPlayer("far", "遠くの人", 2, FAR_NODE);
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "moneyNearby",
+      weight: 1,
+      ownerAmount: -80,
+      nearbyAmount: -30,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner, nearby, far], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({
+      kind: "moneyNearby",
+      ownerAmount: -80,
+      nearby: [{ playerId: "nearby", playerName: "近くの人", amount: -30 }],
+    });
+  });
+
+  it("moneyNearby種別: 巻き添えが0人ならoutcome.nearbyは空配列になる", () => {
+    const owner = createPlayer("owner", "所有者", 0, "wp_komachi2");
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "moneyNearby",
+      weight: 1,
+      ownerAmount: -80,
+      nearbyAmount: -30,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({ kind: "moneyNearby", ownerAmount: -80, nearby: [] });
+  });
+
+  it("propertyLoss種別: 実際に物件を失った場合、outcomeはlost:trueと実際に失った物件id/名前を持つ", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0); // 配列先頭(PROPERTY_A)が選ばれる
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), ownedPropertyIds: [PROPERTY_A, PROPERTY_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({
+      kind: "propertyLoss",
+      lost: true,
+      propertyId: PROPERTY_A,
+      propertyName: getPropertyDef(PROPERTY_A)!.name,
+    });
+  });
+
+  it("propertyLoss種別: 所有物件が0件でfallbackAmountが適用された場合、outcomeはlost:falseとfallbackAmountを持つ(物件を失った扱いにしない)", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX"); // ownedPropertyIds: []
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "propertyLoss",
+      weight: 1,
+      fallbackAmount: -100,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({ kind: "propertyLoss", lost: false, fallbackAmount: -100 });
+  });
+
+  it("cardDestroy種別: outcome.destroyedは実際に破壊されたカードだけを持つ(maxCountではなく実結果)", () => {
+    const owner = { ...createPlayer("owner", "所有者", 0, "nodeX"), cardIds: [USABLE_CARD_A, USABLE_CARD_B] };
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3, // 所持は2枚だけなので、実際に壊れるのは2枚(定義値3ではない)
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    // pickRandomDistinct()は順序をシャッフルしうるため、破壊された2枚の集合(順不同)だけを比較する。
+    expect(result.outcome.kind).toBe("cardDestroy");
+    if (result.outcome.kind === "cardDestroy") {
+      expect([...result.outcome.destroyed].sort((a, b) => a.cardId.localeCompare(b.cardId))).toEqual(
+        [
+          { cardId: USABLE_CARD_A, cardName: getCardDef(USABLE_CARD_A)!.name },
+          { cardId: USABLE_CARD_B, cardName: getCardDef(USABLE_CARD_B)!.name },
+        ].sort((a, b) => a.cardId.localeCompare(b.cardId)),
+      );
+    }
+  });
+
+  it("cardDestroy種別: 破壊できるカードが無ければoutcome.destroyedは空配列になる(maxCount=3の定義があっても0枚)", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX"); // cardIds: []
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "cardDestroy",
+      weight: 1,
+      maxCount: 3,
+      excludeKeyCards: true,
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({ kind: "cardDestroy", destroyed: [] });
+  });
+
+  it("debuff種別: outcomeはdebuffKindをそのまま持つ", () => {
+    const owner = createPlayer("owner", "所有者", 0, "nodeX");
+    const mischief: TroubleCharacterMischiefDef = {
+      id: "m",
+      kind: "debuff",
+      weight: 1,
+      debuffKind: "skipNextRoll",
+      message: "テスト",
+    };
+
+    const result = applyTroubleCharacterMischief([owner], "owner", mischief, map);
+
+    expect(result.outcome).toEqual({ kind: "debuff", debuffKind: "skipNextRoll" });
+  });
+});
+
+// Polish Phase P1 S-3f-5: severity判定は実際の適用結果(TroubleCharacterMischiefOutcome)だけを
+// 見て決まり、mischief定義のkindやformId・"seagullKing"のような形態名には一切依存しない
+// ことを確認する。実データ(troubleCharacterMischiefDefs/Sake/SeagullKing)の実際の数値との
+// 整合も併せて検証する。
+describe("judgeMischiefSeverity()(Polish Phase P1 S-3f-5)", () => {
+  it("しきい値は-100万円である", () => {
+    expect(TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD).toBe(-100);
+  });
+
+  it("money: しきい値ちょうど(-100)はheavy、しきい値より軽い(-99)はlight", () => {
+    expect(judgeMischiefSeverity({ kind: "money", amount: -100 })).toBe("heavy");
+    expect(judgeMischiefSeverity({ kind: "money", amount: -99 })).toBe("light");
+  });
+
+  it("money: 実データのnormal/sake(-50万円)はlight、seagullKingのmoney_smash(-150万円)はheavy", () => {
+    const normalMoney = troubleCharacterMischiefDefs.find((m) => m.id === "trouble_money_pinch")!;
+    const seagullKingMoney = troubleCharacterMischiefSeagullKingDefs.find((m) => m.id === "trouble_seagullking_money_smash")!;
+    expect(normalMoney.kind).toBe("money");
+    expect(seagullKingMoney.kind).toBe("money");
+    if (normalMoney.kind === "money") expect(judgeMischiefSeverity({ kind: "money", amount: normalMoney.amount })).toBe("light");
+    if (seagullKingMoney.kind === "money")
+      expect(judgeMischiefSeverity({ kind: "money", amount: seagullKingMoney.amount })).toBe("heavy");
+  });
+
+  it("moneyNearby: 巻き添えが0人なら、所有者本人の被害額だけで判定される(定義上nearbyAmountがあるだけではheavyにならない)", () => {
+    // 実データ: seagullKingのnearby_storm(ownerAmount:-80)は、巻き添えが1人もいなければ
+    // 所有者本人の-80万円だけではしきい値(-100)に届かずmediumのまま。
+    expect(judgeMischiefSeverity({ kind: "moneyNearby", ownerAmount: -80, nearby: [] })).toBe("medium");
+  });
+
+  it("moneyNearby: 所有者+実際に巻き込まれた人数分の合計がしきい値を超えるとheavyになる", () => {
+    // 実データ: nearby_storm(owner:-80, nearby各-30)は、1人でも実際に巻き込まれれば
+    // 合計-110となりheavyになる。
+    expect(
+      judgeMischiefSeverity({
+        kind: "moneyNearby",
+        ownerAmount: -80,
+        nearby: [{ playerId: "p2", playerName: "P2", amount: -30 }],
+      }),
+    ).toBe("heavy");
+  });
+
+  it("moneyNearby: 実データのsake(nearby_splash、owner:-30/nearby各-10)は、複数人巻き込んでも現実的な人数ではheavyに届かない", () => {
+    const nearby = [1, 2, 3].map((i) => ({ playerId: `p${i}`, playerName: `P${i}`, amount: -10 }));
+    expect(judgeMischiefSeverity({ kind: "moneyNearby", ownerAmount: -30, nearby })).toBe("medium");
+  });
+
+  it("propertyLoss: 実際に物件を失った場合(lost:true)は常にheavy", () => {
+    expect(judgeMischiefSeverity({ kind: "propertyLoss", lost: true, propertyId: "x", propertyName: "テスト物件" })).toBe(
+      "heavy",
+    );
+  });
+
+  it("propertyLoss: 物件0件のためfallbackAmountが適用された場合(lost:false)は、money同じしきい値で判定する(定義上のkindだけでheavy扱いにしない)", () => {
+    // 実データ: seagullKingのproperty_seizeのfallbackAmountは-100万円(しきい値ちょうど)なので、
+    // 実際にfallbackが発動した回はheavyになる。
+    expect(judgeMischiefSeverity({ kind: "propertyLoss", lost: false, fallbackAmount: -100 })).toBe("heavy");
+    // 仮にfallbackAmountがしきい値より軽い値のデータだったとしても、kindが"propertyLoss"という
+    // だけでheavy扱いにはならない(値そのもので判定していることの境界値確認)。
+    expect(judgeMischiefSeverity({ kind: "propertyLoss", lost: false, fallbackAmount: -50 })).toBe("light");
+  });
+
+  it("cardDestroy: 実際に破壊された枚数で判定する(0枚=light、1枚=medium、2枚以上=heavy)", () => {
+    expect(judgeMischiefSeverity({ kind: "cardDestroy", destroyed: [] })).toBe("light");
+    expect(judgeMischiefSeverity({ kind: "cardDestroy", destroyed: [{ cardId: "a", cardName: "A" }] })).toBe("medium");
+    expect(
+      judgeMischiefSeverity({
+        kind: "cardDestroy",
+        destroyed: [
+          { cardId: "a", cardName: "A" },
+          { cardId: "b", cardName: "B" },
+        ],
+      }),
+    ).toBe("heavy");
+    expect(
+      judgeMischiefSeverity({
+        kind: "cardDestroy",
+        destroyed: [
+          { cardId: "a", cardName: "A" },
+          { cardId: "b", cardName: "B" },
+          { cardId: "c", cardName: "C" },
+        ],
+      }),
+    ).toBe("heavy");
+  });
+
+  it("debuff: debuffKindによらず常にlight", () => {
+    expect(judgeMischiefSeverity({ kind: "debuff", debuffKind: "halveDiceNextRoll" })).toBe("light");
+    expect(judgeMischiefSeverity({ kind: "debuff", debuffKind: "skipNextRoll" })).toBe("light");
+  });
+});
+
+describe("deriveMischiefAnnounceHighlight()(Polish Phase P1 S-3f-5)", () => {
+  it("money: severityに関わらず、実際の金額をamountとして返す(S-3f-4の挙動を変えない)", () => {
+    expect(deriveMischiefAnnounceHighlight({ kind: "money", amount: -50 }, "light")).toEqual({ amount: -50 });
+    expect(deriveMischiefAnnounceHighlight({ kind: "money", amount: -150 }, "heavy")).toEqual({ amount: -150 });
+  });
+
+  it("moneyNearby: severityに関わらず所有者本人の実額だけをamountとして返す(巻き込み額・巻き込み人数は含めない、S-3f-4の挙動を変えない)", () => {
+    const outcome: TroubleCharacterMischiefOutcome = {
+      kind: "moneyNearby",
+      ownerAmount: -80,
+      nearby: [{ playerId: "p2", playerName: "P2", amount: -30 }],
+    };
+    expect(deriveMischiefAnnounceHighlight(outcome, "heavy")).toEqual({ amount: -80 });
+  });
+
+  it("propertyLoss: heavy(実際に物件を失った)場合、物件名を含むtextを返す", () => {
+    const outcome: TroubleCharacterMischiefOutcome = {
+      kind: "propertyLoss",
+      lost: true,
+      propertyId: "x",
+      propertyName: "湘南セントラル百貨店",
+    };
+    expect(deriveMischiefAnnounceHighlight(outcome, "heavy")).toEqual({ text: "湘南セントラル百貨店を失った!" });
+  });
+
+  it("propertyLoss: heavy(fallback適用)の場合、「物件を失った」とは表示せず実際の金額をamountとして返す", () => {
+    const outcome: TroubleCharacterMischiefOutcome = { kind: "propertyLoss", lost: false, fallbackAmount: -100 };
+    expect(deriveMischiefAnnounceHighlight(outcome, "heavy")).toEqual({ amount: -100 });
+  });
+
+  it("propertyLoss: light(fallbackがしきい値未満の仮想データ)の場合、highlightを一切追加しない", () => {
+    const outcome: TroubleCharacterMischiefOutcome = { kind: "propertyLoss", lost: false, fallbackAmount: -50 };
+    expect(deriveMischiefAnnounceHighlight(outcome, "light")).toEqual({});
+  });
+
+  it("cardDestroy: heavy(2枚以上)の場合、実際の破壊枚数を含むtextを返す(定義値ではなく実結果)", () => {
+    const outcome: TroubleCharacterMischiefOutcome = {
+      kind: "cardDestroy",
+      destroyed: [
+        { cardId: "a", cardName: "A" },
+        { cardId: "b", cardName: "B" },
+        { cardId: "c", cardName: "C" },
+      ],
+    };
+    expect(deriveMischiefAnnounceHighlight(outcome, "heavy")).toEqual({ text: "カードを3枚失った!" });
+  });
+
+  it("cardDestroy: medium(1枚)の場合、highlightを追加しない(S-3f-4の「非金額mischiefはhighlight無し」を維持)", () => {
+    const outcome: TroubleCharacterMischiefOutcome = { kind: "cardDestroy", destroyed: [{ cardId: "a", cardName: "A" }] };
+    expect(deriveMischiefAnnounceHighlight(outcome, "medium")).toEqual({});
+  });
+
+  it("cardDestroy: light(0枚、実害なし)の場合、highlightを追加しない", () => {
+    const outcome: TroubleCharacterMischiefOutcome = { kind: "cardDestroy", destroyed: [] };
+    expect(deriveMischiefAnnounceHighlight(outcome, "light")).toEqual({});
+  });
+
+  it("debuff: 常にhighlightを追加しない", () => {
+    expect(deriveMischiefAnnounceHighlight({ kind: "debuff", debuffKind: "halveDiceNextRoll" }, "light")).toEqual({});
   });
 });

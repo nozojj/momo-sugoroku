@@ -737,3 +737,87 @@ describe("skipNextRollで所有者の手番が飛ばされる場合(S-3c)", () =
     expect(after.troubleCharacterAnnounceInfo).toBeNull(); // 悪さ通知も出ない(handoffも別途起きていない)
   });
 });
+
+// Polish Phase P1 S-3f-5: severity/highlightAmount/highlightTextが、実データ(seagullKingの
+// mischiefPool)を通じてgameStore.ts側で正しく配線されることを、advanceToNextTurn()経由の
+// 公開アクションだけで検証する(troubleCharacter.test.tsのjudgeMischiefSeverity()/
+// deriveMischiefAnnounceHighlight()単体テストとは別に、実際にgameStoreへ反映されることを
+// end-to-endで確認する)。seagullKingはtransformを持たない(最終形態)ため、Math.random()は
+// drawTroubleCharacterMischief()の抽選(および必要な場合のみpickRandomDistinct())にしか
+// 使われず、単一のmockReturnValueで決定論的に狙ったmischiefを選べる。
+describe("重大mischief(severity heavy)のgameStore配線(advanceToNextTurn経由、実データ)(Polish Phase P1 S-3f-5)", () => {
+  function arriveAtDestinationFocusAsSeagullKing(ownerId: "p1" | "p2"): void {
+    useGameStore.setState((s) => ({
+      players: [
+        { ...s.players[0], currentNodeId: START_3_AWAY, moveHistory: [START_3_AWAY] },
+        { ...s.players[1], currentNodeId: OTHER_HUB, moveHistory: [OTHER_HUB] },
+      ],
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+      troubleCharacterOwnerId: ownerId,
+      troubleCharacterFormId: "seagullKing",
+      troubleCharacterPossessionCount: 2,
+      troubleCharacterAnnounceInfo: null,
+    }));
+    mockSingleDiceFace(3);
+    useGameStore.getState().rollDice();
+    driveToLanding();
+    useGameStore.getState().continueAfterArrival();
+  }
+
+  function advanceToNextPlayer(): void {
+    useGameStore.getState().continueAfterDestinationFocus();
+  }
+
+  it("money_smash(実データ-150万円)が選ばれると、severity:heavy・highlightAmount:-150で通知され、highlightTextは持たない", () => {
+    arriveAtDestinationFocusAsSeagullKing("p2");
+    vi.spyOn(Math, "random").mockReturnValue(0.4); // weight配分(35/25/20/20)でmoney_smash(累積範囲[35,60))になる値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo).toMatchObject({
+      kind: "mischief",
+      mischiefKind: "money",
+      highlightAmount: -150,
+      severity: "heavy",
+    });
+    if (after.troubleCharacterAnnounceInfo?.kind === "mischief") {
+      expect(after.troubleCharacterAnnounceInfo.highlightText).toBeUndefined();
+    }
+  });
+
+  it("property_seize(所有物件0件→fallback実データ-100万円)は、「物件を失った」とは表示せずseverity:heavy・highlightAmount:-100で通知される", () => {
+    arriveAtDestinationFocusAsSeagullKing("p2"); // p2はownedPropertyIds未設定(0件)のまま
+    vi.spyOn(Math, "random").mockReturnValue(0.1); // weight配分でproperty_seize(累積範囲[0,35))になる値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo).toMatchObject({
+      kind: "mischief",
+      mischiefKind: "propertyLoss",
+      highlightAmount: -100,
+      severity: "heavy",
+    });
+    if (after.troubleCharacterAnnounceInfo?.kind === "mischief") {
+      expect(after.troubleCharacterAnnounceInfo.highlightText).toBeUndefined(); // 物件名は表示しない(実際に失っていないため)
+    }
+  });
+
+  it("card_annihilate(所持カード2枚)は、実際に破壊された枚数(2枚、maxCount=3ではない)を反映したhighlightText・severity:heavyで通知される", () => {
+    useGameStore.setState((s) => ({
+      players: s.players.map((p, i) => (i === 1 ? { ...p, cardIds: ["card_dice_again", "card_double_move"] } : p)),
+    }));
+    arriveAtDestinationFocusAsSeagullKing("p2");
+    vi.spyOn(Math, "random").mockReturnValue(0.9); // weight配分でcard_annihilate(累積範囲[80,100))になる値
+    advanceToNextPlayer();
+
+    const after = useGameStore.getState();
+    expect(after.troubleCharacterAnnounceInfo).toMatchObject({
+      kind: "mischief",
+      mischiefKind: "cardDestroy",
+      highlightText: "カードを2枚失った!",
+      severity: "heavy",
+    });
+    expect(after.players.find((p) => p.id === "p2")!.cardIds).toEqual([]); // 所持していた2枚とも破壊された
+  });
+});

@@ -5,6 +5,8 @@ import type {
   TroubleCharacterFormDef,
   TroubleCharacterFormId,
   TroubleCharacterMischiefDef,
+  TroubleCharacterMischiefOutcome,
+  TroubleCharacterMischiefSeverity,
   TroubleCharacterTransformStep,
 } from "@/types/game";
 import { shortestDistance } from "@/lib/game/mapGraph";
@@ -64,22 +66,100 @@ export function isFinalTroubleCharacterForm(formId: TroubleCharacterFormId): boo
  *  複数箇所に直書きしないための共有定数(意味は同じだが、書き間違い防止のため1箇所にまとめる)。 */
 export const TROUBLE_CHARACTER_BASE_FORM_ID: TroubleCharacterFormId = "normal";
 
+/** severity判定でmoney系(money/moneyNearby/propertyLossのfallback)を"heavy"とみなす、
+ *  実損失合計(万円、符号付き)のしきい値(Polish Phase P1 S-3f-5)。実データ(data/troubleCharacter
+ *  Mischief*.ts)との整合: normal/sakeのmoney/moneyNearby(所有者本人-50/-30万円)はいずれも
+ *  この閾値を上回らずlight/medium扱いのまま、seagullKingのmoney(-150万円)・propertyLossの
+ *  fallbackAmount(-100万円、所有物件0件のため代替適用される場合)はちょうど閾値を満たしheavy
+ *  になる。moneyNearbyは「所有者本人+実際に巻き込まれた人数分」の合計で判定するため、
+ *  定義上nearbyAmountが存在するだけで誰も巻き込まれていない回はheavyにならない
+ *  (judgeMischiefSeverity()参照)。 */
+export const TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD = -100;
+
+/** cardDestroyで「複数枚失った」とみなす、実際に破壊された枚数のしきい値(Polish Phase
+ *  P1 S-3f-5)。0枚(破壊対象が無く実害なし)はlight、1枚はmedium、2枚以上でheavyになる。 */
+const HEAVY_CARD_DESTROY_MIN_DESTROYED_COUNT = 2;
+
 /**
- * mischief定義から、TroubleCharacterAnnounceInfo(kind:"mischief")のhighlightAmountへ渡す値を
- * 導出する(Polish Phase P1 S-3f-4)。applyTroubleCharacterMischief()が実際に所有者の所持金へ
- * 適用する値(kind:"money"のamount、kind:"moneyNearby"のownerAmount)をそのまま返すだけで、
- * ここでも呼び出し側(gameStore.ts)でも計算はしない(「gameStore側で既に確定している実際の
- * 被害額をそのまま渡す、表示側で再計算しない」という要件を、値の発生源を1箇所に保つことで
- * 保証する)。moneyNearby種別の巻き込み対象(nearbyAmount)はこのアナウンス自体が所有者本人
- * 向けの通知であるため含めない(所有者本人が受けた金額のみを表す値、という意味を曖昧にしない)。
- * debuff/propertyLoss/cardDestroyは金額を持たないためundefinedを返し、呼び出し側は
- * highlightAmountフィールド自体を省略する(S-3f-4のスコープは金額系mischiefの底上げのみ、
- * 非金額mischiefの演出強化はS-3f-5候補)。
+ * mischiefの演出強度を、applyTroubleCharacterMischief()が実際に確定させた結果
+ * (TroubleCharacterMischiefOutcome)だけから判定する純関数(Polish Phase P1 S-3f-5)。
+ * mischief定義(kind)やformId・"seagullKing"のような形態名には一切依存しない。「カモメ魔王
+ * だから派手にする」ではなく「実際に起きた被害の大きさ」だけを見る、という要件をこの関数
+ * だけで保証する。
+ *
+ * - money: 実際に適用された金額がTROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD以下ならheavy、
+ *   そうでなければlight。
+ * - moneyNearby: 所有者本人+実際に巻き込まれた全員の被害を合算した値で判定する(medium/heavy)。
+ *   巻き込み0人の回は所有者本人の被害額だけで判定されるため、nearbyAmountが定義上存在する
+ *   だけではheavyにならない。
+ * - propertyLoss: 実際に物件を失った(lost:true)場合は常にheavy(取り返しのつかない資産損失、
+ *   金額換算しない)。物件0件のためfallbackAmountが適用された(lost:false)場合は、実際に
+ *   発生したのは「ただの金銭被害」なのでmoneyと同じ閾値で判定する(定義上のkindが
+ *   "propertyLoss"であることだけでheavy扱いにはしない)。
+ * - cardDestroy: 実際に破壊された枚数がHEAVY_CARD_DESTROY_MIN_DESTROYED_COUNT以上ならheavy、
+ *   1枚ならmedium、0枚(実害なし)ならlight。定義上のmaxCountではなく、実際に破壊された
+ *   destroyed配列の長さだけを見る。
+ * - debuff: 金額・件数による被害規模を持たないため常にlight(S-3f-5では演出差を付けない)。
  */
-export function mischiefHighlightAmount(mischief: TroubleCharacterMischiefDef): number | undefined {
-  if (mischief.kind === "money") return mischief.amount;
-  if (mischief.kind === "moneyNearby") return mischief.ownerAmount;
-  return undefined;
+export function judgeMischiefSeverity(outcome: TroubleCharacterMischiefOutcome): TroubleCharacterMischiefSeverity {
+  switch (outcome.kind) {
+    case "money":
+      return outcome.amount <= TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD ? "heavy" : "light";
+    case "moneyNearby": {
+      const total = outcome.ownerAmount + outcome.nearby.reduce((sum, r) => sum + r.amount, 0);
+      return total <= TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD ? "heavy" : "medium";
+    }
+    case "propertyLoss":
+      if (outcome.lost) return "heavy";
+      return outcome.fallbackAmount <= TROUBLE_CHARACTER_MISCHIEF_HEAVY_MONEY_THRESHOLD ? "heavy" : "light";
+    case "cardDestroy":
+      if (outcome.destroyed.length >= HEAVY_CARD_DESTROY_MIN_DESTROYED_COUNT) return "heavy";
+      return outcome.destroyed.length === 1 ? "medium" : "light";
+    case "debuff":
+      return "light";
+  }
+}
+
+export interface TroubleCharacterMischiefAnnounceHighlight {
+  /** money/moneyNearbyの実被害額、またはpropertyLossがfallback(money代替)になった場合の
+   *  実被害額。TroubleCharacterAnnounceInfo.highlightAmountへそのまま渡す。 */
+  amount?: number;
+  /** propertyLoss(実際に物件を失った場合)・cardDestroy(heavy、複数枚破壊時)の実結果を
+   *  表す短いテキスト。TroubleCharacterAnnounceInfo.highlightTextへそのまま渡す。 */
+  text?: string;
+}
+
+/**
+ * TroubleCharacterAnnounceInfo(kind:"mischief")のhighlightAmount/highlightTextへ渡す値を、
+ * 実際の適用結果(outcome)とseverityだけから導出する(Polish Phase P1 S-3f-5、S-3f-4の
+ * mischiefHighlightAmount()を置き換え)。ここでも呼び出し側(gameStore.ts)でも被害内容の
+ * 再計算はしない。
+ *
+ * money/moneyNearbyは severity に関わらず既存通り所有者本人の実額をamountとして返す
+ * (S-3f-4のLIGHT/MEDIUM演出を1つも変えない)。moneyNearbyの巻き込み対象(nearby)は、
+ * このアナウンス自体が所有者本人向けの通知であるため含めない(S-3f-4から変更なし)。
+ *
+ * propertyLoss/cardDestroyは、severityが"heavy"のときだけhighlightを追加する
+ * (S-3f-4時点でこの2種にhighlightが一切無かった状態を、light/mediumでは変えないため)。
+ * propertyLossが実際に物件を失っていればtextで物件名を、物件0件のためfallbackAmountが
+ * 適用されていればamountで実際の金額被害を返す(「物件を失った」とは表示しない = 実際の
+ * 結果と一致させる)。cardDestroyは実際に破壊されたdestroyed配列の枚数をtextへそのまま使う
+ * (定義上のmaxCountではなく実結果)。
+ *
+ * debuffは金額・テキストのどちらも持たないため常に{}を返す(S-3f-4から変更なし)。
+ */
+export function deriveMischiefAnnounceHighlight(
+  outcome: TroubleCharacterMischiefOutcome,
+  severity: TroubleCharacterMischiefSeverity,
+): TroubleCharacterMischiefAnnounceHighlight {
+  if (outcome.kind === "money") return { amount: outcome.amount };
+  if (outcome.kind === "moneyNearby") return { amount: outcome.ownerAmount };
+  if (severity !== "heavy") return {};
+  if (outcome.kind === "propertyLoss") {
+    return outcome.lost ? { text: `${outcome.propertyName}を失った!` } : { amount: outcome.fallbackAmount };
+  }
+  if (outcome.kind === "cardDestroy") return { text: `カードを${outcome.destroyed.length}枚失った!` };
+  return {};
 }
 
 /**
@@ -216,6 +296,9 @@ export function drawTroubleCharacterMischief(pool: TroubleCharacterMischiefDef[]
 export interface TroubleCharacterMischiefApplication {
   players: Player[];
   logMessage: string;
+  /** 実際に適用された結果の構造化データ(Polish Phase P1 S-3f-5)。judgeMischiefSeverity()/
+   *  deriveMischiefAnnounceHighlight()の入力になる。 */
+  outcome: TroubleCharacterMischiefOutcome;
 }
 
 /** 「周囲巻き込み」mischief(kind: "moneyNearby")が対象とみなす、所有者からのグラフ距離
@@ -298,6 +381,7 @@ export function applyTroubleCharacterMischief(
     return {
       players: updated,
       logMessage: `${ownerName}さん: ${mischief.message}(${mischief.amount}万円)`,
+      outcome: { kind: "money", amount: mischief.amount },
     };
   }
 
@@ -308,14 +392,19 @@ export function applyTroubleCharacterMischief(
       if (nearbyIds.includes(p.id)) return { ...p, money: p.money + mischief.nearbyAmount };
       return p;
     });
-    const nearbyNames = players.filter((p) => nearbyIds.includes(p.id)).map((p) => p.name);
+    const nearbyPlayers = players.filter((p) => nearbyIds.includes(p.id));
     const nearbyPart =
-      nearbyNames.length > 0
-        ? `巻き添えで${nearbyNames.join("・")}さんも${mischief.nearbyAmount}万円`
+      nearbyPlayers.length > 0
+        ? `巻き添えで${nearbyPlayers.map((p) => p.name).join("・")}さんも${mischief.nearbyAmount}万円`
         : "幸い巻き添えは出なかった";
     return {
       players: updated,
       logMessage: `${ownerName}さん: ${mischief.message}(${mischief.ownerAmount}万円、${nearbyPart})`,
+      outcome: {
+        kind: "moneyNearby",
+        ownerAmount: mischief.ownerAmount,
+        nearby: nearbyPlayers.map((p) => ({ playerId: p.id, playerName: p.name, amount: mischief.nearbyAmount })),
+      },
     };
   }
 
@@ -326,6 +415,7 @@ export function applyTroubleCharacterMischief(
       return {
         players: updated,
         logMessage: `${ownerName}さん: ${mischief.message}(所有物件が無かったため${mischief.fallbackAmount}万円の被害に切り替わった)`,
+        outcome: { kind: "propertyLoss", lost: false, fallbackAmount: mischief.fallbackAmount },
       };
     }
     const lostPropertyId = ownedPropertyIds[Math.floor(Math.random() * ownedPropertyIds.length)];
@@ -336,6 +426,7 @@ export function applyTroubleCharacterMischief(
     return {
       players: updated,
       logMessage: `${ownerName}さん: ${mischief.message}(${propertyName}が未所有に戻った)`,
+      outcome: { kind: "propertyLoss", lost: true, propertyId: lostPropertyId, propertyName },
     };
   }
 
@@ -348,19 +439,24 @@ export function applyTroubleCharacterMischief(
       .filter(({ cardId }) => !mischief.excludeKeyCards || getCardDef(cardId)?.kind !== "key");
 
     if (destroyableSlots.length === 0) {
-      return { players, logMessage: `${ownerName}さん: ${mischief.message}(壊せるカードが無く実害は無かった)` };
+      return {
+        players,
+        logMessage: `${ownerName}さん: ${mischief.message}(壊せるカードが無く実害は無かった)`,
+        outcome: { kind: "cardDestroy", destroyed: [] },
+      };
     }
 
     const destroyedSlots = pickRandomDistinct(destroyableSlots, mischief.maxCount);
     const destroyedIndexSet = new Set(destroyedSlots.map((s) => s.index));
-    const destroyedNames = destroyedSlots.map((s) => getCardDef(s.cardId)?.name ?? s.cardId);
+    const destroyed = destroyedSlots.map((s) => ({ cardId: s.cardId, cardName: getCardDef(s.cardId)?.name ?? s.cardId }));
 
     const updated = players.map((p) =>
       p.id === ownerId ? { ...p, cardIds: p.cardIds.filter((_, i) => !destroyedIndexSet.has(i)) } : p,
     );
     return {
       players: updated,
-      logMessage: `${ownerName}さん: ${mischief.message}(${destroyedNames.join("・")}を失った)`,
+      logMessage: `${ownerName}さん: ${mischief.message}(${destroyed.map((d) => d.cardName).join("・")}を失った)`,
+      outcome: { kind: "cardDestroy", destroyed },
     };
   }
 
@@ -374,5 +470,6 @@ export function applyTroubleCharacterMischief(
   return {
     players: updated,
     logMessage: `${ownerName}さん: ${mischief.message}`,
+    outcome: { kind: "debuff", debuffKind: mischief.debuffKind },
   };
 }

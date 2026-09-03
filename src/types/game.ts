@@ -221,6 +221,33 @@ export interface YearEventAnnounceInfo {
  *  カモメ魔王専用の効果種別で、それぞれ所有物件・所持カードを直接減らす。 */
 export type TroubleCharacterMischiefKind = "money" | "debuff" | "moneyNearby" | "propertyLoss" | "cardDestroy";
 
+/** 妨害キャラの「悪さ」1回分の演出強度(Polish Phase P1 S-3f-5)。lightとmediumは現時点では
+ *  見た目上まったく区別しない(演出差を付けるのはheavyのみというS-3f-5のスコープ)ため、
+ *  現状の3値はほぼ「heavyかどうか」の2値と同義だが、将来lightとmediumを演出的に分ける余地を
+ *  残すため型としては3値のまま定義する。judgeMischiefSeverity()(lib/game/troubleCharacter.ts)
+ *  がTroubleCharacterMischiefOutcome(実際に起きた結果)だけを見て決める。 */
+export type TroubleCharacterMischiefSeverity = "light" | "medium" | "heavy";
+
+/** applyTroubleCharacterMischief()(lib/game/troubleCharacter.ts)が実際に適用した結果を、
+ *  kind別に構造化した値(Polish Phase P1 S-3f-5)。TroubleCharacterMischiefDef(「これから
+ *  何が起こりうるか」という定義)とは別物で、「実際に何が起きたか」だけを表す。
+ *  judgeMischiefSeverity()・アナウンス演出(highlightText等)はこの実結果だけを見て決め、
+ *  mischief定義のkindが一致していても実際の結果が異なるケース(例: propertyLossだが
+ *  所有物件0件のためmoney代替になった場合)を区別できるようにする。formId/形態名には
+ *  一切依存しない。 */
+export type TroubleCharacterMischiefOutcome =
+  | { kind: "money"; amount: number }
+  | {
+      kind: "moneyNearby";
+      ownerAmount: number;
+      /** 実際に巻き込まれた(距離が範囲内だった)プレイヤーだけを含む。0件もありうる。 */
+      nearby: { playerId: string; playerName: string; amount: number }[];
+    }
+  | { kind: "propertyLoss"; lost: true; propertyId: string; propertyName: string }
+  | { kind: "propertyLoss"; lost: false; fallbackAmount: number }
+  | { kind: "cardDestroy"; destroyed: { cardId: string; cardName: string }[] }
+  | { kind: "debuff"; debuffKind: DebuffKind };
+
 /** troubleCharacterMischief.tsで定義する「悪さ」1件分。weightはyearEventDefsと同じ
  *  「合計100」慣習の重み付き抽選に使う。いずれの種別もmessageは付与時のログ・通知にそのまま
  *  使うテキストで、ここでは金額や対象デバフ以外の計算ロジックは持たせない。 */
@@ -274,7 +301,16 @@ export type TroubleCharacterMischiefDef =
  *  ownerAmount)からそのまま読むだけで、ここでもUI側でも再計算はしない。money/moneyNearby以外
  *  (debuff/propertyLoss/cardDestroy)はundefinedのままにし、その場合TroubleCharacterAnnounceModal.tsxは
  *  highlightを一切追加しない(S-3f-4のスコープは「金額系mischiefの底上げ」のみで、
- *  被害規模・種別ごとの演出差分はS-3f-5候補として残す)。 */
+ *  被害規模・種別ごとの演出差分はS-3f-5候補として残す)。
+ *
+ *  highlightText/severity(Polish Phase P1 S-3f-5)は、highlightAmountでは表せない非金額の
+ *  実被害(物件名・破壊枚数)とseverity判定結果をgameStore.ts側で確定させ、そのまま
+ *  TroubleCharacterAnnounceModal.tsxへ渡すための追加フィールド。lib/game/troubleCharacter.tsの
+ *  judgeMischiefSeverity()/deriveMischiefAnnounceHighlight()が実際の適用結果
+ *  (TroubleCharacterMischiefOutcome)だけを見て求めるため、UI側では一切再計算しない。
+ *  どちらも省略可能(既存テスト・呼び出し元との後方互換のため): severity省略時は"light"相当
+ *  (S-3f-4までの通常演出)として扱う。highlightAmount/highlightTextは同時に両方立つことはない
+ *  (money/moneyNearbyはamount、propertyLoss/cardDestroyのheavyケースはtextのみを使う)。 */
 export type TroubleCharacterAnnounceInfo =
   | { kind: "appeared"; ownerId: string; ownerName: string }
   | { kind: "handoff"; fromPlayerId: string; fromPlayerName: string; toPlayerId: string; toPlayerName: string }
@@ -285,6 +321,8 @@ export type TroubleCharacterAnnounceInfo =
       mischiefKind: TroubleCharacterMischiefKind;
       message: string;
       highlightAmount?: number;
+      highlightText?: string;
+      severity?: TroubleCharacterMischiefSeverity;
     }
   | { kind: "transform"; fromFormId: TroubleCharacterFormId; toFormId: TroubleCharacterFormId };
 

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import type { TroubleCharacterAnnounceInfo } from "@/types/game";
-import type { CharacterAnnouncement } from "@/types/characterAnnouncer";
+import type { CharacterAnnouncement, CharacterLineHighlight } from "@/types/characterAnnouncer";
 import { getTroubleCharacterFormDef, isFinalTroubleCharacterForm } from "@/lib/game/troubleCharacter";
 import { playSE } from "@/lib/audio/soundManager";
 import { CharacterAnnouncer } from "./CharacterAnnouncer";
@@ -52,16 +52,30 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
         lines: [{ text: `妨害キャラが${info.fromPlayerName}さんから${info.toPlayerName}さんへ移った!`, expression: "troubled" }],
       };
 
-    case "mischief":
-      // highlightAmount(Polish Phase P1 S-3f-4): money/moneyNearby種別のmischiefのみ、
-      // gameStore.ts側で既に確定済みの被害額(info.highlightAmount、troubleCharacter.tsの
-      // mischiefHighlightAmount()参照)をCharacterLine.highlightへそのまま渡す(ここでは
-      // 再計算しない)。DestinationCelebrationScreen.tsxの到着ボーナス表示と同じ、既存の
-      // highlight機構をそのまま再利用しているだけで、演出コンポーネント自体は追加していない。
-      // 同じ1行にhighlightを載せる(行を増やさない)ことで、highlightHoldExtraMs分だけ
-      // 保持時間が伸びる以外はテンポに影響しない。debuff/propertyLoss/cardDestroy等
-      // highlightAmountが無い(undefined)種別は、highlightフィールド自体を付けない
-      // (S-3f-4のスコープは金額系mischiefの底上げのみ、非金額mischiefの演出強化はS-3f-5候補)。
+    case "mischief": {
+      // highlight(Polish Phase P1 S-3f-4で金額系、S-3f-5で非金額系のtextに拡張):
+      // gameStore.ts側で既に確定済みの実被害(info.highlightAmount/highlightText、
+      // troubleCharacter.tsのderiveMischiefAnnounceHighlight()参照)をCharacterLine.highlightへ
+      // そのまま渡す(ここでは再計算しない)。DestinationCelebrationScreen.tsxの到着ボーナス
+      // 表示と同じ、既存のhighlight機構をそのまま再利用しているだけで、演出コンポーネント
+      // 自体は追加していない。同じ1行にhighlightを載せる(行を増やさない)ことで、
+      // highlightHoldExtraMs分だけ保持時間が伸びる以外はテンポに影響しない。
+      // amount/textのどちらも無い(undefined)場合はhighlightフィールド自体を付けない
+      // (S-3f-4/S-3f-5のいずれでも、debuffや非heavyのpropertyLoss/cardDestroyはhighlight無しの
+      // まま=既存のLIGHT/MEDIUM演出を1つも変えない)。
+      const highlight: CharacterLineHighlight | undefined =
+        info.highlightAmount !== undefined
+          ? { kind: "money", amount: info.highlightAmount }
+          : info.highlightText !== undefined
+            ? { kind: "text", text: info.highlightText }
+            : undefined;
+      // isHeavy(Polish Phase P1 S-3f-5): severity省略時(S-3f-4以前のテスト等)はfalse扱いにし、
+      // 従来通りheavy専用の演出(impactFlash・heavy SE)を一切追加しない。impactFlashは
+      // S-3f-3で追加した既存effectをそのまま再利用するだけで、新しいCSS effectは増やさない。
+      // negativeテーマの既定演出(shakeOnHighlight)はeffectを個別指定してもresolveAnnouncerEffect()
+      // がマージするため、ここでimpactFlashだけ足してもshakeOnHighlightは維持される。warnRingは
+      // 追加しない(ループが長く、毎ターン発生しうるmischiefには過剰なため)。
+      const isHeavy = info.severity === "heavy";
       return {
         characterId: TROUBLE_CHARACTER_ID,
         expression: "troubled",
@@ -69,14 +83,16 @@ function buildAnnouncement(info: TroubleCharacterAnnounceInfo): CharacterAnnounc
         side: "left",
         animationType: "slide",
         theme: "negative",
+        ...(isHeavy ? { effect: { impactFlash: true } } : {}),
         lines: [
           {
             text: `${info.playerName}さん: ${info.message}`,
             expression: "troubled",
-            ...(info.highlightAmount !== undefined ? { highlight: { amount: info.highlightAmount } } : {}),
+            ...(highlight ? { highlight } : {}),
           },
         ],
       };
+    }
 
     case "transform": {
       // 変身前後の表示名・変身後characterIdはdata/troubleCharacterForms.tsから導出する
@@ -136,7 +152,11 @@ export function TroubleCharacterAnnounceModal({ info, onDismiss }: TroubleCharac
       return;
     }
     if (info.kind === "mischief") {
-      playSE("trouble_mischief");
+      // Polish Phase P1 S-3f-5: severity==="heavy"のときだけtrouble_mischief_heavyを鳴らし、
+      // それ以外(severity省略時のlight相当を含む)は従来通りtrouble_mischiefのまま。
+      // if/elseの一方だけが必ず実行されるため、同じmischief通知でtrouble_mischiefと
+      // trouble_mischief_heavyが二重に鳴ることはない。
+      playSE(info.severity === "heavy" ? "trouble_mischief_heavy" : "trouble_mischief");
     }
   }, [info]);
 

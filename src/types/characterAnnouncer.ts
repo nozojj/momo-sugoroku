@@ -40,18 +40,35 @@ export interface AnnouncerEffectConfig {
   impactFlash?: boolean;
 }
 
+/** セリフ1行の強調表示(highlight)。金額(kind:"money")とテキスト(kind:"text")の2種類を
+ *  型安全に区別するunion(Polish Phase P1 S-3f-5で、妨害キャラのpropertyLoss/cardDestroyの
+ *  ような非金額の実被害("○○を失った!"等)も表示できるよう拡張)。既存の金額highlight
+ *  (kind:"money")の挙動・フィールド(label/amount/holdExtraMs)は1つも変更していない。
+ *  holdExtraMsはどちらの種類でも共通に使える(CharacterAnnouncer.tsxの保持時間延長ロジックは
+ *  kindを判別しない)。 */
+export type CharacterLineHighlight =
+  | {
+      kind: "money";
+      label?: string;
+      amount: number;
+      /** この行の強調表示にどれだけ余分に時間を割くか(ms)。省略時はCHARACTER_ANNOUNCER_TIMING.highlightHoldExtraMsを使う。
+       *  金額が大きい/特殊イベントなど、行ごとに強調時間を変えたい場合にここを指定する。 */
+      holdExtraMs?: number;
+    }
+  | {
+      kind: "text";
+      /** 金額に変換できない実被害結果(例: "○○物件を失った!"、"カードを3枚失った!")を
+       *  そのまま表示する。 */
+      text: string;
+      holdExtraMs?: number;
+    };
+
 export interface CharacterLine {
   text: string;
   /** この行から表情を切り替えたい場合のみ指定(省略時は直前の表情を維持) */
   expression?: CharacterExpression;
-  /** 到着ボーナス・決算額のような数値を大きく強調表示したい行に使う */
-  highlight?: {
-    label?: string;
-    amount: number;
-    /** この行の強調表示にどれだけ余分に時間を割くか(ms)。省略時はCHARACTER_ANNOUNCER_TIMING.highlightHoldExtraMsを使う。
-     *  金額が大きい/特殊イベントなど、行ごとに強調時間を変えたい場合にここを指定する。 */
-    holdExtraMs?: number;
-  };
+  /** 到着ボーナス・決算額・妨害キャラの実被害結果のような、強調表示したい行に使う */
+  highlight?: CharacterLineHighlight;
 }
 
 export interface CharacterAnnouncement {
