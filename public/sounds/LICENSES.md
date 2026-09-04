@@ -26,6 +26,11 @@
 | `destination_reveal.wav` | P10-4-3 (2026-08-22) | 矩形波の2音(B5→E6、完全4度跳躍)、130ms。「次の目的地決定」の短く明瞭な確定音。destination_arriveとは波形・音数・尺のすべてを変えて区別している |
 | `game_over_fanfare.wav` | P10-4-4 (2026-08-22) | 矩形波の呼びかけ(G4→C5→E5→G5→C6)→1オクターブ上のエコー(C6→E6→G6→C7)→C7(矩形波)+G6+E6(三角波)の3声和音フィナーレ、1489ms。ゲーム全体で最も低い音(G4)から始まり、最も長く、最も声部数の多い(3声)フィナーレとして設計。フィナーレ実測ピーク振幅0.7469(クリッピングなし)を確認済み |
 | `ui_select.wav` | P10-4-4 (2026-08-22) | 正弦波の単音(1200Hz)、130ms。既存13音がすべて矩形波/三角波/ノイズのみで構成されるのに対し、ui_selectだけが正弦波を使うことで汎用UI音として明確に区別される |
+| `elimination_out.wav` | P11-3-B2b-3 (2026-08-24) | 矩形波の短い下降ブリップ(760→520Hz)→三角波の二段下降(480→300Hz、380→170Hz)→末尾のノイズ減衰、の4段構成、365ms。最終順位発表演出(FinalRaceSequence.tsx)のdeparting(脱落コースアウト)開始時に鳴らす専用SE |
+| `trouble_transform.wav` | Polish Phase P1 S-3f-3 (2026-09-02) | 矩形波の短いブリップ(660Hz)→三角波の山型スイープ(260→340Hz、340→220Hz)→矩形波の低い着地(196Hz)、の3段構成、約400ms。妨害キャラの変身(TroubleCharacterAnnounceModal.tsx、kind:"transform")の通常進化側専用SE |
+| `trouble_transform_final.wav` | Polish Phase P1 S-3f-3 (2026-09-02) | 三角波の緩やかなスウェル予兆(90→110Hz、attackMs=250)→矩形波+矩形波+ノイズを重ねた三重和音の衝撃音、の2段構成、880ms。同SEの最終形態進化側専用SE |
+| `trouble_mischief.wav` | Polish Phase P1 S-3f-4 (2026-09-03) | ノイズonset→矩形波の短い下降(420→260Hz)→矩形波の低い着地(180Hz)、の3段構成、330ms。妨害キャラの「悪さ」(TroubleCharacterAnnounceModal.tsx、kind:"mischief")専用SE。毎ターン鳴る可能性がある高頻度SEのためtrouble_transform系より明確に短く軽くしている |
+| `trouble_mischief_heavy.wav` | Polish Phase P1 S-3f-5 (2026-09-04) | ノイズonset(trouble_mischiefより強い)→矩形波の深い下降(480→220Hz)→矩形波+ノイズを重ねた着地音、の3段構成、424ms。severity==="heavy"のmischief専用SE。trouble_mischiefより一段重く、trouble_transform_finalより短く保っている |
 
 ## 第三者配布素材(DOVA-SYNDROME)
 
