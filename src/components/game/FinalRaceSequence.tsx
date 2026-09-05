@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { RankedPlayer } from "@/lib/game/engine";
+import { PLAYER_COLORS, type RankedPlayer } from "@/lib/game/engine";
+import { resolveVehicleAssetUrl } from "@/lib/game/vehicleStyle";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { useIsMobileViewport } from "@/lib/useIsMobileViewport";
 import { playSE } from "@/lib/audio/soundManager";
@@ -20,9 +21,12 @@ interface FinalRaceSequenceProps {
 }
 
 /**
- * 最終順位発表演出(P11とは独立したフェーズ、仮称「湘南レースイベント」)のPhase A:
- * phase/state machine基盤のみ。見た目はプレースホルダー(色付きラベル+carIcon列挙)で、
- * 背景・観客・レースコースのビジュアル作り込みはPhase B以降で行う。
+ * 最終順位発表演出(P11とは独立したフェーズ、仮称「湘南レースイベント」)。
+ * phase/state machine(下記)は変更せず、描画・アニメーション・ビジュアル層のみを
+ * 「湘南海岸ロードレース」の本番見た目へ差し替える(Polish Phase「FinalRaceSequence本番
+ * ビジュアル化」Phase1)。背景・車・コースの質感を上げ、carIcon絵文字を本番normal車WebPへ
+ * 置き換えるが、脱落発表・finalTwo・winnerSprint・celebrationの流れやSE発火タイミングは
+ * 1文字も変更しない。
  *
  * 設計上の大原則(P11ミーティング決定事項): 最終順位はgameStore側で既に確定済みの
  * source of truthであり、このコンポーネントのアニメーション・タイマーが順位に影響することは
@@ -145,6 +149,16 @@ function deterministicDelayMs(playerId: string, bucketCount: number, bucketMs: n
     hash = (hash * 31 + playerId.charCodeAt(i)) >>> 0;
   }
   return (hash % bucketCount) * bucketMs;
+}
+
+/** player.colorからcolorIndex(0〜3)を逆引きする。createPlayer()(engine.ts)がcolorIndex%4で
+ *  PLAYER_COLORSから割り当てた値をそのまま復元できるため、Player型自体にcolorIndexを
+ *  持たせなくても安全にvehicleStyle.tsのresolveVehicleAssetUrl()へ渡せる
+ *  (Board.tsxがplayersの配列indexをそのままcolorIndexとして渡しているのと数学的に同じ結果になる)。
+ *  一致しない場合(理論上到達しない安全策)は0番(赤)へフォールバックする。 */
+function colorIndexFor(color: string): number {
+  const index = PLAYER_COLORS.indexOf(color);
+  return index >= 0 ? index : 0;
 }
 
 export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequenceProps) {
@@ -333,214 +347,249 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
   }, [phase, timing.celebration]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-sky-300 via-sky-200 to-amber-100 p-4 text-center dark:from-sky-950 dark:via-slate-900 dark:to-amber-950"
-      aria-live="polite"
-      data-race-phase={phase}
-    >
-      <p className="text-xs font-bold tracking-widest text-white/80 drop-shadow sm:text-sm">湘南レース(Phase A: 仮演出)</p>
+    <div className="fixed inset-0 z-50 overflow-hidden" aria-live="polite" data-race-phase={phase}>
+      {/* 背景: 湘南の海・江の島・富士山(public/backgrounds/shonan.svg、bodyのbackground-imageと
+          同じsite-wide既存アセット)。GameOverModal/DestinationCelebrationScreenと違い、ここは
+          「湘南すごろくのクライマックス」として初めてこのイラストを覆い隠さずに見せる場所にする
+          (新規画像アセットは追加しない)。読みやすさのため、bodyの背景処理(globals.css)と同じ
+          「半透明の白(dark:黒)を重ねる」手法をオーバーレイ用のdivとして踏襲する。 */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "url('/backgrounds/shonan.svg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center bottom",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-linear-to-b from-white/60 via-white/45 to-amber-100/55 dark:from-black/65 dark:via-black/55 dark:to-amber-950/55"
+      />
 
-      {phase === "intro" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">よーい、スタート!</p>}
-      {phase === "running" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">全員、順調に走行中!</p>}
-      {phase === "eliminating" && eliminatedEntry && (
-        <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">
-          {eliminatedEntry.rank}位! {eliminatedEntry.player.name}さん
-        </p>
-      )}
-      {/* P11-3-B2c-2: finalTwo突入の一発強調。DestinationCelebrationScreen.tsxの目的地名reveal
-          (「{name}!!」にanimate-highlight-slamを適用するパターン)と全く同じ既存keyframeを
-          そのまま流用する(新規keyframeなし)。highlight-slamは480ms both(0%→scale(0.3)から
-          100%→scale(1)で静止)の一発アニメーションで、1500msのfinalTwo全体を動かし続けは
-          しない(最初の一発だけ強調し、残りは読みやすい静止状態のまま)。reduced-motion時の
-          抑制はglobals.cssの@media (prefers-reduced-motion: reduce)側で.animate-highlight-slam
-          自体が無効化される既存の仕組みにそのまま乗る(ここでの追加ガードは不要)。 */}
-      {phase === "finalTwo" && (
-        <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">残り2人、デッドヒート!</p>
-      )}
-      {phase === "winnerSprint" && (
-        <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">
-          {winners.map((w) => w.player.name).join("・")}さん、加速!
-        </p>
-      )}
-      {/* P11-3-B2c-4: finishへの一発強調。finalTwoの見出し(残り2人、デッドヒート!)と全く同じ
-          animate-highlight-slam(既存keyframeの再利用、新規keyframeなし)を適用する。480ms
-          both(0%→scale(0.3)から100%→scale(1)で静止)の一発アニメーションで、700msに延長した
-          finish全体を動かし続けはしない(最初の一発だけ強調し、残り約220msは読みやすい
-          静止状態のまま)。SEは意図的に追加しない(無音のままfinish→celebrationの「溜め」を
-          維持し、celebrationのgame_over_fanfareを演出全体の音の最大ピークとして保つ設計を
-          崩さない)。reduced-motion時の抑制はglobals.cssの@media (prefers-reduced-motion: reduce)
-          側で.animate-highlight-slam自体が無効化される既存の仕組みにそのまま乗る。 */}
-      {phase === "finish" && (
-        <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">ゴール!!</p>
-      )}
-      {(phase === "celebration" || phase === "done") && (
-        <div className="relative">
-          <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
-            {isTie ? "優勝 引き分け!" : `優勝 ${winners[0]?.player.name}さん!`}
+      <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 p-4 text-center">
+        <p className="text-xs font-bold tracking-widest text-white/80 drop-shadow sm:text-sm">湘南ファイナルレース</p>
+
+        {phase === "intro" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">よーい、スタート!</p>}
+        {phase === "running" && <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">全員、順調に走行中!</p>}
+        {phase === "eliminating" && eliminatedEntry && (
+          <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">
+            {eliminatedEntry.rank}位! {eliminatedEntry.player.name}さん
           </p>
-          {/* P11-3-B2c-2: celebration開始時だけ紙吹雪+sparkleを表示する。DestinationCelebrationScreen.tsx
-              の「relativeな親div + AnnouncerEffectLayer(confetti/sparkle)」パターンをそのまま流用
-              (新規紙吹雪システムは作らない)。AnnouncerEffectLayer自身がpointer-events-noneかつ
-              aria-hidden="true"のoverlayなので、優勝者名の可読性・下のレーン/chipの操作性を
-              妨げない。doneフェーズでは表示しない(celebrationの1600msだけの一発演出とするため)。
-              reduceMotion時は既存パターンと同じく呼び出し側で丸ごと非表示にする
-              (confetti-fall/announcer-sparkle自体もglobals.cssのreduced-motion側で二重に無効化
-              される既存の仕組みに乗る)。 */}
-          {phase === "celebration" && !reduceMotion && (
-            <AnnouncerEffectLayer effect={{ confetti: true, sparkle: true }} mobile={isMobile} />
-          )}
-        </div>
-      )}
+        )}
+        {/* P11-3-B2c-2: finalTwo突入の一発強調。DestinationCelebrationScreen.tsxの目的地名reveal
+            (「{name}!!」にanimate-highlight-slamを適用するパターン)と全く同じ既存keyframeを
+            そのまま流用する(新規keyframeなし)。highlight-slamは480ms both(0%→scale(0.3)から
+            100%→scale(1)で静止)の一発アニメーションで、1500msのfinalTwo全体を動かし続けは
+            しない(最初の一発だけ強調し、残りは読みやすい静止状態のまま)。reduced-motion時の
+            抑制はglobals.cssの@media (prefers-reduced-motion: reduce)側で.animate-highlight-slam
+            自体が無効化される既存の仕組みにそのまま乗る(ここでの追加ガードは不要)。 */}
+        {phase === "finalTwo" && (
+          <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">残り2人、デッドヒート!</p>
+        )}
+        {phase === "winnerSprint" && (
+          <p className="text-2xl font-black text-white drop-shadow-lg sm:text-4xl">
+            {winners.map((w) => w.player.name).join("・")}さん、加速!
+          </p>
+        )}
+        {/* P11-3-B2c-4: finishへの一発強調。finalTwoの見出し(残り2人、デッドヒート!)と全く同じ
+            animate-highlight-slam(既存keyframeの再利用、新規keyframeなし)を適用する。480ms
+            both(0%→scale(0.3)から100%→scale(1)で静止)の一発アニメーションで、700msに延長した
+            finish全体を動かし続けはしない(最初の一発だけ強調し、残り約220msは読みやすい
+            静止状態のまま)。SEは意図的に追加しない(無音のままfinish→celebrationの「溜め」を
+            維持し、celebrationのgame_over_fanfareを演出全体の音の最大ピークとして保つ設計を
+            崩さない)。reduced-motion時の抑制はglobals.cssの@media (prefers-reduced-motion: reduce)
+            側で.animate-highlight-slam自体が無効化される既存の仕組みにそのまま乗る。 */}
+        {phase === "finish" && (
+          <p className="animate-highlight-slam text-2xl font-black text-white drop-shadow-lg sm:text-4xl">ゴール!!</p>
+        )}
+        {(phase === "celebration" || phase === "done") && (
+          <div className="relative">
+            <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
+              {isTie ? "優勝 引き分け!" : `優勝 ${winners[0]?.player.name}さん!`}
+            </p>
+            {/* P11-3-B2c-2: celebration開始時だけ紙吹雪+sparkleを表示する。DestinationCelebrationScreen.tsx
+                の「relativeな親div + AnnouncerEffectLayer(confetti/sparkle)」パターンをそのまま流用
+                (新規紙吹雪システムは作らない)。AnnouncerEffectLayer自身がpointer-events-noneかつ
+                aria-hidden="true"のoverlayなので、優勝者名の可読性・下のレーン/chipの操作性を
+                妨げない。doneフェーズでは表示しない(celebrationの1600msだけの一発演出とするため)。
+                reduceMotion時は既存パターンと同じく呼び出し側で丸ごと非表示にする
+                (confetti-fall/announcer-sparkle自体もglobals.cssのreduced-motion側で二重に無効化
+                される既存の仕組みに乗る)。 */}
+            {phase === "celebration" && !reduceMotion && (
+              <AnnouncerEffectLayer effect={{ confetti: true, sparkle: true }} mobile={isMobile} />
+            )}
+          </div>
+        )}
 
-      {/* レース会場。PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、
-          名前を左に固定し、右へ伸びるコース上を車が走る先に「ゴール →」を置く。
-          スマホ(sm未満)は上→下の縦レーンを横に並べる: 各レーン=1プレイヤーの列、名前を
-          上に固定し、下へ伸びるコース上を車が走る先に「↓ ゴール」を置く(PCレイアウトの
-          単純縮小ではなく、縦画面の向きに合わせてレーンの方向自体を変えている)。
-          名前ラベル自体は固定し、車・コース側だけに走行演出(P11-3-B2a)を与える。 */}
-      <div className="flex w-full max-w-4xl flex-row items-stretch justify-center gap-3 overflow-x-auto px-2 sm:flex-col sm:items-stretch sm:gap-2.5 sm:overflow-visible sm:px-0">
-        {activeRanked.map((r) => {
-          // P11-3-B2a: 振動(短周期)・漂い(長周期、疑似的な抜きつ抜かれつ)・コース流れの
-          // 3つの装飾アニメーションすべてに同じ遅延を再利用する。CSSのanimation-delayは
-          // 「開始時刻をずらす」だけで足り、周期の異なる複数アニメーションへ同じ値を渡しても
-          // 十分にズレて見える(値そのものは4パターンに丸めているだけの決定論的なもの)。
-          const delayMs = deterministicDelayMs(r.player.id, 4, 90);
-          // P11-3-B2b-1: このプレイヤーが「今回発表中の対象」であれば、そのholding/departing/
-          // settledをdata-elimination-stageとして露出する(対象でなければundefined=属性なし)。
-          const racerIndex = ranked.indexOf(r);
-          const stageForRacer = eliminationStageForIndex(racerIndex, phase, eliminatedCount, eliminationStage, playerCount);
-          const isHolding = stageForRacer === "holding";
-          const isDeparting = stageForRacer === "departing";
+        {/* レース会場。PC(sm以上)は左→右の水平レーンを縦に積む: 各レーン=1プレイヤー、
+            名前を左に固定し、右へ伸びるコース上を車が走る先に「ゴール →」を置く。
+            スマホ(sm未満)は上→下の縦レーンを横に並べる: 各レーン=1プレイヤーの列、名前を
+            上に固定し、下へ伸びるコース上を車が走る先に「↓ ゴール」を置く(PCレイアウトの
+            単純縮小ではなく、縦画面の向きに合わせてレーンの方向自体を変えている)。
+            名前ラベル自体は固定し、車・コース側だけに走行演出(P11-3-B2a)を与える。 */}
+        <div className="flex w-full max-w-4xl flex-row items-stretch justify-center gap-3 overflow-x-auto px-2 sm:flex-col sm:items-stretch sm:gap-2.5 sm:overflow-visible sm:px-0">
+          {activeRanked.map((r) => {
+            // P11-3-B2a: 振動(短周期)・漂い(長周期、疑似的な抜きつ抜かれつ)・コース流れの
+            // 3つの装飾アニメーションすべてに同じ遅延を再利用する。CSSのanimation-delayは
+            // 「開始時刻をずらす」だけで足り、周期の異なる複数アニメーションへ同じ値を渡しても
+            // 十分にズレて見える(値そのものは4パターンに丸めているだけの決定論的なもの)。
+            const delayMs = deterministicDelayMs(r.player.id, 4, 90);
+            // P11-3-B2b-1: このプレイヤーが「今回発表中の対象」であれば、そのholding/departing/
+            // settledをdata-elimination-stageとして露出する(対象でなければundefined=属性なし)。
+            const racerIndex = ranked.indexOf(r);
+            const stageForRacer = eliminationStageForIndex(racerIndex, phase, eliminatedCount, eliminationStage, playerCount);
+            const isHolding = stageForRacer === "holding";
+            const isDeparting = stageForRacer === "departing";
 
-          // P11-3-B2b-2: departing中は通常走行(race-drift)を外し、脱落専用アニメーションへ
-          // 置き換える(同一要素にtransform系animationを重ねて「たまたま動く」実装にしないための
-          // 責務分離。動きは全てこのwrapper側が担い、内側のbadge(車アイコン)はdeparting中は
-          // 静止させる)。reduceMotion時はCSSのprefers-reduced-motionメディアクエリではなく、
-          // コンポーネントが既に持つreduceMotion判定にここで揃える(departingはintro/running/
-          // holdingを経てから到達するため、その時点ではusePrefersReducedMotion()の実値が
-          // 確定済みで、CSS側の二重ガードは不要)。
-          const wrapperMotionClass = isDeparting
-            ? reduceMotion
-              ? "race-departing-reduced"
-              : "race-departing"
-            : decorativeMotionEnabled
-              ? "race-drift"
-              : "";
-          // departing中は動きをwrapper側に一本化するためvibrateを外す。holding中は
-          // 「まもなく発表されるぞ」という控えめな強調として、既存のanimate-character-bounce
-          // (CharacterAnnouncer.tsxで使用済みの一発ポップ)を一時的に流用する(新規keyframeを
-          // 増やさず、reduced-motion時の無効化も既存CSSにそのまま乗る)。
-          const badgeMotionClass = isDeparting
-            ? ""
-            : isHolding
-              ? "animate-character-bounce"
+            // P11-3-B2b-2: departing中は通常走行(race-drift)を外し、脱落専用アニメーションへ
+            // 置き換える(同一要素にtransform系animationを重ねて「たまたま動く」実装にしないための
+            // 責務分離。動きは全てこのwrapper側が担い、内側のbadge(車アイコン)はdeparting中は
+            // 静止させる)。reduceMotion時はCSSのprefers-reduced-motionメディアクエリではなく、
+            // コンポーネントが既に持つreduceMotion判定にここで揃える(departingはintro/running/
+            // holdingを経てから到達するため、その時点ではusePrefersReducedMotion()の実値が
+            // 確定済みで、CSS側の二重ガードは不要)。
+            const wrapperMotionClass = isDeparting
+              ? reduceMotion
+                ? "race-departing-reduced"
+                : "race-departing"
               : decorativeMotionEnabled
-                ? "animate-race-vibrate"
+                ? "race-drift"
                 : "";
-          // P11-3-B2c-3: このプレイヤーがwinnerSprint以降に「前進表示すべき勝者」かどうか。
-          // isWinnerAdvancingPhaseとwinnerIdsの両方を満たす場合のみtrueになる(finalTwo中は
-          // isWinnerAdvancingPhaseが常にfalseなので、winnerIds自体が既に分かっていても
-          // 視覚上は絶対に前進しない)。
-          const isWinnerAdvancing = isWinnerAdvancingPhase && winnerIds.includes(r.player.id);
-          // race-drift/race-departingとは別のDOM階層(1つ外側のwrapper)へ適用することで、
-          // 同一要素上でtransform系animationを重ねない(B-2b-2で発生した競合の教訓を踏襲)。
-          // reduceMotion時は大きなtranslateを避けた静的オフセット版へ切り替える
-          // (race-departing/race-departing-reducedと同じ、コンポーネント側の実値による分岐)。
-          const winnerAdvanceClass = isWinnerAdvancing ? (reduceMotion ? "race-winner-advance-reduced" : "race-winner-advance") : "";
-          return (
-            <div
-              key={r.player.id}
-              data-player-id={r.player.id}
-              data-eliminated="false"
-              data-running={decorativeMotionEnabled}
-              data-elimination-stage={stageForRacer}
-              data-winner-advancing={isWinnerAdvancing}
-              className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
-            >
-              {/* 名前ラベル。sm:w-28で固定幅を持たせることでtruncateの基準を作る(carアイコンを
-                  トラック側へ移したため、Phase B-1時点であったname+carの共有ラッパーは廃止し、
-                  この要素単体でPC/スマホ双方の幅制約を持つ)。 */}
-              <span
-                className="w-full min-w-0 truncate text-center text-[11px] font-bold text-white drop-shadow sm:w-28 sm:shrink-0 sm:text-left sm:text-sm"
-                title={r.player.name}
-              >
-                {r.player.name}
-              </span>
-
-              {/* コース(トラック)本体。flexで「開始位置=主軸の先頭・中央=交差軸」に車を
-                  自然に配置する(絶対配置+transform計算をReact側で行わない)ことで、
-                  drift/vibrateの2層transformと衝突しない(centeringにtransformを使わない)。 */}
+            // departing中は動きをwrapper側に一本化するためvibrateを外す。holding中は
+            // 「まもなく発表されるぞ」という控えめな強調として、既存のanimate-character-bounce
+            // (CharacterAnnouncer.tsxで使用済みの一発ポップ)を一時的に流用する(新規keyframeを
+            // 増やさず、reduced-motion時の無効化も既存CSSにそのまま乗る)。
+            const badgeMotionClass = isDeparting
+              ? ""
+              : isHolding
+                ? "animate-character-bounce"
+                : decorativeMotionEnabled
+                  ? "animate-race-vibrate"
+                  : "";
+            // P11-3-B2c-3: このプレイヤーがwinnerSprint以降に「前進表示すべき勝者」かどうか。
+            // isWinnerAdvancingPhaseとwinnerIdsの両方を満たす場合のみtrueになる(finalTwo中は
+            // isWinnerAdvancingPhaseが常にfalseなので、winnerIds自体が既に分かっていても
+            // 視覚上は絶対に前進しない)。
+            const isWinnerAdvancing = isWinnerAdvancingPhase && winnerIds.includes(r.player.id);
+            // race-drift/race-departingとは別のDOM階層(1つ外側のwrapper)へ適用することで、
+            // 同一要素上でtransform系animationを重ねない(B-2b-2で発生した競合の教訓を踏襲)。
+            // reduceMotion時は大きなtranslateを避けた静的オフセット版へ切り替える
+            // (race-departing/race-departing-reducedと同じ、コンポーネント側の実値による分岐)。
+            const winnerAdvanceClass = isWinnerAdvancing ? (reduceMotion ? "race-winner-advance-reduced" : "race-winner-advance") : "";
+            return (
               <div
-                className={`relative flex flex-1 flex-col items-center sm:flex-row sm:items-center ${
-                  decorativeMotionEnabled ? "race-track-line" : "bg-white/40"
-                } rounded-full`}
+                key={r.player.id}
+                data-player-id={r.player.id}
+                data-eliminated="false"
+                data-running={decorativeMotionEnabled}
+                data-elimination-stage={stageForRacer}
+                data-winner-advancing={isWinnerAdvancing}
+                className="flex h-56 w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl bg-white/15 p-2 sm:h-auto sm:w-full sm:flex-row sm:gap-3 sm:rounded-lg sm:bg-white/10 sm:px-3 sm:py-1.5"
               >
-                {/* P11-3-B2c-3: winnerSprint以降の前進オフセット専用wrapper。race-drift/
-                    race-departingを持つ内側wrapperとは別要素にすることで、進行方向の
-                    transformアニメーション同士を衝突させない(wrapper/inner分離、
-                    B-2b-2の教訓を踏襲)。margin(mt-2/sm:ml-2)は元々内側wrapperが
-                    持っていたものをこちらへ移設した(内側は「relative + 漂いclass」だけの
-                    役割に一本化するため)。 */}
-                <div className={`relative mt-2 sm:mt-0 sm:ml-2 ${winnerAdvanceClass}`}>
-                  {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
-                      @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
-                      rankedの並び順・rankを読み書きすることはない。P11-3-B2b-2: departing中は
-                      このクラスがrace-departing(-reduced)に置き換わり、脱落のコースアウトを
-                      一本のtransformアニメーションで担う。 */}
-                  <div
-                    className={`relative ${wrapperMotionClass}`}
-                    style={wrapperMotionClass === "race-drift" ? { animationDelay: `${delayMs}ms` } : undefined}
-                  >
-                    {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
-                        分離することで、2つの独立したtransformアニメーションを衝突させずに
-                        合成する(1要素に複数transformアニメーションを重ねると片方しか
-                        反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
-                        Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
-                        トラック側へ移った今回もこの丸バッジとして維持する。P11-3-B2b-2:
-                        holding中はanimate-character-bounce、departing中は無し(動きはwrapper側)。 */}
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg shadow sm:text-xl ${badgeMotionClass}`}
-                      style={{
-                        backgroundColor: r.player.color,
-                        animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
-                      }}
+                {/* 名前ラベル。sm:w-28で固定幅を持たせることでtruncateの基準を作る(carアイコンを
+                    トラック側へ移したため、Phase B-1時点であったname+carの共有ラッパーは廃止し、
+                    この要素単体でPC/スマホ双方の幅制約を持つ)。 */}
+                <span
+                  className="w-full min-w-0 truncate text-center text-[11px] font-bold text-white drop-shadow sm:w-28 sm:shrink-0 sm:text-left sm:text-sm"
+                  title={r.player.name}
+                >
+                  {r.player.name}
+                </span>
+
+                {/* コース(トラック)本体。flexで「開始位置=主軸の先頭・中央=交差軸」に車を
+                    自然に配置する(絶対配置+transform計算をReact側で行わない)ことで、
+                    drift/vibrateの2層transformと衝突しない(centeringにtransformを使わない)。
+                    Phase1(本番ビジュアル化): アスファルト色(bg-slate-600/55)を常時のベース色にし、
+                    既存のrace-track-line(流れる白破線、新規keyframeなし)をdecorativeMotionEnabled中
+                    だけ重ねることで「道路の上を車が走っている」ように見せる。走行装飾が止まる間
+                    (celebration等)も灰色の道路自体は残る(旧bg-white/40はほぼ不可視だったため、
+                    静止時も道路として認識できるよう改善)。 */}
+                <div
+                  className={`relative flex flex-1 flex-col items-center rounded-full bg-slate-600/55 sm:flex-row sm:items-center ${
+                    decorativeMotionEnabled ? "race-track-line" : ""
+                  }`}
+                >
+                  {/* P11-3-B2c-3: winnerSprint以降の前進オフセット専用wrapper。race-drift/
+                      race-departingを持つ内側wrapperとは別要素にすることで、進行方向の
+                      transformアニメーション同士を衝突させない(wrapper/inner分離、
+                      B-2b-2の教訓を踏襲)。margin(mt-2/sm:ml-2)は元々内側wrapperが
+                      持っていたものをこちらへ移設した(内側は「relative + 漂いclass」だけの
+                      役割に一本化するため)。 */}
+                  <div className={`relative mt-2 sm:mt-0 sm:ml-2 ${winnerAdvanceClass}`}>
+                    {/* 漂い(疑似的な抜きつ抜かれつ)。PCではX軸、スマホではY軸(globals.cssの
+                        @mediaで切り替え)。順位計算には一切関与しない演出専用のtransformで、
+                        rankedの並び順・rankを読み書きすることはない。P11-3-B2b-2: departing中は
+                        このクラスがrace-departing(-reduced)に置き換わり、脱落のコースアウトを
+                        一本のtransformアニメーションで担う。 */}
+                    <div
+                      className={`relative ${wrapperMotionClass}`}
+                      style={wrapperMotionClass === "race-drift" ? { animationDelay: `${delayMs}ms` } : undefined}
                     >
-                      {r.player.carIcon}
-                    </span>
+                      {/* 振動(路面の細かな凹凸・車体のブレを表す短周期の揺れ)。漂いとは別要素に
+                          分離することで、2つの独立したtransformアニメーションを衝突させずに
+                          合成する(1要素に複数transformアニメーションを重ねると片方しか
+                          反映されないCSSの制約を、CharacterAnnouncer.tsxと同じ「入れ子」で回避)。
+                          Phase B-1ではname+carの共有バッジだったplayer.color表示を、carアイコンが
+                          トラック側へ移った今回もこの丸バッジとして維持する。P11-3-B2b-2:
+                          holding中はanimate-character-bounce、departing中は無し(動きはwrapper側)。
+                          Phase1(本番ビジュアル化): 中身の絵文字(carIcon)をnormal車WebP(4色、
+                          vehicleStyle.tsのresolveVehicleAssetUrl()を安全に再利用、CarToken.tsx
+                          自体はSVG専用のため盤面外のここでは使わない)へ差し替えた。badge自体
+                          (背景色=player.color、shadow、badgeMotionClass)は既存のまま維持し、
+                          中の画像だけをobject-containで収めることで、4色とも同一の表示枠に
+                          揃える(bboxの実寸差があるred用の固定scale補正は今回あえて入れない)。 */}
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0.5 shadow sm:h-10 sm:w-10 ${badgeMotionClass}`}
+                        style={{
+                          backgroundColor: r.player.color,
+                          animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
+                        }}
+                      >
+                        <img
+                          src={resolveVehicleAssetUrl("normal", colorIndexFor(r.player.color))}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-full w-full object-contain"
+                          style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.35))" }}
+                        />
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                <span className="text-[9px] font-bold text-white/70 sm:hidden">↓ ゴール</span>
+                <span className="hidden text-xs font-bold text-white/70 sm:inline">ゴール →</span>
               </div>
-
-              <span className="text-[9px] font-bold text-white/70 sm:hidden">↓ ゴール</span>
-              <span className="hidden text-xs font-bold text-white/70 sm:inline">ゴール →</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 脱落済み・順位発表済みエリア。完全に消さず、小さなchip一覧として残す
-          (Phase Aの仮表示と同じ見た目のパターンを踏襲)。P11-3-B2b-2: chip出現に
-          既存のanimate-arrival-popを流用するが、主役はあくまでレース上のコースアウト側
-          なので、chip側はこの一発ポップだけに留める(新規演出は追加しない)。 */}
-      {eliminatedRanked.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <span className="text-[10px] font-bold text-white/70">脱落済み・順位発表済み</span>
-          {eliminatedRanked.map((r) => (
-            <span
-              key={r.player.id}
-              data-player-id={r.player.id}
-              data-eliminated="true"
-              className="flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-800 opacity-80 shadow dark:bg-slate-800/70 dark:text-white animate-arrival-pop"
-              style={{ borderLeft: `3px solid ${r.player.color}` }}
-            >
-              <span className="max-w-16 truncate" title={r.player.name}>
-                {r.player.carIcon} {r.player.name}
-              </span>
-              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400">{r.rank}位</span>
-            </span>
-          ))}
+            );
+          })}
         </div>
-      )}
+
+        {/* 脱落済み・順位発表済みエリア。完全に消さず、小さなchip一覧として残す
+            (Phase Aの仮表示と同じ見た目のパターンを踏襲)。P11-3-B2b-2: chip出現に
+            既存のanimate-arrival-popを流用するが、主役はあくまでレース上のコースアウト側
+            なので、chip側はこの一発ポップだけに留める(新規演出は追加しない)。 */}
+        {eliminatedRanked.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[10px] font-bold text-white/70">脱落済み・順位発表済み</span>
+            {eliminatedRanked.map((r) => (
+              <span
+                key={r.player.id}
+                data-player-id={r.player.id}
+                data-eliminated="true"
+                className="flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-800 opacity-80 shadow dark:bg-slate-800/70 dark:text-white animate-arrival-pop"
+                style={{ borderLeft: `3px solid ${r.player.color}` }}
+              >
+                <span className="max-w-16 truncate" title={r.player.name}>
+                  {r.player.carIcon} {r.player.name}
+                </span>
+                <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400">{r.rank}位</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

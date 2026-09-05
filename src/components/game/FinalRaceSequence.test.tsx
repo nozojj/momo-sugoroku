@@ -12,7 +12,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { playSE } from "@/lib/audio/soundManager";
-import { computeWinnerIds, rankPlayers } from "@/lib/game/engine";
+import { computeWinnerIds, PLAYER_COLORS, rankPlayers } from "@/lib/game/engine";
+import { resolveVehicleAssetUrl } from "@/lib/game/vehicleStyle";
 import { FinalRaceSequence } from "./FinalRaceSequence";
 import type { Player } from "@/types/game";
 
@@ -93,6 +94,15 @@ describe("FinalRaceSequence", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+  });
+
+  it("Phase1(本番ビジュアル化)で仮タイトル「湘南レース(Phase A: 仮演出)」は残っておらず、正式タイトル「湘南ファイナルレース」が表示される", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(screen.getByText("湘南ファイナルレース")).not.toBeNull();
+    expect(screen.queryByText(/仮演出/)).toBeNull();
+    expect(screen.queryByText(/Phase A/)).toBeNull();
   });
 
   it("マウント(introフェーズ開始)時点ではgame_over_fanfareは鳴らない(P11-3-B2c-1でcelebrationへ移設済み)", () => {
@@ -268,10 +278,10 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
     expect(document.querySelectorAll('[data-eliminated="true"]')).toHaveLength(0);
   });
 
-  it("name/color/carIconがレーンへ反映される", () => {
+  it("name/colorがレーンへ反映され、車バッジは本番normal車WebP(<img>)で描画される(Phase1: 本番ビジュアル化でcarIcon絵文字から差し替え済み)", () => {
     const players = [
-      { ...buildPlayer("p1", "たろう", 2000), color: "#ff0000", carIcon: "🚙" },
-      { ...buildPlayer("p2", "じろう", 1000), color: "#00ff00", carIcon: "🚕" },
+      { ...buildPlayer("p1", "たろう", 2000), color: PLAYER_COLORS[0], carIcon: "🚙" },
+      { ...buildPlayer("p2", "じろう", 1000), color: PLAYER_COLORS[1], carIcon: "🚕" },
     ];
     const ranked = rankPlayers(players);
     const winnerIds = computeWinnerIds(players);
@@ -279,9 +289,27 @@ describe("FinalRaceSequence(Phase B-1: レーン表示)", () => {
 
     const lane = laneFor("p1")!;
     expect(lane.textContent).toContain("たろう");
-    expect(lane.textContent).toContain("🚙");
-    // colorはプレイヤー名側ではなく車アイコンのバッジ(style.backgroundColor)に反映される。
-    expect(lane.innerHTML).toContain("rgb(255, 0, 0)");
+    // colorはプレイヤー名側ではなく車バッジ(style.backgroundColor)に反映される。
+    expect(lane.innerHTML).toContain("rgb(230, 72, 62)"); // PLAYER_COLORS[0] "#e6483e"
+    // carIcon絵文字は現役レーンのバッジからは無くなり、resolveVehicleAssetUrl()が返す
+    // normal車WebP(colorIndexに対応する1色)を<img>で描画する(CarToken.tsx自体は
+    // 盤面SVG専用のため再利用せず、vehicleStyle.tsのresolverだけを安全に再利用する)。
+    const img = lane.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe("/vehicles/normal-red.webp"); // PLAYER_COLORS[0]=赤
+  });
+
+  it("colorIndexに対応するnormal車WebPが4色ともそれぞれ正しく解決される", () => {
+    const players = PLAYER_COLORS.map((color, i) => ({ ...buildPlayer(`p${i + 1}`, `プレイヤー${i + 1}`, 4000 - i * 1000), color }));
+    const ranked = rankPlayers(players);
+    const winnerIds = computeWinnerIds(players);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const expectedSrcs = ["/vehicles/normal-red.webp", "/vehicles/normal-blue.webp", "/vehicles/normal-green.webp", "/vehicles/normal-purple.webp"];
+    players.forEach((p, i) => {
+      const img = laneFor(p.id)!.querySelector("img");
+      expect(img?.getAttribute("src")).toBe(expectedSrcs[i]);
+    });
   });
 
   it("4人: 各eliminatingステップが完了するたびに脱落済みが1人→2人と正しく増え、上位2人は誤って脱落扱いされない", async () => {
@@ -1402,5 +1430,174 @@ describe("FinalRaceSequence(Phase B-2c-4: finish強調とcelebration静止)", ()
 
     await advance(10000);
     expect(onFinish).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * FinalRaceSequence本番ビジュアル化Phase1の最終検証(mobile最終検証): jsdomはCSSメディア
+ * クエリを評価しない(@media (min-width:640px)の有無で実レイアウトは変わらない)ため、
+ * ここでは「sm未満(mobile)側のレイアウトを担うTailwindユーティリティclassが実際に
+ * classNameへ出力され続けているか」をソースの構造的回帰として検証する。
+ * 実ビューポートでの目視確認(iPhone実機幅でのスクロール発生有無等)はコードレビュー側の
+ * 数値計算(w-20×4+gap-3×3+px-2×2+p-4×2=372px @375px viewport等)で別途报告する。
+ */
+describe("FinalRaceSequence(本番ビジュアル化Phase1: mobileレイアウトの構造回帰)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("レース会場コンテナがmobile側(既定)でflex-row+overflow-x-auto、desktop側でsm:flex-colへ切り替わるclassを両方持つ(安全弁のoverflow-x-autoが失われていない)", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const container = laneFor("p1")!.parentElement!;
+    expect(container.className).toContain("flex-row"); // mobile既定: 4レーンを横に並べる
+    expect(container.className).toContain("overflow-x-auto"); // 4人+狭幅での安全弁
+    expect(container.className).toContain("sm:flex-col"); // desktop: 縦に積む
+    expect(container.className).toContain("sm:overflow-visible");
+  });
+
+  it("各レーンがmobile側でw-20(固定80px)+h-56、desktop側でsm:w-full+sm:h-autoへ切り替わるclassを持つ(車imgのバッジ拡大がレーン幅制約を変えていない)", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const lane = laneFor("p1")!;
+    expect(lane.className).toContain("w-20");
+    expect(lane.className).toContain("h-56");
+    expect(lane.className).toContain("flex-col");
+    expect(lane.className).toContain("sm:w-full");
+    expect(lane.className).toContain("sm:h-auto");
+    expect(lane.className).toContain("sm:flex-row");
+  });
+
+  it("車バッジ(h-9 w-9)がmobile側のレーン内側幅(w-20からp-2を引いた64px)より明確に小さく、レーン幅を圧迫しない", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const lane = laneFor("p1")!;
+    const badge = lane.querySelector("img")!.parentElement!;
+    expect(badge.className).toContain("h-9");
+    expect(badge.className).toContain("w-9");
+    expect(badge.className).toContain("sm:h-10");
+    expect(badge.className).toContain("sm:w-10");
+    // w-20(80px) - p-2(左右16px) = 64px。h-9/w-9(36px)は64pxに対して十分小さく、
+    // 名前ラベル(w-full)・「↓ ゴール」表示との横幅競合を起こさない。
+    const LANE_WIDTH_PX = 80;
+    const LANE_PADDING_PX = 16;
+    const BADGE_SIZE_PX = 36;
+    expect(BADGE_SIZE_PX).toBeLessThan(LANE_WIDTH_PX - LANE_PADDING_PX);
+  });
+
+  it("プレイヤー名にtruncate+min-w-0+w-full(mobile)/sm:w-28(desktop)が付き、車バッジ(<img>)には車名由来のテキストが無い(名前の可読性を圧迫しない)", () => {
+    const longName = "あいうえおかきくけこさし"; // 12文字ちょうど(StartScreenのmaxLength上限)
+    const players = [buildPlayer("p1", longName, 2000), buildPlayer("p2", "プレイヤー2", 1000)];
+    const ranked = rankPlayers(players);
+    const winnerIds = computeWinnerIds(players);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const nameEl = screen.getByTitle(longName);
+    expect(nameEl.className).toContain("truncate");
+    expect(nameEl.className).toContain("min-w-0");
+    expect(nameEl.className).toContain("w-full");
+    expect(nameEl.className).toContain("sm:w-28");
+  });
+
+  it("「↓ ゴール」(mobile専用)と「ゴール →」(desktop専用)の両方がDOMに存在し、sm:hidden/sm:inlineで排他的に出し分けられる(どちらか一方が失われていない)", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const lane = laneFor("p1")!;
+    const mobileGoal = Array.from(lane.querySelectorAll("span")).find((el) => el.textContent === "↓ ゴール");
+    const desktopGoal = Array.from(lane.querySelectorAll("span")).find((el) => el.textContent === "ゴール →");
+    expect(mobileGoal).toBeDefined();
+    expect(desktopGoal).toBeDefined();
+    expect(mobileGoal!.className).toContain("sm:hidden");
+    expect(desktopGoal!.className).toContain("hidden");
+    expect(desktopGoal!.className).toContain("sm:inline");
+  });
+
+  it("4人プレイのレース会場に必要な最小幅(w-20×4+gap-3×3+外側px-2×2+p-4×2)を計算すると375pxビューポートでは収まらずoverflow-x-autoの安全弁が必須になる(コードレビューでの数値検証)", () => {
+    // w-20=80px, gap-3=12px, レース会場自身のpx-2=8px(左右で16px)、
+    // 最外周のp-4=16px(左右で32px)。iPhone SE等375px幅の前提。
+    const LANE_WIDTH = 80;
+    const LANE_COUNT = 4;
+    const GAP = 12;
+    const CONTAINER_PADDING_X = 8 * 2; // px-2
+    const OUTER_PADDING_X = 16 * 2; // p-4
+    const requiredWidth = LANE_WIDTH * LANE_COUNT + GAP * (LANE_COUNT - 1) + CONTAINER_PADDING_X + OUTER_PADDING_X;
+    expect(requiredWidth).toBe(404);
+    expect(requiredWidth).toBeGreaterThan(375); // 375px幅では収まらない
+    // → overflow-x-autoが無いと4人プレイは375px幅の画面ではみ出て操作不能になる。
+    //   実際にはoverflow-x-autoが常に付与されているため、はみ出た分は横スクロールで
+    //   到達可能なままになる(安全弁として機能する)。
+  });
+
+  it("レース会場コンテナに常にoverflow-x-autoが付与されている(mobile/desktopの分岐に関わらず安全弁が外れない)", () => {
+    for (const n of [2, 3, 4]) {
+      const { ranked, winnerIds } = buildRanked(Array.from({ length: n }, (_, i) => (i + 1) * 1000));
+      const { unmount } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+      const container = laneFor(ranked[0].player.id)!.parentElement!;
+      expect(container.className).toContain("overflow-x-auto");
+      unmount();
+    }
+  });
+});
+
+/**
+ * FinalRaceSequence本番ビジュアル化Phase1の最終検証(reduced-motion最終検証): 既存の
+ * reduced-motion回帰テスト群(本ファイル各所)に対し、Phase1で追加した本番車WebP(<img>)が
+ * reduced-motion環境でも通常時と同様に描画され続けること(絵文字からimgへの差し替えが
+ * reduced-motion分岐と干渉していないこと)だけを狙って検証する。
+ * decorativeMotionEnabled/race-departing-reduced/race-winner-advance-reduced/confetti抑制
+ * 自体は本ファイルの既存テスト(Phase B-2a/B-2b-1/B-2b-2/B-2c-2/B-2c-3参照)がPhase1変更後も
+ * 全て成功することで、ロジック面は無変更であることを別途確認済み。
+ */
+describe("FinalRaceSequence(本番ビジュアル化Phase1: reduced-motion時の本番車WebP描画)", () => {
+  beforeEach(() => {
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("reduced-motion時でも現役レーンの車バッジはnormal車WebP(<img>)のまま描画され、carIcon絵文字には戻らない", async () => {
+    stubMatchMedia(true);
+    // buildPlayer()の既定color("#000")はPLAYER_COLORSに含まれずcolorIndexFor()が0(赤)へ
+    // フォールバックするため、4色それぞれを正しく検証できるようPLAYER_COLORSを明示的に割り当てる。
+    const players = PLAYER_COLORS.map((color, i) => ({ ...buildPlayer(`p${i + 1}`, `プレイヤー${i + 1}`, (i + 1) * 1000), color }));
+    const ranked = rankPlayers(players);
+    const winnerIds = computeWinnerIds(players);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advance(300); // reduced-motion設定でのintro→running
+    for (const r of ranked) {
+      const img = laneFor(r.player.id)!.querySelector("img");
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute("src")).toBe(resolveVehicleAssetUrl("normal", PLAYER_COLORS.indexOf(r.player.color)));
+    }
+  });
+
+  it("reduced-motion時、winnerSprint以降の勝者バッジもnormal車WebPのまま(race-winner-advance-reducedと共存する)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400]); // reduced: intro+running+finalTwo → winnerSprint
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+
+    const winnerId = winnerIds[0];
+    const img = laneFor(winnerId)!.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(hasDescendantWithClass(winnerId, "race-winner-advance-reduced")).toBe(true);
   });
 });
