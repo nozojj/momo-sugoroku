@@ -359,7 +359,18 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
         style={{
           backgroundImage: "url('/backgrounds/shonan.svg')",
           backgroundSize: "cover",
-          backgroundPosition: "center bottom",
+          // Phase2a: shonan.svg(viewBox 1600x900)をcoverする場合、375x812前後の縦長mobileでは
+          // 高さ基準でスケールされるため、幅方向は実測で画像全体の約26%(≒416/1600)しか
+          // 見えない。center(50%)のままだと可視範囲はおよそx=592〜1008になり、富士山
+          // (x≈260〜470)・江の島(x≈990〜1300、鳥居アクセント込み)・太陽(cx=1180)の
+          // いずれもほぼ画面外へ切れる(江の島の左端がわずかに掠る程度)。
+          // 江の島+鳥居+太陽+桟橋のクラスタ(x≈940〜1340、幅約400)は可視幅(約416)に
+          // ほぼちょうど収まる一方、富士山クラスタとは離れすぎていて同時に入らないため、
+          // 「両方を薄く見せる」のではなく江の島クラスタを丸ごと見せる方を優先し、
+          // background-position-xを78%(可視範囲がおよそx=932〜1348になる値)へ寄せる。
+          // desktopは元のcenter bottom(良好な構図)を一切変更しない。位置の静的な切り替えのみで
+          // animationは持たないため、prefers-reduced-motionへの新しい負担は無い。
+          backgroundPosition: isMobile ? "78% bottom" : "center bottom",
           backgroundRepeat: "no-repeat",
         }}
       />
@@ -511,6 +522,12 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
                     decorativeMotionEnabled ? "race-track-line" : ""
                   }`}
                 >
+                  {/* Phase2a: チェッカーフラッグ風ゴールライン(常時表示、CSSのみ)。既存の
+                      「ゴール →」/「↓ ゴール」テキストラベルは補助表示として残したまま、
+                      視覚的にも「ここがFINISH」と一目で分かるようにする。車の要素より先
+                      (=DOM順で手前、スタッキング上は下)に置くことで、万一winnerSprintの
+                      前進オフセットと位置が重なっても車が常にラインの上に見えるようにする。 */}
+                  <div aria-hidden="true" className="race-goal-line" />
                   {/* P11-3-B2c-3: winnerSprint以降の前進オフセット専用wrapper。race-drift/
                       race-departingを持つ内側wrapperとは別要素にすることで、進行方向の
                       transformアニメーション同士を衝突させない(wrapper/inner分離、

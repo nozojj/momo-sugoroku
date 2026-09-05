@@ -571,6 +571,39 @@ body {
   }
 }
 
+/* Polish Phase「FinalRaceSequence本番ビジュアル化」Phase2a: 各レーン終端に常時表示する
+   チェッカーフラッグ風ゴールライン。新規画像アセットを使わず、repeating-conic-gradientで
+   白黒4分割(=2列×2段のチェッカー1タイル)を作り、background-sizeを帯の太さ(12px)と
+   一致させることで、帯の中に常にちょうど1タイル分のチェッカー柄だけが収まるようにしている。
+   .race-drift/.race-track-lineと同じく1クラスのままレイアウトだけ@mediaで切り替える:
+   mobile(既定)は縦レーン終端の横帯(下端に固定)、desktop(sm以上)は横レーンの終端の縦帯
+   (右端に固定)。checkerタイル自体は正方形なので90度回転しても同じ見た目になり、
+   gradientの向きを変える必要はない(位置・サイズだけの切り替えで済む)。
+   静的なbackground-imageのみでanimationを一切持たないため、prefers-reduced-motionの
+   影響を受けない(下の@mediaブロックに追加する必要がない)描画のみの装飾で、
+   車(h-9/h-10=36〜40px)より明確に細い帯(12px)にすることで目立ちすぎないようにしている。 */
+.race-goal-line {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 2px;
+  height: 12px;
+  border-radius: 9999px;
+  background-image: repeating-conic-gradient(#1f2937 0% 25%, #f8fafc 0% 50%);
+  background-size: 12px 12px;
+  pointer-events: none;
+}
+@media (min-width: 640px) {
+  .race-goal-line {
+    left: auto;
+    right: 2px;
+    top: 4px;
+    bottom: 4px;
+    width: 12px;
+    height: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,

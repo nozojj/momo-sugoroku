@@ -1601,3 +1601,148 @@ describe("FinalRaceSequence(本番ビジュアル化Phase1: reduced-motion時の
     expect(hasDescendantWithClass(winnerId, "race-winner-advance-reduced")).toBe(true);
   });
 });
+
+/** Phase2a: mobile(max-width)とreduced-motionを独立に制御できるmatchMediaスタブ。
+ *  既存のstubMatchMedia()はクエリ文字列を無視して常に同じmatchesを返すため、
+ *  「reduced-motionはfalseのままmobile幅だけtrueにする」という組み合わせを作れない
+ *  (usePrefersReducedMotion/useIsMobileViewportはどちらもwindow.matchMedia()を使うため)。
+ *  Phase2aのゴールライン/背景positionはisMobile単独に依存する演出なので、この2軸を
+ *  独立指定できるスタブを追加する(既存テスト用のstubMatchMedia()自体は変更しない)。 */
+function stubMatchMediaFor({ reducedMotion = false, mobile = false }: { reducedMotion?: boolean; mobile?: boolean }): void {
+  window.matchMedia = ((query: string) => {
+    const matches = query.includes("prefers-reduced-motion") ? reducedMotion : query.includes("max-width") ? mobile : false;
+    return {
+      matches,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    };
+  }) as unknown as typeof window.matchMedia;
+}
+
+/** 背景画像用div(style.backgroundImageにshonan.svgを含むもの)を1件取得する。
+ *  同じ"absolute inset-0"のオーバーレイdivと区別するため、backgroundImageの有無で判定する。 */
+function shonanBackgroundEl(): HTMLElement {
+  const el = [...document.querySelectorAll<HTMLElement>(".absolute.inset-0")].find((e) =>
+    e.style.backgroundImage.includes("shonan.svg"),
+  );
+  expect(el).not.toBeUndefined();
+  return el!;
+}
+
+describe("FinalRaceSequence(Phase2a: ゴールライン+湘南らしさmobile背景)", () => {
+  beforeEach(() => {
+    stubMatchMediaFor({});
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("intro時点で現役レーン全員にチェッカーフラッグ風ゴールライン(.race-goal-line)が常時表示される", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    for (const r of ranked) {
+      expect(hasDescendantWithClass(r.player.id, "race-goal-line")).toBe(true);
+    }
+  });
+
+  it("celebrationまで進んでもゴールラインは残り続ける(勝者レーンから消えない)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // celebration開始
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    for (const id of winnerIds) {
+      expect(hasDescendantWithClass(id, "race-goal-line")).toBe(true);
+    }
+  });
+
+  it("補助ラベル「ゴール →」「↓ ゴール」は引き続き表示され、ゴールライン追加後も失われていない", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(screen.getAllByText("ゴール →").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("↓ ゴール").length).toBeGreaterThan(0);
+  });
+
+  it("globals.cssに.race-goal-lineの基本定義(mobile=下端の横帯)と@media(min-width:640px)によるdesktop向け切り替え(右端の縦帯)が定義されている", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+
+    expect(css).toContain(".race-goal-line");
+    expect(css).toContain("repeating-conic-gradient");
+    // mobile既定(基本ブロック): 横帯(下端固定)。desktop(@media min-width:640px)側で
+    // 縦帯(右端固定)へ切り替わる。厳密なCSS構文解析はせず、両方の宣言が存在することのみ確認する。
+    expect(css).toContain("bottom: 2px");
+    expect(css).toMatch(/@media \(min-width: 640px\)\s*\{\s*\.race-goal-line/);
+  });
+
+  it("globals.cssの.race-goal-lineはprefers-reduced-motionの無効化対象リストに含まれない(animationを持たない静的表示のため)", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+    const reducedBlockMatch = css.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/);
+    expect(reducedBlockMatch).not.toBeNull();
+    expect(reducedBlockMatch![0]).not.toContain("race-goal-line");
+  });
+
+  it("desktop(isMobile=false)では湘南背景のbackgroundPositionがPhase1と同じcenter bottomのまま維持される", () => {
+    stubMatchMediaFor({ mobile: false });
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(shonanBackgroundEl().style.backgroundPosition).toBe("center bottom");
+  });
+
+  it("mobile(isMobile=true)では湘南背景のbackgroundPositionが江の島側(78% bottom)へシフトする", () => {
+    stubMatchMediaFor({ mobile: true });
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    expect(shonanBackgroundEl().style.backgroundPosition).toBe("78% bottom");
+  });
+
+  it("mobile/desktopいずれのbackgroundPositionも静的な値であり、animation関連のstyleは付与しない(reduced-motionへの新規負担なし)", () => {
+    stubMatchMediaFor({ mobile: true, reducedMotion: true });
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const bg = shonanBackgroundEl();
+    expect(bg.style.animation).toBe("");
+    expect(bg.style.backgroundPosition).toBe("78% bottom");
+  });
+
+  it("Phase2a後もレース会場のoverflow-x-auto安全弁(mobile 4人レーンの横スクロール)が維持される", () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const { container } = render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    const laneRow = container.querySelector(".overflow-x-auto");
+    expect(laneRow).not.toBeNull();
+    expect(laneRow?.className).toContain("sm:overflow-visible");
+  });
+
+  it("mobile viewport(isMobile=true)でも既存のphase遷移・onFinish発火回数(1回)はPhase2a変更の影響を受けない", async () => {
+    stubMatchMediaFor({ mobile: true });
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 700]);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(onFinish).not.toHaveBeenCalled();
+
+    await advance(1600); // celebration → done → onFinish()
+    expect(onFinish).toHaveBeenCalledTimes(1);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1); // 二重発火なし
+  });
+});
