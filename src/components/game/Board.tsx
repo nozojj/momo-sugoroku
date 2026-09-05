@@ -995,6 +995,7 @@ export function Board({
                   label={player.carIcon}
                   offsetX={dx}
                   offsetY={dy}
+                  colorIndex={i}
                   isCurrentTurn={i === currentPlayerIndex}
                   vehicleMode={i === currentPlayerIndex ? (activeVehicleMode ?? "normal") : "normal"}
                   instant={i === currentPlayerIndex && isCardWarpFocus && instantCameraTransition}

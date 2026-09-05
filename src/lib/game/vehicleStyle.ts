@@ -1,13 +1,38 @@
 import type { VehicleMode } from "@/types/game";
 
 /**
- * 本番の車画像(PNG/WebP)への差し替え用。vehicleMode→画像URLを登録するだけで、
- * CarTokenはプレースホルダー(手続き的SVG)の代わりにその画像を描画する
+ * express系(expressLv1〜4)の本番車画像(PNG/WebP)への差し替え用。vehicleMode→画像URLを
+ * 登録するだけで、CarTokenはプレースホルダー(手続き的SVG)の代わりにその画像を描画する
  * (CharacterSprite/characterStyle.tsのCHARACTER_ASSET_URLSと同じパターン)。
- * 今回は空のまま(=全モードでプレースホルダー描画)。画像を用意したら1行足すだけでよい。
- * 例: expressLv4: "/vehicles/express-lv4.webp",
+ * 今回はexpress系を本番画像化しないため空のまま(=常にプレースホルダー描画)。
+ * 画像を用意したら1行足すだけでよい。例: expressLv4: "/vehicles/express-lv4.webp",
+ * normalモードはプレイヤーカラー別の画像が必要なため、この単純なURLマップではなく
+ * NORMAL_ASSET_URLS_BY_COLOR_INDEX + resolveVehicleAssetUrl()で解決する(下記)。
  */
 export const VEHICLE_ASSET_URLS: Partial<Record<VehicleMode, string>> = {};
+
+/**
+ * normalモードの本番車画像。PLAYER_COLORS(engine.ts)と同じ順序(赤/青/緑/紫)で
+ * colorIndexに対応させる。4色すべて揃っているため、normalは常にこの配列から解決できる。
+ */
+const NORMAL_ASSET_URLS_BY_COLOR_INDEX: readonly string[] = [
+  "/vehicles/normal-red.webp",
+  "/vehicles/normal-blue.webp",
+  "/vehicles/normal-green.webp",
+  "/vehicles/normal-purple.webp",
+];
+
+/**
+ * CarTokenが実際に描画する画像URLを解決する。normalはプレイヤーカラー別の本番画像を
+ * colorIndex経由で返し、それ以外(express系)は従来通りVEHICLE_ASSET_URLSのみを見る
+ * (今は未登録のため常にundefined=プレースホルダーへ安全にフォールバックする)。
+ */
+export function resolveVehicleAssetUrl(vehicleMode: VehicleMode, colorIndex: number): string | undefined {
+  if (vehicleMode === "normal") {
+    return NORMAL_ASSET_URLS_BY_COLOR_INDEX[colorIndex];
+  }
+  return VEHICLE_ASSET_URLS[vehicleMode];
+}
 
 export interface VehiclePlaceholderStyle {
   /** 通常車に対する拡大率 */

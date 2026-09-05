@@ -1,7 +1,7 @@
 "use client";
 
 import type { VehicleMode } from "@/types/game";
-import { VEHICLE_ASSET_URLS, VEHICLE_PLACEHOLDER_STYLE } from "@/lib/game/vehicleStyle";
+import { VEHICLE_PLACEHOLDER_STYLE, resolveVehicleAssetUrl } from "@/lib/game/vehicleStyle";
 
 interface CarTokenProps {
   x: number;
@@ -12,6 +12,9 @@ interface CarTokenProps {
   offsetX: number;
   offsetY: number;
   isCurrentTurn: boolean;
+  /** PLAYER_COLORS/CAR_ICONSと同じ順序のインデックス(0〜3)。normalモードの本番車画像を
+   *  プレイヤーカラー別に解決するために使う(resolveVehicleAssetUrl参照)。 */
+  colorIndex: number;
   /** 急行系カード使用中に一時的に切り替わる車の見た目。省略時は通常車("normal")。 */
   vehicleMode?: VehicleMode;
   /** trueの間は位置トランジションを無効化し、x/yの変更を即座に反映する(ぶっとび系カードの
@@ -20,11 +23,11 @@ interface CarTokenProps {
 }
 
 /** プレイヤーの車コマ。位置(x,y)の変化はCSSトランジションでアニメーションする(instant時を除く)。
- *  vehicleModeに対応する画像がVEHICLE_ASSET_URLSに登録されていればそれを描画し、
+ *  vehicleMode(+normalはcolorIndex)に対応する画像が解決できればそれを描画し、
  *  無ければ手続き的SVGのプレースホルダー(VEHICLE_PLACEHOLDER_STYLE)を描画する
  *  (CharacterSprite.tsxと同じ「画像→プレースホルダー」の解決順序)。 */
-export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, vehicleMode = "normal", instant = false }: CarTokenProps) {
-  const assetUrl = VEHICLE_ASSET_URLS[vehicleMode];
+export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, colorIndex, vehicleMode = "normal", instant = false }: CarTokenProps) {
+  const assetUrl = resolveVehicleAssetUrl(vehicleMode, colorIndex);
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
 
   return (
