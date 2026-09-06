@@ -1746,3 +1746,216 @@ describe("FinalRaceSequence(Phase2a: ゴールライン+湘南らしさmobile背
     expect(onFinish).toHaveBeenCalledTimes(1); // 二重発火なし
   });
 });
+
+describe("FinalRaceSequence(Polish Phase 2b: winnerSprint強化+ゴール瞬間の演出)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("winnerSprintで勝者だけに速度ストリーク(.race-winner-streak)と追加glow(.race-winner-sprint-glow)が付き、敗者には付かない(2人プレイ)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500]); // → winnerSprint
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+
+    const winnerId = winnerIds[0];
+    const loserId = ranked.find((r) => !winnerIds.includes(r.player.id))!.player.id;
+
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(true);
+    expect(hasDescendantWithClass(winnerId, "race-winner-sprint-glow")).toBe(true);
+    expect(hasDescendantWithClass(loserId, "race-winner-streak")).toBe(false);
+    expect(hasDescendantWithClass(loserId, "race-winner-sprint-glow")).toBe(false);
+  });
+
+  it("速度ストリーク・追加glowはwinnerSprintフェーズ限定で、finalTwo/finish/celebrationでは勝者にも付かない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    const winnerId = winnerIds[0];
+
+    await advanceSteps([1200, 900]); // → finalTwo
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(false);
+
+    await advance(1500); // → winnerSprint
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(true);
+
+    await advance(800); // → finish
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "race-winner-sprint-glow")).toBe(false);
+
+    await advance(700); // → celebration
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "race-winner-sprint-glow")).toBe(false);
+  });
+
+  it("reduced-motion時はwinnerSprintでも速度ストリーク・追加glowが付かない(静的なrace-winner-advance-reducedの強調のみ残る)", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400]); // reduced: → winnerSprint
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+
+    const winnerId = winnerIds[0];
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "race-winner-sprint-glow")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "race-winner-advance-reduced")).toBe(true);
+  });
+
+  it("ゴール(finish)で勝者だけにWINNERバッジ(.race-winner-badge)が出て、敗者には出ない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    const winnerId = winnerIds[0];
+    const loserId = ranked.find((r) => !winnerIds.includes(r.player.id))!.player.id;
+
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(true);
+    expect(laneFor(winnerId)?.textContent).toContain("WINNER");
+    expect(hasDescendantWithClass(loserId, "race-winner-badge")).toBe(false);
+  });
+
+  it("ゴール(finish)で勝者だけに金色リング(.animate-announcer-warn-ring、border-amber-400)が出て、敗者には出ない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    const winnerId = winnerIds[0];
+    const loserId = ranked.find((r) => !winnerIds.includes(r.player.id))!.player.id;
+
+    const ring = laneFor(winnerId)?.querySelector(".animate-announcer-warn-ring");
+    expect(ring).not.toBeNull();
+    expect(ring?.className).toContain("border-amber-400");
+    expect(laneFor(loserId)?.querySelector(".animate-announcer-warn-ring")).toBeNull();
+  });
+
+  it("impactFlashはfinishフェーズだけに出て、running/winnerSprint/celebrationでは出ない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    const winnerId = winnerIds[0];
+
+    await advance(1200); // → running
+    expect(document.querySelector(".animate-announcer-impact-flash")).toBeNull();
+
+    await advance(900); // → finalTwo
+    expect(document.querySelector(".animate-announcer-impact-flash")).toBeNull();
+
+    await advance(1500); // → winnerSprint
+    expect(document.querySelector(".animate-announcer-impact-flash")).toBeNull();
+
+    await advance(800); // → finish
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-impact-flash")).toBe(true);
+
+    await advance(700); // → celebration
+    expect(document.querySelector(".animate-announcer-impact-flash")).toBeNull();
+  });
+
+  it("finishを過ぎてcelebrationへ進むと、WINNERバッジ・金色リングは勝者レーンから消える(Phase2cの担当と分離)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    const winnerId = winnerIds[0];
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-warn-ring")).toBe(false);
+    // celebrationの前進状態(race-winner-advance)自体は既存仕様どおり維持される。
+    expect(hasDescendantWithClass(winnerId, "race-winner-advance")).toBe(true);
+  });
+
+  it("reduced-motion時のゴールでは、WINNERバッジ・金色リングは残るがimpactFlashは出ない", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400, 200]); // reduced: → finish
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    const winnerId = winnerIds[0];
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(true);
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-warn-ring")).toBe(true);
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-impact-flash")).toBe(false);
+  });
+
+  it("4人プレイでも、winnerSprint/finishの新演出は勝者以外の現役プレイヤーには一切付かない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS, 1500]); // → winnerSprint
+    const winnerId = winnerIds[0];
+    const otherFinalist = ranked.slice(0, 2).find((r) => !winnerIds.includes(r.player.id))!.player.id;
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(true);
+    expect(hasDescendantWithClass(otherFinalist, "race-winner-streak")).toBe(false);
+
+    await advance(800); // → finish
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(true);
+    expect(hasDescendantWithClass(otherFinalist, "race-winner-badge")).toBe(false);
+  });
+
+  it("Phase2bの演出を追加してもphase timing(winnerSprint=800ms, finish=700ms)は変わっていない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500]); // → winnerSprint
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+
+    await advance(799);
+    expect(document.querySelector('[data-race-phase="winnerSprint"]')).not.toBeNull();
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+
+    await advance(699);
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+  });
+
+  it("Phase2bの演出を追加してもonFinish()はちょうど1回だけ呼ばれる(4人プレイ通し)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      700,
+      1600,
+    ]);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("globals.cssに速度ストリークのdesktop/mobile方向切り替え(race-winner-streak-y/x)と@media(min-width:640px)による向き反転が定義されている", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+
+    expect(css).toContain("@keyframes race-winner-streak-y");
+    expect(css).toContain("@keyframes race-winner-streak-x");
+    expect(css).toMatch(/@media \(min-width: 640px\)\s*\{\s*\.race-winner-streak\s*\{[\s\S]*?animation-name: race-winner-streak-x;/);
+  });
+
+  it("globals.cssのprefers-reduced-motion無効化ブロックに.race-winner-streakと.race-winner-sprint-glow::beforeが含まれる(コンポーネント側の二重ガード)", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+    const reducedBlockMatch = css.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/);
+    expect(reducedBlockMatch).not.toBeNull();
+    expect(reducedBlockMatch![0]).toContain(".race-winner-streak");
+    expect(reducedBlockMatch![0]).toContain(".race-winner-sprint-glow::before");
+  });
+});

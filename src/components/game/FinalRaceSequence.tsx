@@ -484,6 +484,15 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
             // isWinnerAdvancingPhaseが常にfalseなので、winnerIds自体が既に分かっていても
             // 視覚上は絶対に前進しない)。
             const isWinnerAdvancing = isWinnerAdvancingPhase && winnerIds.includes(r.player.id);
+            // Polish Phase「FinalRaceSequence Polish Phase 2b」: winnerSprint中の勝者だけへ
+            // 速度ストリーク+追加glowを足すかどうか。decorativeMotionEnabledとは独立の演出
+            // (winnerSprint専用の一発強化)なので、既存のisWinnerAdvancing/reduceMotionだけから
+            // 導出する新しい派生値として扱う(新しいstateは追加しない)。
+            const showWinnerSprintBoost = phase === "winnerSprint" && isWinnerAdvancing && !reduceMotion;
+            // ゴール(finish)瞬間だけ、勝者の車にimpactFlash+金色リング+WINNERバッジを重ねる。
+            // finish自体が700ms(reduced175ms)の短いフェーズなので、これだけで「一瞬の見せ場」に
+            // 自然に収まる(celebrationへは引き継がない=Phase2cの担当と切り分ける)。
+            const showWinnerGoalFx = phase === "finish" && isWinnerAdvancing;
             // race-drift/race-departingとは別のDOM階層(1つ外側のwrapper)へ適用することで、
             // 同一要素上でtransform系animationを重ねない(B-2b-2で発生した競合の教訓を踏襲)。
             // reduceMotion時は大きなtranslateを避けた静的オフセット版へ切り替える
@@ -558,12 +567,25 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
                           中の画像だけをobject-containで収めることで、4色とも同一の表示枠に
                           揃える(bboxの実寸差があるred用の固定scale補正は今回あえて入れない)。 */}
                       <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0.5 shadow sm:h-10 sm:w-10 ${badgeMotionClass}`}
+                        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0.5 shadow sm:h-10 sm:w-10 ${badgeMotionClass} ${showWinnerSprintBoost ? "race-winner-sprint-glow" : ""}`}
                         style={{
                           backgroundColor: r.player.color,
                           animationDelay: badgeMotionClass === "animate-race-vibrate" ? `${delayMs}ms` : undefined,
                         }}
                       >
+                        {/* Phase2b: ゴール瞬間だけ、既存AnnouncerEffectLayer(warnRing=金色リング、
+                            impactFlash=既存の一瞬の閃光)をcompactサイズで再利用する。新規Effect
+                            システムは追加しない。reduceMotion時はimpactFlashだけ丸ごと外し
+                            (静止した閃光は不自然なため)、warnRingは残す(そのanimateクラス自体が
+                            globals.cssのprefers-reduced-motionで静止表示へ落ちる既存の仕組みに乗る)。 */}
+                        {showWinnerGoalFx && (
+                          <AnnouncerEffectLayer
+                            effect={{ warnRing: true, impactFlash: !reduceMotion }}
+                            mobile={isMobile}
+                            warnRingClass="border-amber-400"
+                            compact
+                          />
+                        )}
                         <img
                           src={resolveVehicleAssetUrl("normal", colorIndexFor(r.player.color))}
                           alt=""
@@ -571,6 +593,18 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
                           className="h-full w-full object-contain"
                           style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.35))" }}
                         />
+                        {/* winnerSprint専用の速度ストリーク(後方へ流れる光の帯、CSS一発ループのみ)。 */}
+                        {showWinnerSprintBoost && <span aria-hidden="true" className="race-winner-streak" />}
+                        {/* ゴール瞬間だけ出す「WINNER」バッジ。celebrationの見出し(優勝 ○○さん!)や
+                            GameOverModalの文言(○○さんの勝ち!)とは表示タイミング・文言ともに
+                            重複しない、車のすぐ上に添える小さな金色バッジとして独立させた
+                            (日本語の見出しが別途すぐ後続するため、あえて英語の実況風バッジにして
+                            役割を分けている)。animate-character-bounceは既存keyframeの再利用。 */}
+                        {showWinnerGoalFx && (
+                          <span aria-hidden="true" className="race-winner-badge-wrap">
+                            <span className="race-winner-badge animate-character-bounce">WINNER</span>
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>

@@ -604,6 +604,125 @@ body {
   }
 }
 
+/* Polish Phase「FinalRaceSequence Polish Phase 2b」: winnerSprint中の勝者バッジだけに付く
+   速度ストリーク(後方=進行方向と逆側へ流れる短い光の帯)。新規JS座標アニメーションは使わず、
+   CSSのtransform+opacityの一発ループだけで「後方へ流れている」ことを示す。base(mobile既定、
+   縦レース=上→下)は車の上側(後方)、@media(min-width:640px)の横レース(左→右)では車の左側
+   (後方)へ、race-drift/race-winner-advanceと同じ「1クラスのままanimation-nameだけ@mediaで
+   切り替える」方式で向きを反転する。車バッジ本体(badgeMotionClass)のtransformアニメーションとは
+   別要素(この専用span自身)に閉じているため衝突しない。 */
+@keyframes race-winner-streak-y {
+  0% {
+    opacity: 0.9;
+    transform: translateX(-50%) scaleY(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(1.6);
+  }
+}
+@keyframes race-winner-streak-x {
+  0% {
+    opacity: 0.9;
+    transform: translateY(-50%) scaleX(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scaleX(1.6);
+  }
+}
+.race-winner-streak {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  transform-origin: center bottom;
+  width: 4px;
+  height: 20px;
+  margin-bottom: 1px;
+  border-radius: 9999px;
+  background: linear-gradient(to top, rgba(250, 204, 21, 0.9), rgba(250, 204, 21, 0));
+  animation: race-winner-streak-y 240ms ease-out infinite;
+  pointer-events: none;
+}
+@media (min-width: 640px) {
+  .race-winner-streak {
+    left: auto;
+    right: 100%;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    transform-origin: right center;
+    width: 20px;
+    height: 4px;
+    margin-bottom: 0;
+    margin-right: 1px;
+    background: linear-gradient(to left, rgba(250, 204, 21, 0.9), rgba(250, 204, 21, 0));
+    animation-name: race-winner-streak-x;
+  }
+}
+
+/* winnerSprint中だけ勝者バッジへ足す追加の金色glow。既存race-winner-advance(-reduced)の
+   box-shadowアニメーションとは別要素(::before疑似要素)に完全分離しているため、バッジ本体の
+   transform(badgeMotionClass)や外側wrapperのrace-winner-advanceと衝突しない。中心80%は
+   常にtransparentにしてあるため、ペイント順に関わらず車の絵柄自体を金色で覆い隠すことがない
+   (バッジの外周だけに薄いドーナツ状の光を足す)。 */
+.race-winner-sprint-glow {
+  position: relative;
+}
+.race-winner-sprint-glow::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, transparent 0%, transparent 78%, rgba(250, 204, 21, 0.8) 90%, rgba(250, 204, 21, 0) 100%);
+  animation: race-winner-sprint-glow-pulse 260ms ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes race-winner-sprint-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* ゴール(finish)瞬間だけ勝者バッジの上に出す「WINNER」バッジ。wrap(位置決め専用、
+   translateX(-50%)を保持し続ける)とbadge(見た目専用、animate-character-bounceの
+   scale転倒transformを乗せる)を分離しているのは、race-drift/animate-race-vibrateと同じ
+   「1要素に複数のtransformアニメーション/静的transformを重ねると後勝ちで消える」CSSの制約を
+   避けるため(1要素=1transform役割の原則をこのPhaseでも踏襲)。 */
+.race-winner-badge-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  pointer-events: none;
+}
+.race-winner-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #fde68a, #f59e0b);
+  color: #451a03;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+@media (min-width: 640px) {
+  .race-winner-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,
@@ -619,6 +738,11 @@ body {
   .animate-race-vibrate,
   .race-drift,
   .race-track-line,
+  /* Phase2b: winnerSprintの速度ストリーク・追加glowは、コンポーネント側で既に
+     !reduceMotion時しかレンダリングしないが(race-drift等と同じ二重ガード方針)、
+     念のためこちらにも列挙しておく。 */
+  .race-winner-streak,
+  .race-winner-sprint-glow::before,
   /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
      止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
      「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */
