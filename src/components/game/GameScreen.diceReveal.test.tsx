@@ -11,10 +11,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useGameStore } from "@/store/gameStore";
+import { ARRIVAL_LAST_MS, DEPART_MS } from "@/lib/game/moveTempo";
 import { DICE_FAKE_ROLL_MS, DICE_SETTLE_MS } from "./useDiceRevealPhase";
 import { GameScreen } from "./GameScreen";
 
-const STEP_ANIMATION_MS = 460;
+// Polish Phase 3b: 最初の1マスのstep intervalは、出目(totalSteps)によって
+// DEPART_MS(totalSteps>2)〜ARRIVAL_LAST_MS(totalSteps<=1)まで変わりうる(moveTempo.ts参照)。
+// このテストでは実際の出目を固定していないため、どちらのティアになっても確実に
+// advanceStep()相当の処理が完了しているとみなせるよう、両方の最大値を安全マージンとして使う。
+const FIRST_STEP_MAX_MS = Math.max(DEPART_MS, ARRIVAL_LAST_MS);
 
 function stubMatchMedia(matches: boolean): void {
   window.matchMedia = ((query: string) => ({
@@ -87,8 +92,8 @@ describe("GameScreen: サイコロ演出と車移動の同期(Polish Phase 3a)",
     // useDiceRevealPhase.test.tsと同じ理由で、1回のadvanceTimersByTimeAsyncにまとめず
     // 段階ごとに分けて進める(直前のsetState()に対するReactの再レンダー・useEffect登録=
     // 次のsetTimeout予約が間に合わないまま時間だけ進んでしまうため)。
-    // Phase3a以前はSTEP_ANIMATION_MS=460ms後に既に1歩進んでいたが、DICE_FAKE_ROLL_MS(450ms)
-    // だけでは足りず(+DICE_SETTLE_MS=180ms)、この時点で動いていたら演出とゲーム進行が
+    // Phase3a以前は固定460ms後に既に1歩進んでいたが、DICE_FAKE_ROLL_MS(450ms)だけでは
+    // 足りず(+DICE_SETTLE_MS=180ms)、この時点で動いていたら演出とゲーム進行が
     // ズレている(=不具合)。
     await act(async () => {
       await vi.advanceTimersByTimeAsync(DICE_FAKE_ROLL_MS);
@@ -100,10 +105,11 @@ describe("GameScreen: サイコロ演出と車移動の同期(Polish Phase 3a)",
     });
     expect(advanceStepHappened(startMoveHistoryLength)).toBe(false); // 演出は終わったが移動タイマーはまだ
 
-    // フェイクロール演出が完全に終わった後、既存のSTEP_ANIMATION_MS分だけ経過して
-    // ようやく1歩目(または分岐マスならselectingRouteへの遷移)が処理される。
+    // フェイクロール演出が完全に終わった後、Polish Phase 3bの可変step interval
+    // (出目に応じてDEPART_MS〜ARRIVAL_LAST_MS)分だけ経過して、ようやく1歩目
+    // (または分岐マスならselectingRouteへの遷移)が処理される。
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(STEP_ANIMATION_MS);
+      await vi.advanceTimersByTimeAsync(FIRST_STEP_MAX_MS);
     });
     expect(advanceStepHappened(startMoveHistoryLength)).toBe(true);
   });
@@ -135,7 +141,7 @@ describe("GameScreen: サイコロ演出と車移動の同期(Polish Phase 3a)",
     expect(advanceStepHappened(startMoveHistoryLength)).toBe(false); // まだ動いていない
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(STEP_ANIMATION_MS);
+      await vi.advanceTimersByTimeAsync(FIRST_STEP_MAX_MS);
     });
     expect(advanceStepHappened(startMoveHistoryLength)).toBe(true); // 演出完了後に進む
   });

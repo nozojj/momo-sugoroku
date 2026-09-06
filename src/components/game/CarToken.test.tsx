@@ -177,3 +177,35 @@ describe("CarToken: 既存の位置transform/current turn ring/変身flash/label
     expect(shadowedG?.querySelector("image")).not.toBeNull();
   });
 });
+
+describe("CarToken: movementDurationMs(Polish Phase 3b「車移動の気持ちよさ」)", () => {
+  it("movementDurationMs省略時は既存どおり420msのtransitionになる(既存の見た目を維持)", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1)");
+  });
+
+  it("movementDurationMsを指定するとtransition durationがその値になる(可変テンポ)", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: transform 270ms cubic-bezier(0.4, 0, 0.2, 1)");
+  });
+
+  it("movementDurationMsを指定してもinstant=trueが優先され、transitionはnoneのまま(瞬間移動を壊さない)", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} instant movementDurationMs={270} />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: none");
+  });
+});

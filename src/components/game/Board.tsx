@@ -39,6 +39,12 @@ interface BoardProps {
   onCardWarpFocusComplete?: () => void;
   /** 急行系カード使用中に一時的に切り替わる車の見た目。currentPlayerIndexの駒にのみ適用する。 */
   activeVehicleMode: VehicleMode | null;
+  /** Polish Phase 3b: 移動中(isMovingPhase)のパン用transition duration(ms)。省略時は
+   *  既存どおりCAMERA_TRANSITION_MS(420ms)固定のまま(idle/destinationFocus/cardWarpFocus等、
+   *  移動フェーズ以外のカメラ演出には一切影響しない)。GameScreen.tsxがmoveTempo.tsの
+   *  getStepTransitionMs()から算出した値を渡す想定で、currentPlayerIndexの駒(CarToken)へも
+   *  同じ値を渡すことで「カメラのパン」と「車の移動」が同じテンポから導出される。 */
+  movementTransitionMs?: number;
 }
 
 const PADDING = 80;
@@ -138,6 +144,7 @@ export function Board({
   cardWarpTargetNodeId = null,
   onCardWarpFocusComplete,
   activeVehicleMode,
+  movementTransitionMs,
 }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
@@ -644,7 +651,14 @@ export function Board({
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",
-            transition: dragging || instantCameraTransition ? "none" : `transform ${CAMERA_TRANSITION_MS}ms ease-out`,
+            // Polish Phase 3b: 移動中(isMovingPhase)だけ、GameScreen.tsxが渡す
+            // movementTransitionMs(moveTempo.tsの現在のテンポから算出)を使う。
+            // idle/destinationFocus/cardWarpFocus等、移動フェーズ以外は既存どおり
+            // CAMERA_TRANSITION_MS固定のまま(zoom設計・他カメラ演出には一切影響しない)。
+            transition:
+              dragging || instantCameraTransition
+                ? "none"
+                : `transform ${isMovingPhase && movementTransitionMs ? movementTransitionMs : CAMERA_TRANSITION_MS}ms ease-out`,
           }}
         >
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -999,6 +1013,11 @@ export function Board({
                   isCurrentTurn={i === currentPlayerIndex}
                   vehicleMode={i === currentPlayerIndex ? (activeVehicleMode ?? "normal") : "normal"}
                   instant={i === currentPlayerIndex && isCardWarpFocus && instantCameraTransition}
+                  // Polish Phase 3b: 現在の手番プレイヤーの駒にだけ現在の移動テンポを渡す
+                  // (他プレイヤーの駒は自分の手番以外で位置が動かないため無関係。
+                  // クラスターオフセット(dx/dy)による位置調整には既存どおりのデフォルト420msを
+                  // 使わせ、意図せず速すぎる/遅すぎるズレを生まないようにする)。
+                  movementDurationMs={i === currentPlayerIndex && isMovingPhase ? movementTransitionMs : undefined}
                 />
               );
             })}

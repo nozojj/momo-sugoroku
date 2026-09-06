@@ -20,13 +20,35 @@ interface CarTokenProps {
   /** trueの間は位置トランジションを無効化し、x/yの変更を即座に反映する(ぶっとび系カードの
    *  瞬間移動用。Board.tsxのinstantCameraTransitionと同じ「カットで見せる」目的で使う)。 */
   instant?: boolean;
+  /** Polish Phase 3b: 位置transitionの所要時間(ms)。省略時は既存どおり420ms固定
+   *  (Phase3a以前の見た目を完全に維持する)。Board.tsxが現在の移動テンポ
+   *  (moveTempo.tsのgetStepTransitionMs())から算出した値を、現在の手番プレイヤーの
+   *  トークンにだけ渡す想定(他プレイヤーの駒は自分の手番以外で位置が動かないため、
+   *  この値を渡しても渡さなくても見た目に影響しない)。 */
+  movementDurationMs?: number;
 }
+
+/** 位置transitionの既定時間(ms)。Phase3b以前からの値をそのまま定数化しただけで、
+ *  movementDurationMs省略時の見た目は一切変えない。 */
+const DEFAULT_MOVEMENT_DURATION_MS = 420;
 
 /** プレイヤーの車コマ。位置(x,y)の変化はCSSトランジションでアニメーションする(instant時を除く)。
  *  vehicleMode(+normalはcolorIndex)に対応する画像が解決できればそれを描画し、
  *  無ければ手続き的SVGのプレースホルダー(VEHICLE_PLACEHOLDER_STYLE)を描画する
  *  (CharacterSprite.tsxと同じ「画像→プレースホルダー」の解決順序)。 */
-export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, colorIndex, vehicleMode = "normal", instant = false }: CarTokenProps) {
+export function CarToken({
+  x,
+  y,
+  color,
+  label,
+  offsetX,
+  offsetY,
+  isCurrentTurn,
+  colorIndex,
+  vehicleMode = "normal",
+  instant = false,
+  movementDurationMs = DEFAULT_MOVEMENT_DURATION_MS,
+}: CarTokenProps) {
   const assetUrl = resolveVehicleAssetUrl(vehicleMode, colorIndex);
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
 
@@ -34,7 +56,7 @@ export function CarToken({ x, y, color, label, offsetX, offsetY, isCurrentTurn, 
     <g
       style={{
         transform: `translate(${x + offsetX}px, ${y - 22 + offsetY}px)`,
-        transition: instant ? "none" : "transform 420ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: instant ? "none" : `transform ${movementDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
       {isCurrentTurn && (
