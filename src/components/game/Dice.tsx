@@ -1,8 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DICE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+/** フェイクロール中に面を切り替える間隔(ms)。実際の乱数(ゲーム結果)には一切使わない、
+ *  純粋な表示演出用の値。 */
+const FAKE_FACE_INTERVAL_MS = 80;
+
+/** Polish Phase 3a: GameScreen.tsx側が一元管理するロール演出フェーズ。
+ *  "idle": 演出なし(通常表示、または未ロール)。
+ *  "rolling": rollDice()は既に実行済み(=diceResult/remainingMoves/status:"moving"は
+ *    裏側で確定済み)だが、UI上はまだ本当の出目を見せず、ランダムな面を切り替えて
+ *    「転がっている」ように見せる段階。
+ *  "settling": フェイクロールが終わり、本当のdiceResult/diceFacesを見せて短く弾ませる段階。
+ *  GameScreen.tsx側がタイミングを一元管理し、このコンポーネントは受け取ったphaseに応じて
+ *  「何を表示するか」だけを決める(このコンポーネント自身はsetTimeoutでフェーズを進めない)。 */
+export type DiceRevealPhase = "idle" | "rolling" | "settling";
 
 interface DiceProps {
   diceResult: number | null;
@@ -13,17 +27,55 @@ interface DiceProps {
   canRoll: boolean;
   doubleArmed: boolean;
   onRoll: () => void;
+  /** Polish Phase 3a: ロール演出フェーズ(上記参照)。GameScreen.tsxから渡される。 */
+  revealPhase: DiceRevealPhase;
 }
 
-export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArmed, onRoll }: DiceProps) {
-  const [spinning, setSpinning] = useState(false);
+function randomFace(): number {
+  return 1 + Math.floor(Math.random() * 6);
+}
+
+export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArmed, onRoll, revealPhase }: DiceProps) {
+  // フェイクロール中だけ表示するランダムな面(演出専用のローカルstate。ゲーム結果には
+  // 一切影響しない)。diceCount個ぶんまとめて持つことで、急行系カード(diceCount>1)でも
+  // 全ての面が独立してパラパラ切り替わって見える。
+  const [fakeFaces, setFakeFaces] = useState<number[]>([]);
+  // "idle"/"settling"→"rolling"へ切り替わった最初のレンダーで、本当の出目が1フレームも
+  // 見えてしまわないよう、レンダー中に同期でfakeFacesを埋める(Reactが公式にサポートする
+  // 「propsの変化に応じてstateを調整する」パターン。effect側の初回setState待ちだと、
+  // fakeFacesがまだ空配列のままdiceResult側へフォールバックする1フレームが理論上生じうる)。
+  const prevRevealPhaseRef = useRef<DiceRevealPhase>("idle");
+  if (revealPhase !== prevRevealPhaseRef.current) {
+    prevRevealPhaseRef.current = revealPhase;
+    if (revealPhase === "rolling") setFakeFaces(Array.from({ length: Math.max(1, diceCount) }, randomFace));
+  }
+
+  useEffect(() => {
+    if (revealPhase !== "rolling") return;
+    const count = Math.max(1, diceCount);
+    const timer = window.setInterval(() => {
+      setFakeFaces(Array.from({ length: count }, randomFace));
+    }, FAKE_FACE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [revealPhase, diceCount]);
 
   function handleClick() {
     if (!canRoll) return;
-    setSpinning(true);
     onRoll();
-    window.setTimeout(() => setSpinning(false), 500);
   }
+
+  const isRolling = revealPhase === "rolling";
+  const isSettling = revealPhase === "settling";
+  // "rolling"中はrollDice()が既に確定させた本当の出目を隠し、フェイクロールの面だけを見せる。
+  // フェイクロールがまだ1周も回っていない最初の1フレーム(fakeFacesが空)の保険として
+  // diceResult/diceFacesへフォールバックする(実際には同じeffect内でほぼ同時にセットされるため
+  // 到達しないが、念のため)。
+  const displayResult = isRolling ? (fakeFaces[0] ?? diceResult) : diceResult;
+  const displayFaces = isRolling ? (fakeFaces.length > 0 ? fakeFaces : diceFaces) : diceFaces;
+  // "settling"の瞬間だけ、本当の出目が確定したことを示す軽いバウンド(既存animate-character-bounce
+  // の再利用、新規keyframeは追加しない)。isRolling中はanimate-dice-rollと共存させない
+  // (同一要素に複数のtransform系animationを重ねない、というプロジェクト既存の方針を踏襲)。
+  const motionClass = isRolling ? "animate-dice-roll" : isSettling ? "animate-character-bounce" : "";
 
   // diceCount<=1のときは既存の単一ダイス表示をそのまま使う(見た目・挙動を一切変えない)。
   if (diceCount <= 1) {
@@ -35,29 +87,35 @@ export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArme
           disabled={!canRoll}
           className={`flex h-20 w-20 items-center justify-center rounded-2xl border-2 bg-white text-5xl shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${
             doubleArmed ? "border-fuchsia-400" : "border-slate-300 dark:border-slate-500"
-          } ${spinning ? "animate-dice-roll" : ""}`}
+          } ${motionClass}`}
           aria-label="サイコロを振る"
         >
-          {diceResult ? DICE_FACES[diceResult] : "🎲"}
+          {displayResult ? DICE_FACES[displayResult] : "🎲"}
         </button>
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-          {canRoll ? (doubleArmed ? "出目 x2 で移動!" : "タップしてサイコロを振る") : diceResult ? `${diceResult}マス移動中…` : "-"}
+          {canRoll
+            ? doubleArmed
+              ? "出目 x2 で移動!"
+              : "タップしてサイコロを振る"
+            : isRolling
+              ? "サイコロを振っています…"
+              : diceResult
+                ? `${diceResult}マス移動中…`
+                : "-"}
         </span>
       </div>
     );
   }
 
   // diceCount>1: 急行系カード使用中。ロール前はN個振る旨を、ロール後は内訳+合計を表示する。
-  const rolled = diceFaces && diceFaces.length > 0 ? diceFaces : null;
+  const rolled = displayFaces && displayFaces.length > 0 ? displayFaces : null;
   return (
     <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         onClick={handleClick}
         disabled={!canRoll}
-        className={`flex items-center gap-1 rounded-2xl border-2 border-fuchsia-400 bg-white px-3 py-4 shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${
-          spinning ? "animate-dice-roll" : ""
-        }`}
+        className={`flex items-center gap-1 rounded-2xl border-2 border-fuchsia-400 bg-white px-3 py-4 shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${motionClass}`}
         aria-label={`サイコロ${diceCount}個を振る`}
       >
         {rolled
@@ -75,9 +133,11 @@ export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArme
       <span className="text-xs font-medium text-fuchsia-600 dark:text-fuchsia-300">
         {canRoll
           ? `タップしてサイコロ${diceCount}個を振る!`
-          : rolled
-            ? `${rolled.join("+")}=${diceResult} マス移動中…`
-            : "-"}
+          : isRolling
+            ? `サイコロ${diceCount}個を振っています…`
+            : rolled
+              ? `${rolled.join("+")}=${diceResult} マス移動中…`
+              : "-"}
       </span>
     </div>
   );

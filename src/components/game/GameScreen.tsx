@@ -32,6 +32,7 @@ import { StartScreen } from "./StartScreen";
 import { useCpuAutoplay } from "./useCpuAutoplay";
 import { useGameplaySoundEffects } from "./useGameplaySoundEffects";
 import { useBgmController } from "./useBgmController";
+import { useDiceRevealPhase } from "./useDiceRevealPhase";
 
 const STEP_ANIMATION_MS = 460;
 
@@ -135,15 +136,24 @@ export function GameScreen() {
   // このフック自体は生存し続ける(詳細はuseBgmController.ts参照)。
   useBgmController();
 
-  // マス移動を1歩ずつアニメーションしながら自動で進める
+  // Polish Phase 3a: サイコロ演出(フェイクロール→本当の出目)のフェーズ管理。
+  // ロジック本体はuseDiceRevealPhase.tsへ分離済み(useGameplaySoundEffects.ts等と同じ
+  // 「storeの値を読んで、副作用/ローカルstateだけを持つ薄いフック」設計に揃えるため)。
+  const diceRevealPhase = useDiceRevealPhase(diceResult);
+
+  // マス移動を1歩ずつアニメーションしながら自動で進める。Polish Phase 3a: サイコロの
+  // フェイクロール演出("idle"以外)が終わるまでは最初の1歩を開始しない(diceRevealPhaseを
+  // 依存配列に加えることで、"rolling"→"idle"に戻った瞬間にこのeffectが再評価される)。
+  // 2歩目以降はdiceRevealPhaseが既に"idle"のまま変化しないため、既存のペース(STEP_ANIMATION_MS
+  // 固定間隔)に一切影響しない。
   useEffect(() => {
-    if (status !== "moving") return;
+    if (status !== "moving" || diceRevealPhase !== "idle") return;
     const timer = window.setTimeout(() => {
       advanceStep();
     }, STEP_ANIMATION_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, remainingMoves, currentPlayer?.currentNodeId]);
+  }, [status, remainingMoves, currentPlayer?.currentNodeId, diceRevealPhase]);
 
   // persist(localStorage)のrehydrationが完了するまでは、StartScreenの「ゲーム開始」を
   // 誤って操作できてしまわないよう、StartScreenも本編も一切マウントしない。
@@ -226,6 +236,7 @@ export function GameScreen() {
       </div>
 
       <GameHud
+        currentPlayerId={currentPlayer?.id ?? ""}
         currentPlayerName={currentPlayer?.name ?? ""}
         currentPlayerColor={currentPlayer?.color ?? "#94a3b8"}
         destinationName={destinationNode.name}
@@ -266,6 +277,7 @@ export function GameScreen() {
           canRoll={isCurrentHuman && status === "rolling" && diceResult === null}
           doubleArmed={pendingDoubleMove}
           onRoll={rollDice}
+          revealPhase={diceRevealPhase}
         />
         {status === "moving" && remainingMoves > 0 && (
           <p className="mt-1 text-center text-xs font-bold text-slate-600 drop-shadow-sm dark:text-slate-300">
