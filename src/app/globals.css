@@ -723,6 +723,29 @@ body {
   }
 }
 
+/* Polish Phase「FinalRaceSequence Polish Phase 2c」: celebration見出し(優勝○○さん!)を
+   ほんの少しだけ主役に見せるための静的な金色halo。第一候補だった既存.animate-spotlight-glow
+   (Board.tsxの目的地スポットライト用、transform-box:fill-boxはSVG専用でHTML textには効かず、
+   そもそもinfiniteで拡大し続けるリングは見出しテキストには騒がしすぎる)は調査の結果不採用にし、
+   新規keyframeも追加せず、text-shadowだけの静的な強調に留めた(animationを持たないため
+   reduced-motionの分岐も不要)。 */
+.celebration-winner-glow {
+  text-shadow:
+    0 0 10px rgba(250, 204, 21, 0.6),
+    0 0 26px rgba(250, 204, 21, 0.35);
+}
+
+/* celebration中だけ背景(湘南イラスト)へ重ねる非常に薄いvignette。黒一色のベタ塗りではなく、
+   中心(優勝者名・レーン)はtransparentのまま外側だけradial-gradientでわずかに落とすことで
+   視線を中心へ集める。Phase2bのimpactFlash(一瞬だけの白い閃光、finish専用)とは役割を
+   明確に分ける(こちらはmotionを持たないcelebration専用の常時背景整理)。z-10のコンテンツ
+   wrapper(見出し・レーン・confetti)より下の背景レイヤーとして重ねるため、湘南イラストだけを
+   ほんの少し落ち着かせ、見出し・車・ゴールラインの視認性には影響しない。animationを持たない
+   静的overlayなのでprefers-reduced-motionの影響を受けない。 */
+.celebration-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(15, 23, 42, 0.3) 100%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,

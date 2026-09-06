@@ -378,6 +378,12 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
         aria-hidden="true"
         className="absolute inset-0 bg-linear-to-b from-white/60 via-white/45 to-amber-100/55 dark:from-black/65 dark:via-black/55 dark:to-amber-950/55"
       />
+      {/* Polish Phase「FinalRaceSequence Polish Phase 2c」: celebration中だけ重ねる非常に薄い
+          vignette(背景レイヤー、z-10のコンテンツより下)。「追加する」より「優勝者へ視線を
+          整理する」ことが目的なので、湘南イラストをほんの少し落ち着かせるだけに留め、見出し・
+          confetti・車・ゴールライン(すべてz-10側)には一切重ならない。Phase2bのimpactFlash
+          (finish専用の一瞬の閃光)とは表示フェーズ・役割ともに完全に分離している。 */}
+      {phase === "celebration" && <div aria-hidden="true" className="celebration-vignette absolute inset-0" />}
 
       <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 p-4 text-center">
         <p className="text-xs font-bold tracking-widest text-white/80 drop-shadow sm:text-sm">湘南ファイナルレース</p>
@@ -417,7 +423,11 @@ export function FinalRaceSequence({ ranked, winnerIds, onFinish }: FinalRaceSequ
         )}
         {(phase === "celebration" || phase === "done") && (
           <div className="relative">
-            <p className="text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
+            {/* Phase2c: 既存animate-spotlight-glow(Board.tsxの目的地スポットライト、SVG専用の
+                infiniteな拡大リング)は見出しテキストには不採用と判断し、新規keyframeなしの
+                静的な金色halo(celebration-winner-glow、text-shadowのみ)だけを足した。
+                Phase2bより派手にしない、という方針どおりmotionは一切追加していない。 */}
+            <p className="celebration-winner-glow text-3xl font-black text-white drop-shadow-lg sm:text-5xl">
               {isTie ? "優勝 引き分け!" : `優勝 ${winners[0]?.player.name}さん!`}
             </p>
             {/* P11-3-B2c-2: celebration開始時だけ紙吹雪+sparkleを表示する。DestinationCelebrationScreen.tsx

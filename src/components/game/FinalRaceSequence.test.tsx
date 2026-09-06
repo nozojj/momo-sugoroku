@@ -1959,3 +1959,164 @@ describe("FinalRaceSequence(Polish Phase 2b: winnerSprint強化+ゴール瞬間�
     expect(reducedBlockMatch![0]).toContain(".race-winner-sprint-glow::before");
   });
 });
+
+describe("FinalRaceSequence(Polish Phase 2c: celebrationの余韻+Phase2全体最終回帰)", () => {
+  beforeEach(() => {
+    stubMatchMedia(false);
+    playSEMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("celebrationで優勝者名(優勝 ○○さん!)が表示され、静的な金色halo(.celebration-winner-glow)が付く", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800, 700]); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    const heading = screen.getByText(`優勝 ${ranked.find((r) => winnerIds.includes(r.player.id))!.player.name}さん!`);
+    expect(heading.className).toContain("celebration-winner-glow");
+  });
+
+  it("celebration用vignette(.celebration-vignette)はcelebrationフェーズだけに存在し、running/winnerSprint/finishでは出ない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advance(1200); // → running
+    expect(document.querySelector(".celebration-vignette")).toBeNull();
+
+    await advance(900); // → finalTwo
+    expect(document.querySelector(".celebration-vignette")).toBeNull();
+
+    await advance(1500); // → winnerSprint
+    expect(document.querySelector(".celebration-vignette")).toBeNull();
+
+    await advance(800); // → finish
+    expect(document.querySelector(".celebration-vignette")).toBeNull();
+
+    await advance(700); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(document.querySelector(".celebration-vignette")).not.toBeNull();
+  });
+
+  it("celebrationへ入ると、Phase2bのWINNERバッジ・金色リング・impactFlashは勝者レーンから消える", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+    const winnerId = winnerIds[0];
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(true);
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-warn-ring")).toBe(true);
+
+    await advance(700); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    expect(hasDescendantWithClass(winnerId, "race-winner-badge")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "animate-announcer-warn-ring")).toBe(false);
+    expect(document.querySelector(".animate-announcer-impact-flash")).toBeNull();
+    // winnerSprint専用の速度ストリーク・追加glowもcelebrationへは引き継がれない(既存Phase2b仕様)。
+    expect(hasDescendantWithClass(winnerId, "race-winner-streak")).toBe(false);
+    expect(hasDescendantWithClass(winnerId, "race-winner-sprint-glow")).toBe(false);
+  });
+
+  it("celebrationのconfetti/sparkleは既存どおり1セットだけで、二重追加やfinishでの前倒し発生がない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull(); // finishではまだconfettiなし
+
+    await advance(700); // → celebration
+    const layers = document.querySelectorAll('[aria-hidden="true"].pointer-events-none');
+    // AnnouncerEffectLayerは(confetti+sparkle)の1インスタンスのみ描画される(warnRing/impactFlash用の
+    // レイヤーはfinish専用でcelebrationには存在しないため、この時点で残るのは1つだけのはず)。
+    expect(layers.length).toBe(1);
+    expect(document.querySelectorAll(".animate-confetti-fall").length).toBeGreaterThan(0);
+  });
+
+  it("reduced-motion時でも優勝者名(celebration-winner-glowの静的表示込み)は残り、vignette/haloのどちらも新規motionを持たない", async () => {
+    stubMatchMedia(true);
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([300, 200, 400, 200, 175]); // reduced: → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    const heading = screen.getByText(`優勝 ${ranked.find((r) => winnerIds.includes(r.player.id))!.player.name}さん!`);
+    expect(heading.className).toContain("celebration-winner-glow");
+    expect(document.querySelector(".celebration-vignette")).not.toBeNull();
+    // reduced-motion時は既存どおりconfetti/sparkle自体を丸ごと非表示にする(Phase2b以前から不変)。
+    expect(document.querySelector(".animate-confetti-fall")).toBeNull();
+  });
+
+  it("globals.cssの.celebration-vignette/.celebration-winner-glowはどちらもanimation/keyframeを持たない静的CSSである", () => {
+    const cssPath = path.resolve(__dirname, "../../app/globals.css");
+    const css = readFileSync(cssPath, "utf-8");
+
+    const vignetteBlockMatch = css.match(/\.celebration-vignette\s*\{[^}]*\}/);
+    const glowBlockMatch = css.match(/\.celebration-winner-glow\s*\{[^}]*\}/);
+    expect(vignetteBlockMatch).not.toBeNull();
+    expect(glowBlockMatch).not.toBeNull();
+    expect(vignetteBlockMatch![0]).not.toContain("animation");
+    expect(glowBlockMatch![0]).not.toContain("animation");
+    expect(css).not.toContain("@keyframes celebration-vignette");
+    expect(css).not.toContain("@keyframes celebration-winner-glow");
+  });
+
+  it("Phase2cの変更を追加してもphase timing(finish=700ms, celebration=1600ms)は変わっていない", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000]);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, 1500, 800]); // → finish
+    await advance(699);
+    expect(document.querySelector('[data-race-phase="finish"]')).not.toBeNull();
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    await advance(1599);
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+    await advance(1);
+    expect(document.querySelector('[data-race-phase="done"]')).not.toBeNull();
+  });
+
+  it("Phase2cの変更を追加してもonFinish()はちょうど1回だけ呼ばれる(4人プレイ、intro〜celebration通し)", async () => {
+    const { ranked, winnerIds } = buildRanked([1000, 2000, 3000, 4000]);
+    const onFinish = vi.fn();
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={onFinish} />);
+
+    await advanceSteps([
+      1200,
+      900,
+      ...ELIMINATION_STEP_STAGES_MS,
+      ...ELIMINATION_STEP_STAGES_MS,
+      1500,
+      800,
+      700,
+      1600,
+    ]);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+
+    await advance(10000);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("4人プレイの同着1位でも、celebrationのvignette/haloは正常に付き、Phase2bのfinish演出は残らない", async () => {
+    const { ranked, winnerIds } = buildRanked([3000, 3000, 2000, 1000]); // p1/p2が同着1位
+    expect(winnerIds).toHaveLength(2);
+    render(<FinalRaceSequence ranked={ranked} winnerIds={winnerIds} onFinish={() => {}} />);
+
+    await advanceSteps([1200, 900, ...ELIMINATION_STEP_STAGES_MS, ...ELIMINATION_STEP_STAGES_MS, 1500, 800, 700]); // → celebration
+    expect(document.querySelector('[data-race-phase="celebration"]')).not.toBeNull();
+
+    expect(screen.getByText("優勝 引き分け!").className).toContain("celebration-winner-glow");
+    expect(document.querySelector(".celebration-vignette")).not.toBeNull();
+    for (const id of winnerIds) {
+      expect(hasDescendantWithClass(id, "race-winner-badge")).toBe(false);
+      expect(hasDescendantWithClass(id, "animate-announcer-warn-ring")).toBe(false);
+    }
+  });
+});
