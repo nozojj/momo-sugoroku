@@ -1,7 +1,9 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { VehicleMode } from "@/types/game";
 import { VEHICLE_PLACEHOLDER_STYLE, resolveVehicleAssetUrl } from "@/lib/game/vehicleStyle";
+import { useVehicleHeading } from "./useVehicleHeading";
 
 interface CarTokenProps {
   x: number;
@@ -57,6 +59,23 @@ export function CarToken({
   const assetUrl = resolveVehicleAssetUrl(vehicleMode, colorIndex);
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
 
+  // Polish Phase 3d: 「進行方向が変化したstepだけ車体をカーブ方向へ軽く傾ける」curve lean。
+  // 調査結果により、normal本番画像(3/4パース)は進行方向そのものへ360°rotateする方式に
+  // 向かないため採用しない。代わりにoffsetX/offsetY適用前のx/y(=マス座標そのもの)だけを
+  // useVehicleHeadingへ渡し、cluster offsetの変化(同じマスに他プレイヤーが増減した場合)や
+  // instant(ワープ)中の不自然な傾きを避ける。normal/expressどちらのvehicleModeでも同じ
+  // 演出を適用する(vehicleMode自体はこのhookに渡さないため、切替で挙動が変わらない)。
+  const { leanDeg, stepKey } = useVehicleHeading(x, y);
+  // instant(瞬間移動)中はcurve leanのアニメーションも表示しない(位置transitionを
+  // 無効化するinstantと同じ「カットで見せる」方針。teleport先との間には道路上の
+  // 進行方向という意味が無いため、直前の値を引きずって不自然に傾かせない)。
+  const curveLeanActive = !instant && leanDeg !== 0;
+  // durationはmovementDurationMs(Phase3bの現在のテンポ)にそのまま同期させる
+  // (globals.cssの.animate-curve-leanが持つデフォルトdurationをインラインで上書きする)。
+  const curveLeanStyle: CSSProperties | undefined = curveLeanActive
+    ? ({ "--curve-lean-deg": `${leanDeg}deg`, animationDuration: `${movementDurationMs}ms` } as CSSProperties)
+    : undefined;
+
   return (
     <g
       style={{
@@ -87,27 +106,36 @@ export function CarToken({
           className="animate-vehicle-transform-flash"
         />
       )}
-      {/* 車体。Polish Phase 3c: landingSettle=trueの間だけanimate-landing-settleを付与する。
-          このg自体は位置transitionを持たない(親<g>の役割)ため、scaleアニメーションと
-          position transitionが同一要素で衝突することはない(CarToken.tsx既存の
-          wrapper/inner分離方針をそのまま踏襲)。 */}
-      <g
-        className={landingSettle ? "animate-landing-settle" : ""}
-        style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
-      >
-        {assetUrl ? (
-          <image href={assetUrl} x={-13} y={-13} width={26} height={26} />
-        ) : (
-          <g style={{ transform: `scale(${placeholder.scale})`, transformBox: "fill-box", transformOrigin: "center" }}>
-            {placeholder.spoiler && (
-              <rect x={-12.5} y={-4} width={2.5} height={7} rx={1} fill={placeholder.accent} stroke="#1f2937" strokeWidth={0.8} />
-            )}
-            <rect x={-11} y={-7} width={22} height={14} rx={5} fill={color} stroke={placeholder.accent} strokeWidth={1.4} />
-            <rect x={-6} y={-11} width={12} height={8} rx={3} fill={color} stroke={placeholder.accent} strokeWidth={1.2} opacity={0.9} />
-            <circle cx={-6} cy={7} r={2.6} fill="#1f2937" />
-            <circle cx={6} cy={7} r={2.6} fill="#1f2937" />
-          </g>
-        )}
+      {/* Polish Phase 3d: curve lean wrapper。position(親<g>のtranslate)・landing settle
+          (直下の子<g>のscale)とはそれぞれ別要素にすることで、「1要素1transform
+          animation責務」を維持する(同一要素にrotateとscaleのCSS animationを重ねると
+          後勝ちで一方が消えるため)。key={stepKey}により、同じleanDegが連続しても
+          (同じ角度のカーブが続く道等)アニメーションを毎step必ず再生させる
+          (CarToken.tsx既存のkey={vehicleMode}による変身flash再生と同じ手法)。
+          curveLeanStyleがundefined(直進/初回/instant中)の間は素通しのgとして働く。 */}
+      <g key={stepKey} className={curveLeanActive ? "animate-curve-lean" : ""} style={curveLeanStyle}>
+        {/* 車体。Polish Phase 3c: landingSettle=trueの間だけanimate-landing-settleを付与する。
+            このg自体は位置transitionを持たない(親<g>の役割)ため、scaleアニメーションと
+            position transitionが同一要素で衝突することはない(CarToken.tsx既存の
+            wrapper/inner分離方針をそのまま踏襲)。 */}
+        <g
+          className={landingSettle ? "animate-landing-settle" : ""}
+          style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
+        >
+          {assetUrl ? (
+            <image href={assetUrl} x={-13} y={-13} width={26} height={26} />
+          ) : (
+            <g style={{ transform: `scale(${placeholder.scale})`, transformBox: "fill-box", transformOrigin: "center" }}>
+              {placeholder.spoiler && (
+                <rect x={-12.5} y={-4} width={2.5} height={7} rx={1} fill={placeholder.accent} stroke="#1f2937" strokeWidth={0.8} />
+              )}
+              <rect x={-11} y={-7} width={22} height={14} rx={5} fill={color} stroke={placeholder.accent} strokeWidth={1.4} />
+              <rect x={-6} y={-11} width={12} height={8} rx={3} fill={color} stroke={placeholder.accent} strokeWidth={1.2} opacity={0.9} />
+              <circle cx={-6} cy={7} r={2.6} fill="#1f2937" />
+              <circle cx={6} cy={7} r={2.6} fill="#1f2937" />
+            </g>
+          )}
+        </g>
       </g>
       <text
         y={-16}

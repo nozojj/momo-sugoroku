@@ -180,6 +180,32 @@ body {
   transform-origin: center;
 }
 
+/* Polish Phase 3d: カーブ時に車体をごく軽く傾けるcurve lean専用アニメーション。
+   進行方向そのものへ回転させる(向きを正確に合わせる)のではなく、「カーブの軽い反動」だけを
+   表現する短い一発アニメーション(調査結果によりnormal本番画像は3/4パースのため、
+   90°/180°の大きなrotateはしない)。開始角度は--curve-lean-degカスタムプロパティ
+   経由でCarToken.tsxがstep毎に渡す。0%で開始角度から始まり、65%で0°へ戻り、以降は
+   movementDurationMsが終わるまで0°を維持する(「カーブに入って軽く傾き、
+   曲がり終える前に体勢を戻す」自然な体感を狙う)。 */
+@keyframes curve-lean {
+  0% {
+    transform: rotate(var(--curve-lean-deg, 0deg));
+  }
+  65%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+.animate-curve-lean {
+  /* durationはmovementDurationMs(Phase3bの現在のテンポ)に同期させるため、
+     CarToken.tsx側がインラインstyleのanimationDurationで上書きする前提の
+     デフォルト値(位置transitionの既定420msに近い値)。 */
+  animation: curve-lean 420ms ease-out both;
+  /* .animate-landing-settleと同じ理由でfill-boxが必要(SVG要素のtransform-origin: center対策)。 */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 @keyframes character-shake {
   0%,
   100% {
@@ -794,6 +820,9 @@ body {
      コンポーネント側の追加ガードは持たないが、他の一発animationと同じくここに列挙して
      おくことで、将来通常移動全体がreduced-motion対応する際にまとめて無効化できるようにする。 */
   .animate-landing-settle,
+  /* Polish Phase 3d: カーブ時のcurve lean。.animate-landing-settleと同じ理由
+     (通常移動全体は現状reduced-motion未対応)でここに列挙しておく。 */
+  .animate-curve-lean,
   /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
      止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
      「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */

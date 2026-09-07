@@ -266,3 +266,141 @@ describe("CarToken: landingSettle(Polish Phase 3c「着地→マス効果発生�
     expect(container.querySelector(".animate-landing-settle")).not.toBeNull();
   });
 });
+
+describe("CarToken: curve lean(Polish Phase 3d「カーブ時の車体リアクション」)", () => {
+  it("初回mount時・最初の移動(previous headingが無い)ではcurve leanが適用されない", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).toBeNull();
+
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).toBeNull();
+  });
+
+  it("直進が続く間はcurve leanが適用されない", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={20} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).toBeNull();
+  });
+
+  it("方向転換した場合、curve lean(--curve-lean-degカスタムプロパティ付き)が適用される", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    const leanEl = container.querySelector(".animate-curve-lean");
+    expect(leanEl).not.toBeNull();
+    expect(leanEl?.getAttribute("style")).toContain("--curve-lean-deg");
+  });
+
+  it("movementDurationMsを指定すると、curve leanのanimation-durationがその値に同期する", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    const leanEl = container.querySelector(".animate-curve-lean");
+    expect(leanEl?.getAttribute("style")).toContain("270ms");
+  });
+
+  it("instant=trueのときはcurve leanのクラスが付与されない(瞬間移動中に不自然な回転を見せない)", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} instant />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).toBeNull();
+  });
+
+  it("landingSettleとcurve leanは別要素として共存し、互いに競合しない", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} landingSettle />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).not.toBeNull();
+    expect(container.querySelector(".animate-landing-settle")).not.toBeNull();
+    // 同一要素が両方のクラスを持たない(1要素1transform animation責務を維持)
+    expect(container.querySelector(".animate-curve-lean.animate-landing-settle")).toBeNull();
+  });
+
+  it("vehicleModeが変わってもcurve leanの発生自体は壊れない(x/yベースの計算に無関係)", () => {
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} vehicleMode="normal" />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} vehicleMode="expressLv2" />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} vehicleMode="expressLv2" />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).not.toBeNull();
+  });
+});
