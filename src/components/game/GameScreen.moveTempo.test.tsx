@@ -19,10 +19,16 @@ import {
   CRUISE_MS,
   DEPART_MS,
   getStepAnimationMs,
+  getStepTransitionMs,
 } from "@/lib/game/moveTempo";
 import { DICE_FAKE_ROLL_MS, DICE_SETTLE_MS } from "./useDiceRevealPhase";
+import { LANDING_SETTLE_MS } from "./useLandingSettlePhase";
 import { GameScreen } from "./GameScreen";
-const LANDING_TICK_MS = 460;
+
+// Polish Phase 3c: 着地tick(remainingMoves===0)の待ち時間は、旧来の固定460msから
+// 「最後の1マスの視覚transitionが完了する時間(ARRIVAL_LAST_MSから算出) + 着地settle
+// (LANDING_SETTLE_MS)」へ変わった。目的地到着ではない通常マスを前提にしたテスト用の合計値。
+const LANDING_TICK_MS = getStepTransitionMs(ARRIVAL_LAST_MS) + LANDING_SETTLE_MS;
 
 function stubMatchMedia(matches: boolean): void {
   window.matchMedia = ((query: string) => ({

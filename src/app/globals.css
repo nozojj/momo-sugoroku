@@ -157,6 +157,29 @@ body {
   animation: character-bounce 150ms ease-out both;
 }
 
+/* Polish Phase 3c: 通常マスの着地settle専用。既存animate-character-bounceは
+   squash&stretch(scale(1.08,0.9)→scale(0.95,1.06))でキャラクター向けの弾みが強く、
+   何十回も見る車の着地には強すぎると判断し、既存animationを流用せず新設した。
+   「跳ねる」というより「ピタッと止まったときの軽い反動」程度に留める、均一なscaleだけの
+   非常に小さい一発アニメーション。 */
+@keyframes landing-settle {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-landing-settle {
+  animation: landing-settle 150ms ease-out both;
+  /* .animate-vehicle-transform-flashと同じ理由でfill-boxが必要(SVG要素のtransform-origin: center対策)。 */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 @keyframes character-shake {
   0%,
   100% {
@@ -766,6 +789,11 @@ body {
      念のためこちらにも列挙しておく。 */
   .race-winner-streak,
   .race-winner-sprint-glow::before,
+  /* Polish Phase 3c: 通常マスの着地settle。既存の通常移動(Board.tsx/CarToken.tsx)は
+     現状prefers-reduced-motionを一切見ておらず(既知の未対応領域)、このanimationも
+     コンポーネント側の追加ガードは持たないが、他の一発animationと同じくここに列挙して
+     おくことで、将来通常移動全体がreduced-motion対応する際にまとめて無効化できるようにする。 */
+  .animate-landing-settle,
   /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
      止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
      「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */

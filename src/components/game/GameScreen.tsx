@@ -34,14 +34,8 @@ import { useGameplaySoundEffects } from "./useGameplaySoundEffects";
 import { useBgmController } from "./useBgmController";
 import { useDiceRevealPhase } from "./useDiceRevealPhase";
 import { useMoveTotalSteps } from "./useMoveTotalSteps";
-import { getStepAnimationMs, getStepTransitionMs } from "@/lib/game/moveTempo";
-
-/** remainingMoves===0になった瞬間(=このtickでは1マスも進まず、advanceStep()が
- *  resolveLanding()を呼ぶためだけの間)に使う固定値。Polish Phase 3b以前のSTEP_ANIMATION_MSを
- *  そのまま維持した値で、「移動する1マス」の可変テンポ(moveTempo.tsのgetStepAnimationMs())とは
- *  意図的に分離している(調査結果どおり、着地演出自体の改善は別Phaseの対象とし、ここでは
- *  移動テンポ導入によってこの「間」が意図せずCRUISE並みに短くなる、といった副作用だけを防ぐ)。 */
-const LANDING_TICK_MS = 460;
+import { useLandingSettlePhase, LANDING_SETTLE_MS } from "./useLandingSettlePhase";
+import { ARRIVAL_LAST_MS, getStepAnimationMs, getStepTransitionMs } from "@/lib/game/moveTempo";
 
 export function GameScreen() {
   const hasHydrated = useHasHydrated();
@@ -157,32 +151,57 @@ export function GameScreen() {
   // Polish Phase 3b: 直近にスケジュールした「1マス移動」のstep interval(ms)。CarToken/Board
   // cameraのtransition durationをこの値から導出する(getStepTransitionMs())ことで、
   // 「stepのタイマー間隔」「車の移動」「カメラのパン」が同じテンポ値から一致して動く。
-  // 着地tick(remainingMoves===0、LANDING_TICK_MS使用)ではこの値を更新しない
-  // (車もカメラも動かないtickのため、直前の実移動テンポの値をそのまま保持しておけば十分)。
-  const [lastStepIntervalMs, setLastStepIntervalMs] = useState(LANDING_TICK_MS);
+  // 着地tick(remainingMoves===0)ではこの値を更新しない(車もカメラも動かないtickのため、
+  // 直前の実移動テンポの値=最後の1マスのtransition時間をそのまま保持しておけば十分。
+  // Polish Phase3cはこの「保持された最後のtransition時間」を着地settleの起点として使う)。
+  // 初期値(ARRIVAL_LAST_MS由来)は最初の移動が始まる前は一切参照されないため、値そのものに
+  // 意味はない(既存の420ms相当の見た目にするための無難な初期シードにすぎない)。
+  const [lastStepIntervalMs, setLastStepIntervalMs] = useState(ARRIVAL_LAST_MS);
   const movementTransitionMs = getStepTransitionMs(lastStepIntervalMs);
+
+  // Polish Phase 3c: 車がこのまま目的地へ到着するかどうかの事前判定。checkDestinationArrival()
+  // (gameStore.ts)が行う判定(player.currentNodeId === destinationNodeId)と全く同じ単純な
+  // 等値比較を、どちらもGameScreen.tsxが既に読んでいるstore値だけを使って行うだけであり、
+  // 目的地抽選・到着処理そのもの(ゲームロジック)を複製するものではない。DestinationCelebration
+  // Screen側が既に十分強い専用演出を持つため、目的地到着時は通常マスの着地settleを追加せず
+  // 抑制する(調査結果のB案)。
+  const willArriveAtDestination = currentPlayer?.currentNodeId === destinationNodeId;
+
+  // Polish Phase 3c: 「最後の1マスへの視覚transitionが完了してから、マス効果(resolveLanding())が
+  // 発生するまで」の短い着地settleフェーズ。ロジック本体はuseLandingSettlePhase.tsへ分離済み
+  // (useDiceRevealPhase/useMoveTotalStepsと同じ設計)。
+  const landingSettlePhase = useLandingSettlePhase(status, remainingMoves, movementTransitionMs);
+  // 目的地到着が事前に分かっている間は、通常マスの着地settleビジュアルを出さない(調査結果の
+  // B案。DestinationCelebrationScreenへの遷移と重ねてくどくしないため)。
+  const showLandingSettle = landingSettlePhase === "settling" && !willArriveAtDestination;
 
   // マス移動を1歩ずつアニメーションしながら自動で進める。Polish Phase 3a: サイコロの
   // フェイクロール演出("idle"以外)が終わるまでは最初の1歩を開始しない(diceRevealPhaseを
   // 依存配列に加えることで、"rolling"→"idle"に戻った瞬間にこのeffectが再評価される)。
   // Polish Phase 3b: remainingMoves>0(実際に1マス進む/分岐する)ときだけmoveTempo.tsの
-  // getStepAnimationMs()で可変のstep intervalを使い、remainingMoves===0(resolveLanding()を
-  // 呼ぶためだけの最終tick)は既存どおりLANDING_TICK_MS固定のままにする(「移動する1マス」と
-  // 「着地処理を呼ぶだけのtick」を混同しない、調査結果どおりの設計)。totalStepsが未確定
-  // (理論上到達しない防御的分岐)の場合はremainingMovesをtotalStepsとみなして安全側に倒す。
+  // getStepAnimationMs()で可変のstep intervalを使う。totalStepsが未確定(理論上到達しない
+  // 防御的分岐)の場合はremainingMovesをtotalStepsとみなして安全側に倒す。
+  // Polish Phase 3c: remainingMoves===0(resolveLanding()を呼ぶためだけの最終tick)は、
+  // 「最後の1マスの視覚transition(movementTransitionMs)が完了してから、着地settle
+  // (LANDING_SETTLE_MS)ぶんだけ待つ」合計時間にする(=調査結果どおり、旧LANDING_TICK_MS
+  // 固定460msの「車のtransition完了より早くresolveLanding()が呼ばれてしまう」問題を解消する)。
+  // 目的地到着が事前に分かっている場合は着地settleを足さず、transition完了時点で
+  // resolveLanding()へ進む(DestinationCelebrationScreen側の演出を待たせないため)。
   useEffect(() => {
     if (status !== "moving" || diceRevealPhase !== "idle") return;
     const interval =
       remainingMoves > 0
         ? getStepAnimationMs({ totalSteps: totalSteps ?? remainingMoves, remainingMoves })
-        : LANDING_TICK_MS;
+        : willArriveAtDestination
+          ? movementTransitionMs
+          : movementTransitionMs + LANDING_SETTLE_MS;
     if (remainingMoves > 0) setLastStepIntervalMs(interval);
     const timer = window.setTimeout(() => {
       advanceStep();
     }, interval);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, remainingMoves, currentPlayer?.currentNodeId, diceRevealPhase, totalSteps]);
+  }, [status, remainingMoves, currentPlayer?.currentNodeId, diceRevealPhase, totalSteps, willArriveAtDestination]);
 
   // persist(localStorage)のrehydrationが完了するまでは、StartScreenの「ゲーム開始」を
   // 誤って操作できてしまわないよう、StartScreenも本編も一切マウントしない。
@@ -262,6 +281,7 @@ export function GameScreen() {
           onCardWarpFocusComplete={continueAfterCardWarpFocus}
           activeVehicleMode={activeVehicleMode}
           movementTransitionMs={movementTransitionMs}
+          landingSettle={showLandingSettle}
         />
       </div>
 

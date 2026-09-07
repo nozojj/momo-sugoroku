@@ -209,3 +209,60 @@ describe("CarToken: movementDurationMs(Polish Phase 3b「車移動の気持ち�
     expect(rootG?.getAttribute("style")).toContain("transition: none");
   });
 });
+
+describe("CarToken: landingSettle(Polish Phase 3c「着地→マス効果発生の気持ちよさ」)", () => {
+  it("landingSettle省略時(既定false)はanimate-landing-settleが付かない(既存の見た目を維持)", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-landing-settle")).toBeNull();
+  });
+
+  it("landingSettle=trueのとき車体(位置transitionを持つ親<g>とは別要素)にanimate-landing-settleが付く", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} landingSettle />
+      </svg>,
+    );
+    const settleEl = container.querySelector(".animate-landing-settle");
+    expect(settleEl).not.toBeNull();
+    // 位置transitionを持つ親<g>そのものには付かない(同一要素で複数transform系animationを
+    // 重ねない、というCarToken.tsx既存のwrapper/inner分離方針を壊していないことの確認)。
+    const rootG = container.querySelector("g");
+    expect(rootG?.classList.contains("animate-landing-settle")).toBe(false);
+    expect(rootG?.getAttribute("style")).not.toContain("landing-settle");
+  });
+
+  it("landingSettle=falseを明示してもanimate-landing-settleは付かない", () => {
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} landingSettle={false} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-landing-settle")).toBeNull();
+  });
+
+  it("landingSettleとmovementDurationMs/instantは独立して共存できる(互いに干渉しない)", () => {
+    const { container } = render(
+      <svg>
+        <CarToken
+          x={0}
+          y={0}
+          color="#e6483e"
+          label="🚗"
+          offsetX={0}
+          offsetY={0}
+          isCurrentTurn={false}
+          colorIndex={0}
+          movementDurationMs={270}
+          landingSettle
+        />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: transform 270ms cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(container.querySelector(".animate-landing-settle")).not.toBeNull();
+  });
+});

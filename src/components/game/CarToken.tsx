@@ -26,6 +26,10 @@ interface CarTokenProps {
    *  トークンにだけ渡す想定(他プレイヤーの駒は自分の手番以外で位置が動かないため、
    *  この値を渡しても渡さなくても見た目に影響しない)。 */
   movementDurationMs?: number;
+  /** Polish Phase 3c: trueの間だけ、車体(位置transitionを持つ親<g>とは別要素)へ
+   *  着地settle(animate-landing-settle、既存animate-character-bounceより控えめな
+   *  一発scaleアニメーション)を適用する。省略時(false)は既存どおり何も付かない。 */
+  landingSettle?: boolean;
 }
 
 /** 位置transitionの既定時間(ms)。Phase3b以前からの値をそのまま定数化しただけで、
@@ -48,6 +52,7 @@ export function CarToken({
   vehicleMode = "normal",
   instant = false,
   movementDurationMs = DEFAULT_MOVEMENT_DURATION_MS,
+  landingSettle = false,
 }: CarTokenProps) {
   const assetUrl = resolveVehicleAssetUrl(vehicleMode, colorIndex);
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
@@ -82,8 +87,14 @@ export function CarToken({
           className="animate-vehicle-transform-flash"
         />
       )}
-      {/* 車体 */}
-      <g style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}>
+      {/* 車体。Polish Phase 3c: landingSettle=trueの間だけanimate-landing-settleを付与する。
+          このg自体は位置transitionを持たない(親<g>の役割)ため、scaleアニメーションと
+          position transitionが同一要素で衝突することはない(CarToken.tsx既存の
+          wrapper/inner分離方針をそのまま踏襲)。 */}
+      <g
+        className={landingSettle ? "animate-landing-settle" : ""}
+        style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
+      >
         {assetUrl ? (
           <image href={assetUrl} x={-13} y={-13} width={26} height={26} />
         ) : (

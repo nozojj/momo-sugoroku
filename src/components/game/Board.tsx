@@ -45,6 +45,10 @@ interface BoardProps {
    *  getStepTransitionMs()から算出した値を渡す想定で、currentPlayerIndexの駒(CarToken)へも
    *  同じ値を渡すことで「カメラのパン」と「車の移動」が同じテンポから導出される。 */
   movementTransitionMs?: number;
+  /** Polish Phase 3c: trueの間だけ、現在の手番プレイヤーの駒(CarToken)へ着地settle
+   *  (animate-landing-settle)を適用する。省略時(false/undefined)は既存どおり何も付かない。
+   *  GameScreen.tsxのuseLandingSettlePhaseが"settling"を返している間だけtrueにする想定。 */
+  landingSettle?: boolean;
 }
 
 const PADDING = 80;
@@ -145,6 +149,7 @@ export function Board({
   onCardWarpFocusComplete,
   activeVehicleMode,
   movementTransitionMs,
+  landingSettle = false,
 }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
@@ -1018,6 +1023,9 @@ export function Board({
                   // クラスターオフセット(dx/dy)による位置調整には既存どおりのデフォルト420msを
                   // 使わせ、意図せず速すぎる/遅すぎるズレを生まないようにする)。
                   movementDurationMs={i === currentPlayerIndex && isMovingPhase ? movementTransitionMs : undefined}
+                  // Polish Phase 3c: 現在の手番プレイヤーの駒にだけ着地settleを渡す
+                  // (他プレイヤーの駒は自分の手番以外で着地しないため無関係)。
+                  landingSettle={i === currentPlayerIndex && landingSettle}
                 />
               );
             })}
