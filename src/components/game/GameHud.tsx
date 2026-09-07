@@ -1,17 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@/lib/format";
 
 /** Polish Phase 3a: 手番が切り替わった瞬間だけ、現在プレイヤー表示へ既存の
  *  animate-highlight-slam(FinalRaceSequence.tsx等で使用済みの「一発ポップして収束する」
  *  keyframe、480ms both)を短時間だけ付与する。新しいkeyframeは追加しない。 */
 const TURN_HIGHLIGHT_MS = 480;
 
+/** Polish Phase 3e: 現在プレイヤーの所持金が変化したときだけ、金額表示へ.animate-money-flash
+ *  (globals.css、200ms both)を短時間だけ付与する。globals.css側のanimation durationと
+ *  一致させ、CSSアニメーション終了後に確実にclassを外す。 */
+const MONEY_FLASH_MS = 200;
+
 interface GameHudProps {
   /** 手番交代の検知だけに使う安定id。名前・色が同じプレイヤーがいても交代を正しく検知できる。 */
   currentPlayerId: string;
   currentPlayerName: string;
   currentPlayerColor: string;
+  /** Polish Phase 3e: 現在手番プレイヤーの所持金(万円)。常に現在プレイヤーの値のみを表示し、
+   *  全プレイヤー一覧・順位・総資産等は表示しない(詳細はPlayerHud/GameDrawer側の役割のまま)。 */
+  currentPlayerMoney: number;
   destinationName: string;
   calendarText: string;
   onOpenDrawer: () => void;
@@ -29,6 +38,7 @@ export function GameHud({
   currentPlayerId,
   currentPlayerName,
   currentPlayerColor,
+  currentPlayerMoney,
   destinationName,
   calendarText,
   onOpenDrawer,
@@ -49,6 +59,22 @@ export function GameHud({
     return () => window.clearTimeout(timer);
   }, [currentPlayerId]);
 
+  // Polish Phase 3e: 所持金の金額表示だけを対象にした、justChangedとは独立のflash判定。
+  // 「同じプレイヤーのままmoneyだけ変わった」ときだけ発火し、「手番交代でcurrentPlayerMoneyが
+  // 別プレイヤーの値へ切り替わっただけ」では発火させない(手番交代の合図はjustChanged/
+  // animate-highlight-slamの責務のまま、ここでは混同しない)。初回mountでも発火しない
+  // (justChangedと同じ誤発火防止方針)。
+  const [moneyFlash, setMoneyFlash] = useState(false);
+  const prevMoneyRef = useRef<{ playerId: string; money: number } | null>(null);
+  useEffect(() => {
+    const prev = prevMoneyRef.current;
+    prevMoneyRef.current = { playerId: currentPlayerId, money: currentPlayerMoney };
+    if (prev === null || prev.playerId !== currentPlayerId || prev.money === currentPlayerMoney) return;
+    setMoneyFlash(true);
+    const timer = window.setTimeout(() => setMoneyFlash(false), MONEY_FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentPlayerId, currentPlayerMoney]);
+
   return (
     <div
       // ノッチ/Dynamic Island(上)とホームインジケーター寄りの左右エッジを想定し、
@@ -63,6 +89,15 @@ export function GameHud({
           >
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: currentPlayerColor }} />
             <span className="truncate">{currentPlayerName}さんの番</span>
+          </span>
+          {/* Polish Phase 3e: 現在プレイヤーの所持金。「所持金:」等のラベルは付けず、
+              金額だけをプレイヤー名の直後(同じクラスタ)に置くことで「誰の所持金か」を
+              位置関係だけで示す(mobileで文言を増やさない方針)。moneyFlashはjustChanged
+              (手番強調)とは別のクラスへ独立して付与し、責務を混同しない。 */}
+          <span
+            className={`shrink-0 font-mono text-amber-700 dark:text-amber-300 ${moneyFlash ? "animate-money-flash" : ""}`}
+          >
+            {formatMoney(currentPlayerMoney)}
           </span>
           <span className="text-slate-300 dark:text-slate-600">・</span>
           <span className="truncate text-slate-600 dark:text-slate-300">🎯 {destinationName}</span>

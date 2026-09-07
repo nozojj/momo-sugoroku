@@ -203,6 +203,17 @@ export function GameScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, remainingMoves, currentPlayer?.currentNodeId, diceRevealPhase, totalSteps, willArriveAtDestination]);
 
+  // Polish Phase 3e: 年度またぎの最後のmoney着地でlandingResultInfoが設定されたまま
+  // settlementIntro/settlementへ遷移すると、居残ったLandingResultToastがSettlementIntro
+  // Announcer(「○年目の決算です」)やSettlementScreenと同時に見えてしまう(調査済み)。
+  // gameStore.ts側にendTurn timing用の演出ロジックを追加するのではなく、GameScreen側から
+  // 既存の公開action(dismissLandingResult)を呼ぶだけで解消する(GameStatus追加なし、
+  // gameStore.ts無変更)。既に片付いていれば何もしない(不要なsetを避ける)。
+  useEffect(() => {
+    if (status !== "settlementIntro" && status !== "settlement") return;
+    if (landingResultInfo) dismissLandingResult();
+  }, [status, landingResultInfo, dismissLandingResult]);
+
   // persist(localStorage)のrehydrationが完了するまでは、StartScreenの「ゲーム開始」を
   // 誤って操作できてしまわないよう、StartScreenも本編も一切マウントしない。
   if (!hasHydrated) {
@@ -289,6 +300,7 @@ export function GameScreen() {
         currentPlayerId={currentPlayer?.id ?? ""}
         currentPlayerName={currentPlayer?.name ?? ""}
         currentPlayerColor={currentPlayer?.color ?? "#94a3b8"}
+        currentPlayerMoney={currentPlayer?.money ?? 0}
         destinationName={destinationNode.name}
         calendarText={`${calendar.year}年目 ${calendar.month}月`}
         yearEvent={currentYearEvent}
