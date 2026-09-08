@@ -12,6 +12,9 @@ import {
   getClusterOffset,
   straightRoadPath,
   dominantRoadType,
+  computeRoadCrossingGaps,
+  roadPathSegments,
+  type RoadEdgeGeometry,
 } from "@/lib/game/mapStyle";
 import { resolveVisibleLabelIds, type LabelCandidate } from "@/lib/game/boardLabels";
 import { backEdgeKey, edgeKey, recentTrailEdgeKeys, selectableEdgeKeys } from "@/lib/game/boardEdgeHighlight";
@@ -203,20 +206,19 @@ export function Board({
     return { width: w, height: h, edges: edgeList };
   }, [map]);
 
-  /** 交差点接合パッチ(Phase3)の対象一覧。degree(接続数)3以上、かつ接続道路に
-   *  main/coastal/nationalのいずれかを含む交差点だけに絞る(residential同士の
-   *  住宅街の角は対象外)。パッチの色は新しい色を作らず、接続道路の中で最優先の
-   *  roadType(dominantRoadType)のbase/top色をそのまま使うことで、パッチ単体が
-   *  「別色の丸いシール」に見えず、道路の舗装がそのまま交差点まで続いて見えるようにする。
-   *  半径は接続道路の最大幅から算出し、丸い線端(strokeLinecap)どうしの隙間だけを
-   *  埋める控えめなサイズに留める(交差点を目立たせるのが目的ではない)。 */
+  /** 交差点接合パッチ(Phase3、道路見た目Polishで対象条件を緩和)の対象一覧。degree(接続数)
+   *  2以上の全ての合流点(=曲がり角も含む)に敷く。かつては「main/coastal/nationalを含む
+   *  交差点だけ」に絞っていたが、residential同士の曲がり角でも丸い線端(strokeLinecap)
+   *  どうしの継ぎ目が見えていたため、道路が2本以上つながっている箇所は種別を問わず対象にする。
+   *  パッチの色は新しい色を作らず、接続道路の中で最優先のroadType(dominantRoadType)の
+   *  base/top色をそのまま使うことで、パッチ単体が「別色の丸いシール」に見えず、道路の舗装が
+   *  そのまま交差点まで続いて見えるようにする。半径は接続道路の最大幅から算出し、丸い線端
+   *  どうしの隙間だけを埋める控えめなサイズに留める(交差点を目立たせるのが目的ではない)。 */
   const intersectionPatches = useMemo(() => {
-    const significant = new Set<RoadType>(["main", "coastal", "national"]);
     const patches: { id: string; x: number; y: number; radius: number; roadType: RoadType }[] = [];
     for (const node of map.nodes) {
-      if (node.connections.length < 3) continue;
+      if (node.connections.length < 2) continue;
       const types = node.connections.map((c) => c.roadType);
-      if (!types.some((t) => significant.has(t))) continue;
       const maxWidth = Math.max(...node.connections.map((c) => ROAD_STYLE[c.roadType].width));
       patches.push({ id: node.id, x: node.x, y: node.y, radius: maxWidth / 2 + 3, roadType: dominantRoadType(types) });
     }
@@ -226,6 +228,39 @@ export function Board({
   const minX = Math.min(...map.nodes.map((n) => n.x)) - PADDING;
   const minY = Math.min(...map.nodes.map((n) => n.y)) - PADDING;
   const nodeById = useMemo(() => new Map(map.nodes.map((n) => [n.id, n])), [map]);
+
+  /** 道路見た目Polish: 実際には繋がっていない道路同士が、SVG上ではただの線分として交差して
+   *  しまうケース(オーバーパス的な見え方)を検出し、道幅が細い方に「途切れ」を入れるための
+   *  gapTs。mapStyle.tsのcomputeRoadCrossingGaps()(純関数)へ、map.nodesの生座標
+   *  (minX/minYで引く前。差分だけを使う交差判定のため原点の取り方に依存しない)と
+   *  ROAD_STYLE由来のwidthだけを渡し、計算そのものはそちらへ委譲する。edgesと同じ
+   *  「from/toをsortしたキーで重複排除」を経由することで、A→B/B→Aの2重登録
+   *  (=総当たり判定が不要に倍化する)を避ける。返り値はedgeKey(edge.from, edge.to)で
+   *  そのまま引けるMap<string, number[]>で、道路描画ループ側はそれを引くだけでよい。 */
+  const roadCrossingGaps = useMemo(() => {
+    const seen = new Set<string>();
+    const geometry: RoadEdgeGeometry[] = [];
+    for (const node of map.nodes) {
+      for (const edge of node.connections) {
+        const key = [node.id, edge.to].sort().join("|");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const to = nodeById.get(edge.to);
+        if (!to) continue;
+        geometry.push({
+          from: node.id,
+          to: edge.to,
+          x1: node.x,
+          y1: node.y,
+          x2: to.x,
+          y2: to.y,
+          width: ROAD_STYLE[edge.roadType].width,
+        });
+      }
+    }
+    return computeRoadCrossingGaps(geometry);
+  }, [map, nodeById]);
+
   const selectableIds = new Set(routeOptions.map((o) => o.nodeId));
   const currentPlayer = players[currentPlayerIndex];
 
@@ -741,12 +776,21 @@ export function Board({
               const edgeMapKey = edgeKey(edge.from, edge.to);
               const isSelectableEdge = selectableEdgeKeySet.has(edgeMapKey);
               const isTrailEdge = trailEdgeKeySet.has(edgeMapKey);
+              // 道路見た目Polish: 実際には繋がっていない道路同士がSVG上で交差して見える箇所
+              // (roadCrossingGapsから引いたgapTs)だけ、舗装レイヤー(下敷き影・base・top・
+              // 中央線)を複数セグメントに分割する。gapTsが無ければ従来通りpavementSegmentsは
+              // [d]と全く同じ1要素配列になり、見た目・要素数とも変わらない。選択可能edgeの
+              // グロー・通過済みトレイルは操作性を優先し、途切れさせず従来通り1本のdのまま使う。
+              const gapTs = roadCrossingGaps.get(edgeMapKey);
+              const pavementSegments = roadPathSegments(x1, y1, x2, y2, gapTs);
               return (
                 <g key={`${edge.from}-${edge.to}`} opacity={isSelectableEdge ? 1 : 0.92}>
                   {/* Visual Prototype 1: 道路の下敷き影。ぼかしフィルタは使わず、わずかな下方向オフセット+
                       低不透明度だけで立体感を出す(建物・車の落ち影と同じ「まっすぐ下」の光源方向)。 */}
                   <g transform="translate(0, 2.2)" opacity={0.18}>
-                    <path d={d} fill="none" stroke="#241c14" strokeWidth={style.width * 0.9} strokeLinecap="round" />
+                    {pavementSegments.map((segment, i) => (
+                      <path key={i} d={segment} fill="none" stroke="#241c14" strokeWidth={style.width * 0.9} strokeLinecap="round" />
+                    ))}
                   </g>
                   {/* P6-3/P7-3: 直前に通過したedge、および分岐選択中の「戻る」候補の短時間表示。
                       選択可能edge(下記)より優先度を下げるため、アニメーションは付けず静的にする。
@@ -779,11 +823,24 @@ export function Board({
                       className="animate-pulse-node"
                     />
                   )}
-                  <path d={d} fill="none" stroke={style.base} strokeWidth={style.width} strokeLinecap="round" />
-                  <path d={d} fill="none" stroke={style.top} strokeWidth={style.width * 0.72} strokeLinecap="round" strokeDasharray={style.dash} />
-                  {!style.dash && (
-                    <path d={d} fill="none" stroke="#f3ecd9" strokeWidth={1.6} strokeDasharray="8 10" strokeLinecap="round" opacity={0.75} />
-                  )}
+                  {pavementSegments.map((segment, i) => (
+                    <path key={i} d={segment} fill="none" stroke={style.base} strokeWidth={style.width} strokeLinecap="round" />
+                  ))}
+                  {pavementSegments.map((segment, i) => (
+                    <path
+                      key={i}
+                      d={segment}
+                      fill="none"
+                      stroke={style.top}
+                      strokeWidth={style.width * 0.72}
+                      strokeLinecap="round"
+                      strokeDasharray={style.dash}
+                    />
+                  ))}
+                  {!style.dash &&
+                    pavementSegments.map((segment, i) => (
+                      <path key={i} d={segment} fill="none" stroke="#f3ecd9" strokeWidth={1.6} strokeDasharray="8 10" strokeLinecap="round" opacity={0.75} />
+                    ))}
                 </g>
               );
             })}
