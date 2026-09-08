@@ -77,7 +77,7 @@ export function MoneyRouletteModal({ info, onContinue }: MoneyRouletteModalProps
       {/* Visual Prototype 1.5: プラス/マイナスの既存アクセント色(sky/rose)を上部アクセントにも
           反映。単色白から暖色グラデーションへ。 */}
       <div
-        className={`w-full max-w-sm rounded-2xl border-t-4 bg-linear-to-b from-white to-amber-50/30 p-6 text-center shadow-xl dark:from-slate-800 dark:to-slate-800/80 ${
+        className={`pop-card w-full max-w-sm rounded-2xl border-t-4 bg-linear-to-b from-white to-amber-50/30 p-6 text-center dark:from-slate-800 dark:to-slate-800/80 ${
           isGain ? "border-t-sky-300 dark:border-t-sky-500/50" : "border-t-rose-300 dark:border-t-rose-500/50"
         }`}
       >
@@ -91,7 +91,7 @@ export function MoneyRouletteModal({ info, onContinue }: MoneyRouletteModalProps
 
         <div
           key={settled ? "settled" : "spinning"}
-          className={`mt-5 rounded-xl border-2 py-4 text-3xl font-black tabular-nums ${
+          className={`text-pop mt-5 rounded-xl border-2 py-4 text-3xl font-black tabular-nums ${
             settled ? "animate-arrival-pop" : ""
           } ${
             spinning

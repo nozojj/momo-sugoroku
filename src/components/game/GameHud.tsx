@@ -95,7 +95,7 @@ export function GameHud({
               位置関係だけで示す(mobileで文言を増やさない方針)。moneyFlashはjustChanged
               (手番強調)とは別のクラスへ独立して付与し、責務を混同しない。 */}
           <span
-            className={`shrink-0 font-mono text-amber-700 dark:text-amber-300 ${moneyFlash ? "animate-money-flash" : ""}`}
+            className={`text-pop shrink-0 font-mono text-amber-700 dark:text-amber-300 ${moneyFlash ? "animate-money-flash" : ""}`}
           >
             {formatMoney(currentPlayerMoney)}
           </span>

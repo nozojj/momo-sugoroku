@@ -110,7 +110,7 @@ export function Dice({
           type="button"
           onClick={handleClick}
           disabled={!canRoll}
-          className={`flex h-20 w-20 items-center justify-center rounded-2xl border-2 bg-white text-5xl shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${
+          className={`pop-button flex h-20 w-20 items-center justify-center rounded-2xl border-2 bg-white text-5xl transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${
             doubleArmed ? "border-fuchsia-400" : "border-slate-300 dark:border-slate-500"
           } ${motionClass}`}
           aria-label="サイコロを振る"
@@ -142,7 +142,7 @@ export function Dice({
         type="button"
         onClick={handleClick}
         disabled={!canRoll}
-        className={`flex items-center gap-1 rounded-2xl border-2 border-fuchsia-400 bg-white px-3 py-4 shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${motionClass}`}
+        className={`pop-button flex items-center gap-1 rounded-2xl border-2 border-fuchsia-400 bg-white px-3 py-4 transition disabled:opacity-40 disabled:cursor-not-allowed dark:bg-slate-700 ${motionClass}`}
         aria-label={`サイコロ${diceCount}個を振る`}
       >
         {rolled

@@ -104,7 +104,7 @@ export function SettlementScreen({ info, history, players, onContinue }: Settlem
               if (!info.isFinalSettlement) playSE("ui_select");
               onContinue();
             }}
-            className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
+            className="pop-button w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 transition active:border-b-0 dark:border-amber-800"
           >
             {info.isFinalSettlement ? "結果を見る" : "次の年度へ"}
           </button>
@@ -286,7 +286,7 @@ function SettlementRankingRow({
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.playerColor }} />
         <span className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">{entry.playerName}さん</span>
         <span className="ml-auto shrink-0 text-right">
-          <span className="block text-sm font-black text-slate-800 dark:text-white">{formatMoney(entry.netWorthAfter)}</span>
+          <span className="text-pop block text-sm font-black text-slate-800 dark:text-white">{formatMoney(entry.netWorthAfter)}</span>
           <span
             className={`block text-[10px] font-bold ${
               entry.netWorthDelta >= 0

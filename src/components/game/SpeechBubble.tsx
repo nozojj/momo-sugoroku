@@ -25,12 +25,12 @@ export function SpeechBubble({ line, side, theme }: SpeechBubbleProps) {
       key={line.text}
       // Visual Prototype 1.5: 単色白から暖色グラデーションへ。役割ごとのアクセント色
       // (themeStyle.accentBorderClass、既存)はそのまま生かし、吹き出し自体に厚み・質感を足すだけ。
-      className={`animate-arrival-pop relative min-w-0 flex-1 rounded-2xl border-b border-l border-r border-t-4 border-amber-900/10 bg-linear-to-b from-white to-amber-50/50 p-4 text-base font-bold text-slate-800 shadow-xl dark:border-amber-100/10 dark:from-slate-800 dark:to-slate-800/80 dark:text-white sm:max-w-[500px] sm:p-5 sm:text-lg ${themeStyle.accentBorderClass}`}
+      className={`animate-arrival-pop pop-card relative min-w-0 flex-1 rounded-2xl border-b border-l border-r border-t-4 border-amber-900/10 bg-linear-to-b from-white to-amber-50/50 p-4 text-base font-bold text-slate-800 dark:border-amber-100/10 dark:from-slate-800 dark:to-slate-800/80 dark:text-white sm:max-w-[500px] sm:p-5 sm:text-lg ${themeStyle.accentBorderClass}`}
     >
       <p>{line.text}</p>
       {line.highlight && (
         <p
-          className={`animate-highlight-slam mt-1 text-2xl font-black sm:text-3xl ${themeStyle.accentTextClass}`}
+          className={`animate-highlight-slam text-pop mt-1 text-2xl font-black sm:text-3xl ${themeStyle.accentTextClass}`}
           style={{ animationDelay: `${CHARACTER_ANNOUNCER_TIMING.highlightDelayMs}ms` }}
         >
           {line.highlight.kind === "money" ? (

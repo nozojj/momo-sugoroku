@@ -73,7 +73,7 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
     <div
       className={`fixed inset-0 z-50 overflow-y-auto bg-linear-to-b from-amber-200 via-orange-100 to-amber-50 p-4 dark:from-amber-950/50 dark:via-slate-900 dark:to-slate-950 ${fadeTransitionClass} ${fadeOpacityClass}`}
     >
-      <div className="mx-auto my-6 w-full max-w-sm rounded-2xl border-2 border-amber-300/70 bg-linear-to-b from-white to-amber-50/50 p-5 shadow-2xl dark:border-amber-400/20 dark:from-slate-800 dark:to-slate-800/80 lg:max-w-5xl lg:p-8">
+      <div className="pop-card mx-auto my-6 w-full max-w-sm rounded-2xl border-2 border-amber-300/70 bg-linear-to-b from-white to-amber-50/50 p-5 dark:border-amber-400/20 dark:from-slate-800 dark:to-slate-800/80 lg:max-w-5xl lg:p-8">
         <div className="text-center">
           {/* P9-2: 到着演出(DestinationCelebrationScreen)と同じ組み合わせ(CharacterSprite+
               AnnouncerEffectLayer)をトロフィー脇に絶対配置で添え、「フィナーレ」感を出す。
@@ -124,7 +124,7 @@ export function GameOverModal({ players, winnerIds, totalYears, netWorthHistory,
               playSE("ui_select");
               onRestart();
             }}
-            className="w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 shadow-md transition active:translate-y-0.5 active:border-b-0 dark:border-amber-800"
+            className="pop-button w-full rounded-xl border-b-4 border-amber-700 bg-linear-to-b from-amber-400 to-amber-500 py-2.5 font-black text-slate-900 transition active:border-b-0 dark:border-amber-800"
           >
             もう一度遊ぶ
           </button>
@@ -253,7 +253,7 @@ function RankingCard({ ranked }: { ranked: RankedPlayer }) {
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: player.color }} />
         <span className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">{player.name}さん</span>
         <span className="ml-auto shrink-0 text-right">
-          <span className="block text-sm font-black text-slate-800 dark:text-white">{formatMoney(ranked.netWorth)}</span>
+          <span className="text-pop block text-sm font-black text-slate-800 dark:text-white">{formatMoney(ranked.netWorth)}</span>
           <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500">総資産</span>
         </span>
       </div>

@@ -85,13 +85,13 @@ export function PurchaseModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       {/* Visual Prototype 1.5: 物件購入=ショップ役割のピンクを引き続きアクセントに使いつつ、
           単色白から暖色グラデーションへ。情報構造・操作位置は無変更。 */}
-      <div className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl border border-pink-900/10 bg-linear-to-b from-white to-pink-50/40 shadow-xl dark:border-pink-100/10 dark:from-slate-800 dark:to-slate-800/80">
+      <div className="pop-card flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl border border-pink-900/10 bg-linear-to-b from-white to-pink-50/40 dark:border-pink-100/10 dark:from-slate-800 dark:to-slate-800/80">
         <div className="shrink-0 border-b border-pink-900/10 p-5 pb-3 dark:border-pink-100/10">
           <p className="text-xs font-semibold text-pink-500">
             {group?.icon} {group?.name ?? "物件エリア"}
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {player.name}さんの所持金: <span className="font-bold">{formatMoney(player.money)}</span>
+            {player.name}さんの所持金: <span className="text-pop font-bold">{formatMoney(player.money)}</span>
           </p>
           {monopolyAttainable && remainingForMonopoly.length >= 2 && (
             <p className="mt-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
@@ -178,7 +178,7 @@ export function PurchaseModal({
                     type="button"
                     disabled={!purchasable || !canCurrentPlayerAct}
                     onClick={() => purchasable && canCurrentPlayerAct && onBuy(def.id)}
-                    className="mt-2 w-full rounded-lg border-b-4 border-pink-800 bg-linear-to-b from-pink-400 to-pink-600 py-2 text-sm font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:border-pink-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
+                    className="pop-button mt-2 w-full rounded-lg border-b-4 border-pink-800 bg-linear-to-b from-pink-400 to-pink-600 py-2 text-sm font-black text-white transition active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 dark:border-pink-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
                   >
                     {canAfford ? "購入する" : "所持金が足りません"}
                   </button>
@@ -193,7 +193,7 @@ export function PurchaseModal({
             type="button"
             disabled={!canCurrentPlayerAct}
             onClick={onFinish}
-            className="w-full rounded-lg border-b-4 border-slate-950 bg-linear-to-b from-slate-700 to-slate-900 py-2.5 font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:border-slate-400 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
+            className="pop-button w-full rounded-lg border-b-4 border-slate-950 bg-linear-to-b from-slate-700 to-slate-900 py-2.5 font-black text-white transition active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 dark:border-slate-400 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
           >
             購入を終える
           </button>

@@ -909,3 +909,81 @@ body {
     animation: none !important;
   }
 }
+
+/* ============================================================
+   Pop UI utilities: text-pop / pop-card / pop-button
+   ============================================================
+   ゲーム全体の「押せる/目立つ」見た目を1箇所に集約する3つの薄いユーティリティ。
+   Tailwindの角丸・余白・色・border-*系クラスはそのまま活かし続ける前提で、
+   ここでは影(box-shadow)・押し込みのtransform・文字の縁取りだけを追加で担当する。
+   このファイルの他のクラス(.board-atmosphere等)と同じく@layerの外に素で置くことで、
+   Tailwindが@layer utilitiesへ出力する各種ユーティリティ(shadow-* や active:translate-y-* 等)より
+   後勝ちさせる(CSS Cascade Layersの仕様上、無名/非layer宣言は名前付きlayerより常に優先される)。
+   そのため、box-shadowを持つ既存のshadow-*クラスや、押下時にtransformを動かす
+   active:translate-y-*クラスと共存させても、意図せず二重に効いて見た目が崩れることはない
+   (該当プロパティはこれらのクラスへ完全に置き換わる形で上書きされる)。 */
+
+/* text-pop: 数字・スコアなど「目立たせたい」テキスト用の縁取り文字。
+   既存のcolor(Tailwindのtext-*)はfillとして生きたままにしたいので、ここではcolorを
+   一切指定しない。-webkit-text-stroke(主要ブラウザ)+text-shadow(フォールバック)の
+   二重掛けで縁取りを描き、どちらか一方しか効かない環境でも読み取れるようにする。
+   背景色がライト/ダークで反転するため、縁取りの色調も同じ方針(prefers-color-scheme)で
+   反転させ、どちらのテーマでも背景に対してコントラストが出るようにする。 */
+.text-pop {
+  --text-pop-stroke: rgba(15, 23, 42, 0.55);
+  -webkit-text-stroke: 1.25px var(--text-pop-stroke);
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 var(--text-pop-stroke),
+    1px -1px 0 var(--text-pop-stroke),
+    -1px 1px 0 var(--text-pop-stroke),
+    1px 1px 0 var(--text-pop-stroke);
+}
+@media (prefers-color-scheme: dark) {
+  .text-pop {
+    --text-pop-stroke: rgba(255, 251, 235, 0.75);
+  }
+}
+
+/* pop-card: モーダル/トースト等のカードコンテナ用のハードシャドウ。ぼかしを持たせず、
+   輪郭のはっきりした「紙が浮いている」ようなpop-art系の影にする。border-width/
+   border-colorは意図的に持たない(各コンポーネント側のborder-*クラスと衝突しないため、
+   box-shadowだけを担当する)。 */
+.pop-card {
+  box-shadow: 4px 4px 0 0 rgba(41, 27, 15, 0.22);
+}
+@media (prefers-color-scheme: dark) {
+  .pop-card {
+    box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* pop-button: 「浮いていて、押すと沈む」ボタン用のユーティリティ。border-width/
+   border-colorは持たず(既存のborder-b-4ベベル等と衝突させないため)、box-shadowと
+   :active時のtransformだけで押し込み効果を作る。disabled時は沈まず、影も薄くして
+   「押せない」ことを示す(Polish Phase 3hのdisabled表現とは別プロパティなので共存可)。 */
+.pop-button {
+  box-shadow: 0 4px 0 0 rgba(41, 27, 15, 0.35);
+  transition:
+    transform 100ms ease-out,
+    box-shadow 100ms ease-out;
+}
+.pop-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 0 rgba(41, 27, 15, 0.35);
+}
+.pop-button:disabled {
+  box-shadow: 0 2px 0 0 rgba(41, 27, 15, 0.15);
+  transform: none;
+}
+@media (prefers-color-scheme: dark) {
+  .pop-button {
+    box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.5);
+  }
+  .pop-button:active {
+    box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.5);
+  }
+  .pop-button:disabled {
+    box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.25);
+  }
+}

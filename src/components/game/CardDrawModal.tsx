@@ -107,7 +107,7 @@ export function CardDrawModal({ info, onContinue }: CardDrawModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       {/* Visual Prototype 1.5: カード関連UIの役割色(フューシャ)を上部アクセントに統一。 */}
-      <div className="w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-6 text-center shadow-xl dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80">
+      <div className="pop-card w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-6 text-center dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80">
         <p className="text-4xl">🃏</p>
         <h2 className="mt-2 text-lg font-bold text-slate-800 dark:text-white">カードマス</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{info.playerName}さん</p>

@@ -40,7 +40,7 @@ export function SkipTurnToast({ info, onDismiss }: SkipTurnToastProps) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-40 z-50 flex justify-center px-4">
       <div
-        className="animate-landing-result-toast pointer-events-auto flex max-w-xs items-center gap-2 rounded-2xl border-b-4 border-slate-400 bg-slate-100 px-4 py-2.5 text-slate-800 shadow-xl dark:border-slate-500 dark:bg-slate-800/90 dark:text-slate-100"
+        className="animate-landing-result-toast pop-card pointer-events-auto flex max-w-xs items-center gap-2 rounded-2xl border-b-4 border-slate-400 bg-slate-100 px-4 py-2.5 text-slate-800 dark:border-slate-500 dark:bg-slate-800/90 dark:text-slate-100"
         style={{ animationDuration: `${AUTO_DISMISS_MS}ms` }}
         onClick={onDismiss}
         role="status"

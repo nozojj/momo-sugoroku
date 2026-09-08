@@ -253,7 +253,7 @@ export function DestinationCelebrationScreen({
       )}
 
       {phase === "spin" && (
-        <div className="w-full max-w-sm rounded-2xl border-2 border-white/50 bg-white/10 px-4 py-6 text-center shadow-xl backdrop-blur-sm sm:max-w-md">
+        <div className="pop-card w-full max-w-sm rounded-2xl border-2 border-white/50 bg-white/10 px-4 py-6 text-center backdrop-blur-sm sm:max-w-md">
           <p key={spinStep} className="animate-arrival-pop text-3xl font-black text-white/80 drop-shadow-lg sm:text-5xl">
             {spinSequence[spinStep]}
           </p>
@@ -261,7 +261,7 @@ export function DestinationCelebrationScreen({
       )}
 
       {phase === "reveal" && (
-        <div className="w-full max-w-sm rounded-2xl border-2 border-white bg-white/20 px-4 py-6 text-center shadow-xl backdrop-blur-sm sm:max-w-md">
+        <div className="pop-card w-full max-w-sm rounded-2xl border-2 border-white bg-white/20 px-4 py-6 text-center backdrop-blur-sm sm:max-w-md">
           <p className="animate-highlight-slam text-4xl font-black text-white drop-shadow-lg sm:text-6xl">
             {arrivalInfo.nextDestinationName}!!
           </p>

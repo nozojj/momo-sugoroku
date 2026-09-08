@@ -29,7 +29,7 @@ export function MonopolyToast({ achievement, onDismiss }: MonopolyToastProps) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-14 z-50 flex justify-center px-4">
       <div
-        className={`animate-arrival-pop pointer-events-auto flex max-w-sm items-center gap-2 rounded-2xl border-b-4 px-4 py-3 shadow-xl ${
+        className={`animate-arrival-pop pop-card pointer-events-auto flex max-w-sm items-center gap-2 rounded-2xl border-b-4 px-4 py-3 ${
           isRegion
             ? "border-sky-500 bg-sky-500 text-white"
             : "border-amber-500 bg-amber-400 text-slate-900"

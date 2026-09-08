@@ -64,7 +64,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <p className="text-sm text-slate-500 dark:text-slate-400">車で走る、湘南エリアの桃鉄風すごろく</p>
       </div>
 
-      <div className="w-full max-w-xs rounded-2xl border-t-4 border-t-amber-300 bg-linear-to-b from-white to-amber-50/30 p-5 shadow-xl dark:border-t-amber-500/50 dark:from-slate-800 dark:to-slate-800/80">
+      <div className="pop-card w-full max-w-xs rounded-2xl border-t-4 border-t-amber-300 bg-linear-to-b from-white to-amber-50/30 p-5 dark:border-t-amber-500/50 dark:from-slate-800 dark:to-slate-800/80">
         <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">人数を選択</h2>
         <div className="mb-4 grid grid-cols-3 gap-2">
           {PLAYER_COUNT_OPTIONS.map((count) => (
@@ -143,7 +143,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <button
           type="button"
           onClick={handleStart}
-          className="mt-4 w-full rounded-lg bg-slate-800 py-2.5 font-bold text-white dark:bg-white dark:text-slate-900"
+          className="pop-button mt-4 w-full rounded-lg bg-slate-800 py-2.5 font-bold text-white dark:bg-white dark:text-slate-900"
         >
           ゲーム開始
         </button>

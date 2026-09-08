@@ -26,7 +26,7 @@ export function TargetSelectOverlay({ info, canCurrentPlayerAct, onSelect, onCan
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
       {/* Visual Prototype 1.5: カード関連UIの役割色(フューシャ)を上部アクセントに統一。 */}
-      <div className="w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-5 shadow-xl dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80">
+      <div className="pop-card w-full max-w-sm rounded-2xl border-t-4 border-t-fuchsia-300 bg-linear-to-b from-white to-fuchsia-50/30 p-5 dark:border-t-fuchsia-500/50 dark:from-slate-800 dark:to-slate-800/80">
         <p className="text-xs font-semibold text-fuchsia-500">{info.cardName}</p>
         <h2 className="mt-1 text-base font-bold text-slate-800 dark:text-white">
           {info.playerName}さん、行き先を選んでください
@@ -45,7 +45,7 @@ export function TargetSelectOverlay({ info, canCurrentPlayerAct, onSelect, onCan
               type="button"
               disabled={!canCurrentPlayerAct}
               onClick={() => onSelect(opt.optionId)}
-              className="flex flex-col items-center gap-0.5 rounded-lg border border-fuchsia-300 bg-fuchsia-50/60 p-2 text-center active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:border-fuchsia-500/40 dark:bg-fuchsia-400/10"
+              className="pop-button flex flex-col items-center gap-0.5 rounded-lg border border-fuchsia-300 bg-fuchsia-50/60 p-2 text-center disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-500/40 dark:bg-fuchsia-400/10"
             >
               {opt.icon && <span className="text-xl">{opt.icon}</span>}
               <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{opt.label}</span>

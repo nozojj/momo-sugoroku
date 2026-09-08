@@ -29,7 +29,7 @@ export function PropertyDetailSheet({ def, group, annualRevenue, isMonopoly, onC
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
       {/* Visual Prototype 1.5: 物件関連UIの役割色(ピンク、PurchaseModalと統一)を上部アクセントに。 */}
       <div
-        className="w-full max-w-sm rounded-2xl border-t-4 border-t-pink-300 bg-linear-to-b from-white to-pink-50/30 p-5 text-center shadow-xl dark:border-t-pink-500/50 dark:from-slate-800 dark:to-slate-800/80"
+        className="pop-card w-full max-w-sm rounded-2xl border-t-4 border-t-pink-300 bg-linear-to-b from-white to-pink-50/30 p-5 text-center dark:border-t-pink-500/50 dark:from-slate-800 dark:to-slate-800/80"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-4xl">{def.icon ?? "🏠"}</p>
@@ -61,7 +61,7 @@ export function PropertyDetailSheet({ def, group, annualRevenue, isMonopoly, onC
           </div>
           <div className="rounded-lg bg-emerald-50 p-2 dark:bg-emerald-400/10">
             <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">年間収益</p>
-            <p className="mt-0.5 text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatMoneyDelta(annualRevenue)}</p>
+            <p className="text-pop mt-0.5 text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatMoneyDelta(annualRevenue)}</p>
           </div>
         </div>
 

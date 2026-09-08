@@ -49,7 +49,7 @@ export function LandingResultToast({ info, onDismiss }: LandingResultToastProps)
   return (
     <div className="pointer-events-none fixed inset-x-0 top-28 z-50 flex justify-center px-4">
       <div
-        className={`animate-landing-result-toast pointer-events-auto flex max-w-xs flex-col gap-1 rounded-2xl border-b-4 px-4 py-2.5 shadow-xl ${
+        className={`animate-landing-result-toast pop-card pointer-events-auto flex max-w-xs flex-col gap-1 rounded-2xl border-b-4 px-4 py-2.5 ${
           isGain
             ? "border-sky-500 bg-sky-50 text-sky-900 dark:border-sky-400 dark:bg-sky-950/90 dark:text-sky-100"
             : "border-rose-500 bg-rose-50 text-rose-900 dark:border-rose-400 dark:bg-rose-950/90 dark:text-rose-100"
@@ -75,7 +75,7 @@ export function LandingResultToast({ info, onDismiss }: LandingResultToastProps)
         <div className="flex items-center gap-2">
           <TrendArrowIcon up={isGain} />
           <span className="shrink-0 text-[11px] font-bold">{label}</span>
-          <span className="text-xl font-black tabular-nums">{formatMoneyDelta(info.amount)}</span>
+          <span className="text-pop text-xl font-black tabular-nums">{formatMoneyDelta(info.amount)}</span>
         </div>
 
         {/* 小: 既存message(マス名・理由等の補足)。主役はあくまで上の金額。 */}
