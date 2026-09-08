@@ -9,7 +9,7 @@
 // P10-4-5: monopolyAchievementが同時に真の場合はproperty_buyを鳴らさない(monopoly_group/
 // monopoly_regionはMonopolyToast/MonopolyAnnounceModal側が鳴らすため、ここでは検証しない)。
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { playSE } from "@/lib/audio/soundManager";
 import { PurchaseModal } from "./PurchaseModal";
 import type { MonopolyAchievement, Player } from "@/types/game";
@@ -56,6 +56,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -72,6 +73,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -84,6 +86,7 @@ describe("PurchaseModal", () => {
         player={boughtOne}
         players={[boughtOne]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -101,6 +104,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -113,6 +117,7 @@ describe("PurchaseModal", () => {
         player={boughtTwo}
         players={[boughtTwo]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -130,6 +135,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -142,6 +148,7 @@ describe("PurchaseModal", () => {
         player={moneyChanged}
         players={[moneyChanged]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -160,6 +167,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -172,6 +180,7 @@ describe("PurchaseModal", () => {
         player={boughtOne}
         players={[boughtOne]}
         monopolyAchievement={GROUP_ACHIEVEMENT}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -188,6 +197,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -200,6 +210,7 @@ describe("PurchaseModal", () => {
         player={boughtOne}
         players={[boughtOne]}
         monopolyAchievement={REGION_ACHIEVEMENT}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -220,6 +231,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={GROUP_ACHIEVEMENT}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -233,6 +245,7 @@ describe("PurchaseModal", () => {
         player={boughtAnother}
         players={[boughtAnother]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -250,6 +263,7 @@ describe("PurchaseModal", () => {
         player={player}
         players={[player]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -265,6 +279,7 @@ describe("PurchaseModal", () => {
         player={boughtTwoWithMonopoly}
         players={[boughtTwoWithMonopoly]}
         monopolyAchievement={GROUP_ACHIEVEMENT}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -285,6 +300,7 @@ describe("PurchaseModal", () => {
         player={boughtOne}
         players={[boughtOne]}
         monopolyAchievement={GROUP_ACHIEVEMENT}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
@@ -298,11 +314,83 @@ describe("PurchaseModal", () => {
         player={boughtOne}
         players={[boughtOne]}
         monopolyAchievement={null}
+        canCurrentPlayerAct
         onBuy={() => {}}
         onFinish={() => {}}
       />,
     );
 
     expect(playSEMock).not.toHaveBeenCalled();
+  });
+});
+
+// --- Polish Phase 3h: CPUターン中は購入ボタンを人間が操作できないようにする ---
+describe("PurchaseModal: CPUターン中は操作不可(Polish Phase 3h)", () => {
+  it("canCurrentPlayerAct:falseでは「購入する」「購入を終える」がdisabledになり、クリックしてもコールバックが呼ばれない", () => {
+    const onBuy = vi.fn();
+    const onFinish = vi.fn();
+    const player = buildPlayer([]);
+    render(
+      <PurchaseModal
+        groupId={GROUP_ID}
+        player={player}
+        players={[player]}
+        monopolyAchievement={null}
+        canCurrentPlayerAct={false}
+        onBuy={onBuy}
+        onFinish={onFinish}
+      />,
+    );
+
+    const buyButtons = screen.getAllByRole("button", { name: /購入する/ }) as HTMLButtonElement[];
+    expect(buyButtons.length).toBeGreaterThan(0);
+    for (const b of buyButtons) expect(b.disabled).toBe(true);
+    for (const b of buyButtons) fireEvent.click(b);
+    expect(onBuy).not.toHaveBeenCalled();
+
+    const finishButton = screen.getByRole("button", { name: "購入を終える" }) as HTMLButtonElement;
+    expect(finishButton.disabled).toBe(true);
+    fireEvent.click(finishButton);
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("canCurrentPlayerAct:falseでは「🤖 CPUが選んでいます…」が表示され、物件情報自体は読める", () => {
+    const player = buildPlayer([]);
+    render(
+      <PurchaseModal
+        groupId={GROUP_ID}
+        player={player}
+        players={[player]}
+        monopolyAchievement={null}
+        canCurrentPlayerAct={false}
+        onBuy={() => {}}
+        onFinish={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("🤖 CPUが選んでいます…")).not.toBeNull();
+    expect(screen.getAllByText(/価格/).length).toBeGreaterThan(0);
+  });
+
+  it("canCurrentPlayerAct:trueでは従来通り「購入する」「購入を終える」がクリック可能", () => {
+    const onFinish = vi.fn();
+    const player = buildPlayer([]);
+    render(
+      <PurchaseModal
+        groupId={GROUP_ID}
+        player={player}
+        players={[player]}
+        monopolyAchievement={null}
+        canCurrentPlayerAct
+        onBuy={() => {}}
+        onFinish={onFinish}
+      />,
+    );
+
+    expect(screen.queryByText("🤖 CPUが選んでいます…")).toBeNull();
+    const finishButton = screen.getByRole("button", { name: "購入を終える" }) as HTMLButtonElement;
+    expect(finishButton.disabled).toBe(false);
+    fireEvent.click(finishButton);
+    expect(onFinish).toHaveBeenCalledTimes(1);
   });
 });

@@ -50,6 +50,7 @@ describe("RouteChoiceOverlay: 表示直後の操作性(Polish Phase 3g回帰)", 
         ]}
         destinationNodeId="east"
         ownedCardIds={[]}
+        canCurrentPlayerAct
         onSelectRoute={onSelectRoute}
         backNodeId={null}
         remainingMovesAfterBack={1}
@@ -73,6 +74,7 @@ describe("RouteChoiceOverlay: 表示直後の操作性(Polish Phase 3g回帰)", 
         routeOptions={[{ nodeId: "east", nodeName: "東の道", roadType: "main", available: true }]}
         destinationNodeId="east"
         ownedCardIds={[]}
+        canCurrentPlayerAct
         onSelectRoute={() => {}}
         backNodeId="north"
         remainingMovesAfterBack={2}
@@ -96,6 +98,7 @@ describe("RouteChoiceOverlay: 出現演出/transitionクラス(Polish Phase 3g)"
         routeOptions={[{ nodeId: "east", nodeName: "東の道", roadType: "main", available: true }]}
         destinationNodeId="east"
         ownedCardIds={[]}
+        canCurrentPlayerAct
         onSelectRoute={() => {}}
         backNodeId={null}
         remainingMovesAfterBack={1}
@@ -114,6 +117,7 @@ describe("RouteChoiceOverlay: 出現演出/transitionクラス(Polish Phase 3g)"
         routeOptions={[{ nodeId: "east", nodeName: "東の道", roadType: "main", available: true }]}
         destinationNodeId="east"
         ownedCardIds={[]}
+        canCurrentPlayerAct
         onSelectRoute={() => {}}
         backNodeId="north"
         remainingMovesAfterBack={2}
@@ -125,5 +129,59 @@ describe("RouteChoiceOverlay: 出現演出/transitionクラス(Polish Phase 3g)"
     const backButton = screen.getByRole("button", { name: /戻る/ });
     expect(directionButton.className).toContain("transition");
     expect(backButton.className).toContain("transition");
+  });
+});
+
+describe("RouteChoiceOverlay: CPUターン中は操作不可(Polish Phase 3h)", () => {
+  it("canCurrentPlayerAct:falseでは方向ボタン/戻るボタンがdisabledになり、クリックしてもコールバックが呼ばれない", () => {
+    const onSelectRoute = vi.fn();
+    const onStepBack = vi.fn();
+    render(
+      <RouteChoiceOverlay
+        map={MAP}
+        currentNodeId="start"
+        routeOptions={[{ nodeId: "east", nodeName: "東の道", roadType: "main", available: true }]}
+        destinationNodeId="east"
+        ownedCardIds={[]}
+        canCurrentPlayerAct={false}
+        onSelectRoute={onSelectRoute}
+        backNodeId="north"
+        remainingMovesAfterBack={2}
+        onStepBack={onStepBack}
+      />,
+    );
+
+    const directionButton = screen.getByRole("button", { name: /東の道/ }) as HTMLButtonElement;
+    const backButton = screen.getByRole("button", { name: /戻る/ }) as HTMLButtonElement;
+    expect(directionButton.disabled).toBe(true);
+    expect(backButton.disabled).toBe(true);
+
+    fireEvent.click(directionButton);
+    fireEvent.click(backButton);
+    expect(onSelectRoute).not.toHaveBeenCalled();
+    expect(onStepBack).not.toHaveBeenCalled();
+  });
+
+  it("canCurrentPlayerAct:falseでは「🤖 CPUが選んでいます…」の表示が出て、選択肢自体(行き先名)は読める", () => {
+    render(
+      <RouteChoiceOverlay
+        map={MAP}
+        currentNodeId="start"
+        routeOptions={[{ nodeId: "east", nodeName: "東の道", roadType: "main", available: true }]}
+        destinationNodeId="east"
+        ownedCardIds={[]}
+        canCurrentPlayerAct={false}
+        onSelectRoute={() => {}}
+        backNodeId={null}
+        remainingMovesAfterBack={1}
+        onStepBack={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("🤖 CPUが選んでいます…")).not.toBeNull();
+    // 通常時の案内文(「地図をタップしてもOK」)は出ない: CPUターン中は地図タップも
+    // 効かない(GameScreen.tsx側でBoardのonSelectRouteも同じisCurrentHumanでガードしている)ため。
+    expect(screen.queryByText(/地図をタップしてもOK/)).toBeNull();
+    expect(screen.getByText("東の道")).not.toBeNull();
   });
 });

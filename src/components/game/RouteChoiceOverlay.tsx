@@ -36,6 +36,12 @@ interface RouteChoiceOverlayProps {
   /** 戻った場合の残りマス数(現在のremainingMoves + 1)。ボタンのラベル表示用。 */
   remainingMovesAfterBack: number;
   onStepBack: () => void;
+  /** Polish Phase 3h: falseなら現在の手番プレイヤーはCPUで、人間が方向/戻るボタンを操作
+   *  できないようにする(GameDrawer.tsxのcanCurrentPlayerActと同じ名前・同じ意味)。
+   *  GameScreen.tsx側は従来通りCPUターン中onSelectRoute/onStepBackを() => {}へ差し替えている
+   *  ため、この見た目上の無効化はその安全策に加える表示専用の変更。出現演出(animate-route-panel-in)
+   *  やレイアウトはPhase 3gのまま変更しない。 */
+  canCurrentPlayerAct: boolean;
 }
 
 export function RouteChoiceOverlay({
@@ -48,6 +54,7 @@ export function RouteChoiceOverlay({
   backNodeId,
   remainingMovesAfterBack,
   onStepBack,
+  canCurrentPlayerAct,
 }: RouteChoiceOverlayProps) {
   const decorated = useMemo<DecoratedOption[]>(() => {
     const current = getNode(map, currentNodeId);
@@ -75,8 +82,9 @@ export function RouteChoiceOverlay({
       <button
         key={opt.nodeId}
         type="button"
+        disabled={!canCurrentPlayerAct}
         onClick={() => onSelectRoute(opt.nodeId)}
-        className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-300 bg-white/90 px-2.5 py-1.5 text-amber-800 shadow-sm transition active:scale-95 dark:bg-slate-800 dark:text-amber-200"
+        className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-300 bg-white/90 px-2.5 py-1.5 text-amber-800 shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:bg-slate-800 dark:text-amber-200"
       >
         <span className="text-base font-black leading-none">
           {arrow} {label}
@@ -104,7 +112,7 @@ export function RouteChoiceOverlay({
           可読性はそのまま)。 */}
       <div className="animate-route-panel-in pointer-events-auto max-w-sm rounded-xl border border-amber-300 bg-amber-50/56 p-2.5 shadow-lg backdrop-blur-sm dark:bg-amber-950/50 sm:max-w-md">
         <p className="mb-1.5 text-center text-sm font-bold text-amber-700 dark:text-amber-300">
-          分岐点です。進む道を選んでください(地図をタップしてもOK)
+          {canCurrentPlayerAct ? "分岐点です。進む道を選んでください(地図をタップしてもOK)" : "🤖 CPUが選んでいます…"}
         </p>
         {backNodeId && backNodeName && (
           // P7-3: 盤面側の「戻る」候補(トレイルと同じ生成り色、Board.tsx)との対応が分かる程度に、
@@ -112,8 +120,9 @@ export function RouteChoiceOverlay({
           // 明らかに控えめな彩度に留め、これが「前進候補」ではないことが一目で分かるようにする。
           <button
             type="button"
+            disabled={!canCurrentPlayerAct}
             onClick={onStepBack}
-            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 border-l-4 border-l-amber-100 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm transition active:scale-95 dark:border-slate-500 dark:border-l-amber-100/40 dark:bg-slate-800 dark:text-slate-200"
+            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 border-l-4 border-l-amber-100 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:border-slate-500 dark:border-l-amber-100/40 dark:bg-slate-800 dark:text-slate-200"
           >
             <span className="text-base font-black leading-none">← 戻る</span>
             <span className="text-[10px] font-medium opacity-80">({backNodeName}へ)</span>

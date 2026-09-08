@@ -288,7 +288,12 @@ export function GameScreen() {
           currentPlayerIndex={currentPlayerIndex}
           destinationNodeId={destinationNodeId}
           routeOptions={routeOptions}
-          onSelectRoute={chooseRoute}
+          // Polish Phase 3h: 分岐マス自体を地図上でタップして選ぶ経路(RouteChoiceOverlayの
+          // ボタンとは別のもう一つの選択手段)。RouteChoiceOverlay側は既にisCurrentHumanで
+          // ガードされていたが、こちらは対象外だったため、CPUの手番中に人間が地図の選択可能マスを
+          // タップするとchooseRoute()が実際に呼ばれてしまっていた(見た目の問題ではなく実際の
+          // 操作ハイジャックだったため、RouteChoiceOverlayと同じ条件で揃える)。
+          onSelectRoute={isCurrentHuman ? chooseRoute : () => {}}
           status={status}
           onDestinationFocusComplete={continueAfterDestinationFocus}
           cardWarpTargetNodeId={cardWarpInfo?.targetNodeId ?? null}
@@ -325,6 +330,7 @@ export function GameScreen() {
           routeOptions={routeOptions}
           destinationNodeId={destinationNodeId}
           ownedCardIds={currentPlayer.cardIds}
+          canCurrentPlayerAct={isCurrentHuman}
           onSelectRoute={isCurrentHuman ? chooseRoute : () => {}}
           backNodeId={backNodeId}
           remainingMovesAfterBack={remainingMoves + 1}
@@ -391,6 +397,7 @@ export function GameScreen() {
           players={players}
           currentYearEventId={currentYearEventId}
           monopolyAchievement={monopolyAchievement}
+          canCurrentPlayerAct={isCurrentHuman}
           onBuy={isCurrentHuman ? buyProperty : () => {}}
           onFinish={isCurrentHuman ? finishPropertyShopping : () => {}}
         />
@@ -403,6 +410,7 @@ export function GameScreen() {
       {status === "selectingCardTarget" && targetSelectInfo && (
         <TargetSelectOverlay
           info={targetSelectInfo}
+          canCurrentPlayerAct={isCurrentHuman}
           onSelect={isCurrentHuman ? confirmTargetSelection : () => {}}
           onCancel={isCurrentHuman ? cancelTargetSelection : () => {}}
         />
@@ -419,6 +427,7 @@ export function GameScreen() {
       {status === "cardOverflow" && cardOverflowInfo && (
         <CardOverflowModal
           info={cardOverflowInfo}
+          canCurrentPlayerAct={isCurrentHuman}
           onDiscardExisting={isCurrentHuman ? (index) => resolveCardOverflow({ discard: "existing", index }) : () => {}}
           onKeepCurrentHand={isCurrentHuman ? () => resolveCardOverflow({ discard: "newCard" }) : () => {}}
         />

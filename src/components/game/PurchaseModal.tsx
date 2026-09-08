@@ -23,6 +23,11 @@ interface PurchaseModalProps {
    *  Phase10/P10-4-5: property_buyとmonopoly_group/monopoly_regionの同時発火を避けるためだけに
    *  参照する。 */
   monopolyAchievement: MonopolyAchievement | null;
+  /** Polish Phase 3h: falseなら現在の手番プレイヤーはCPUで、人間が購入ボタンを操作できないように
+   *  する(GameDrawer.tsxのcanCurrentPlayerActと同じ名前・同じ意味)。GameScreen.tsx側は従来通り
+   *  CPUターン中onBuy/onFinishを() => {}へ差し替えているため、この見た目上の無効化はその安全策に
+   *  加える表示専用の変更であり、購入可否そのもののゲームルール(purchasable)には影響しない。 */
+  canCurrentPlayerAct: boolean;
   onBuy: (propertyId: string) => void;
   onFinish: () => void;
 }
@@ -33,6 +38,7 @@ export function PurchaseModal({
   players,
   currentYearEventId,
   monopolyAchievement,
+  canCurrentPlayerAct,
   onBuy,
   onFinish,
 }: PurchaseModalProps) {
@@ -91,6 +97,11 @@ export function PurchaseModal({
             <p className="mt-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
               あと{remainingForMonopoly.length}件で{group?.name ?? "この物件エリア"}を独占
             </p>
+          )}
+          {/* Polish Phase 3h: CPUターン中は下のボタン群がdisabledになるだけでは「何もできず
+              固まっている」ように見えるため、CPUが判断中であることを短く明示する。 */}
+          {!canCurrentPlayerAct && (
+            <p className="mt-1.5 text-xs font-bold text-slate-400 dark:text-slate-500">🤖 CPUが選んでいます…</p>
           )}
         </div>
 
@@ -165,8 +176,8 @@ export function PurchaseModal({
                   // Visual Prototype 1.5: 「押せるゲームボタン」に見えるベベル+押下フィードバック。
                   <button
                     type="button"
-                    disabled={!purchasable}
-                    onClick={() => purchasable && onBuy(def.id)}
+                    disabled={!purchasable || !canCurrentPlayerAct}
+                    onClick={() => purchasable && canCurrentPlayerAct && onBuy(def.id)}
                     className="mt-2 w-full rounded-lg border-b-4 border-pink-800 bg-linear-to-b from-pink-400 to-pink-600 py-2 text-sm font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:border-pink-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
                   >
                     {canAfford ? "購入する" : "所持金が足りません"}
@@ -180,8 +191,9 @@ export function PurchaseModal({
         <div className="shrink-0 border-t border-pink-900/10 p-4 dark:border-pink-100/10">
           <button
             type="button"
+            disabled={!canCurrentPlayerAct}
             onClick={onFinish}
-            className="w-full rounded-lg border-b-4 border-slate-950 bg-linear-to-b from-slate-700 to-slate-900 py-2.5 font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 dark:border-slate-400 dark:from-white dark:to-slate-100 dark:text-slate-900"
+            className="w-full rounded-lg border-b-4 border-slate-950 bg-linear-to-b from-slate-700 to-slate-900 py-2.5 font-black text-white shadow-sm transition active:translate-y-0.5 active:border-b-0 disabled:border-b-0 disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none dark:border-slate-400 dark:from-white dark:to-slate-100 dark:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
           >
             購入を終える
           </button>

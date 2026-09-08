@@ -6,13 +6,18 @@ import { CARD_CATEGORY_BADGE_CLASS, CARD_CATEGORY_LABEL, RARITY_BADGE_CLASS, RAR
 
 interface CardOverflowModalProps {
   info: CardOverflowInfo;
+  /** Polish Phase 3h: falseなら現在の手番プレイヤーはCPUで、人間が入れ替え/見送りボタンを
+   *  操作できないようにする(GameDrawer.tsxのcanCurrentPlayerActと同じ名前・同じ意味)。
+   *  GameScreen.tsx側は従来通りCPUターン中onDiscardExisting/onKeepCurrentHandを() => {}へ
+   *  差し替えているため、この見た目上の無効化はその安全策に加える表示専用の変更。 */
+  canCurrentPlayerAct: boolean;
   onDiscardExisting: (index: number) => void;
   onKeepCurrentHand: () => void;
 }
 
 /** 所持上限到達時の整理画面。moneyRoulette/cardDrawと違い自動進行はせず、
  *  プレイヤーが明示的に選ぶまでターンを進めない(PurchaseModalと同じ「確認待ち」系)。 */
-export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }: CardOverflowModalProps) {
+export function CardOverflowModal({ info, canCurrentPlayerAct, onDiscardExisting, onKeepCurrentHand }: CardOverflowModalProps) {
   const newDef = getCardDef(info.newCardId);
   if (!newDef) return null;
 
@@ -45,7 +50,7 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
         </div>
 
         <p className="mt-4 text-xs font-bold text-slate-400 dark:text-slate-500">
-          既存の手札から1枚タップして入れ替える
+          {canCurrentPlayerAct ? "既存の手札から1枚タップして入れ替える" : "🤖 CPUが選んでいます…"}
         </p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {info.currentCardIds.map((cardId, i) => {
@@ -55,8 +60,9 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
               <button
                 key={`${cardId}-${i}`}
                 type="button"
+                disabled={!canCurrentPlayerAct}
                 onClick={() => onDiscardExisting(i)}
-                className="flex flex-col items-center rounded-lg border border-fuchsia-900/15 bg-linear-to-b from-white to-fuchsia-50/20 p-2 text-center shadow-sm active:scale-95 dark:border-fuchsia-100/15 dark:from-slate-800/60 dark:to-slate-800/40"
+                className="flex flex-col items-center rounded-lg border border-fuchsia-900/15 bg-linear-to-b from-white to-fuchsia-50/20 p-2 text-center shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:border-fuchsia-100/15 dark:from-slate-800/60 dark:to-slate-800/40"
               >
                 <span className="text-xl">{def.icon}</span>
                 <span className="mt-0.5 text-xs font-bold text-slate-700 dark:text-slate-200">{def.name}</span>
@@ -82,8 +88,9 @@ export function CardOverflowModal({ info, onDiscardExisting, onKeepCurrentHand }
 
         <button
           type="button"
+          disabled={!canCurrentPlayerAct}
           onClick={onKeepCurrentHand}
-          className="mt-4 w-full rounded-lg border border-fuchsia-900/15 py-2.5 text-sm font-medium text-slate-600 dark:border-fuchsia-100/15 dark:text-slate-200"
+          className="mt-4 w-full rounded-lg border border-fuchsia-900/15 py-2.5 text-sm font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-fuchsia-100/15 dark:text-slate-200"
         >
           今回のカードを見送って、今の手札を維持する
         </button>
