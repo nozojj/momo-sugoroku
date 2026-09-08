@@ -35,6 +35,9 @@ dev-err.log
 # dev-only scratch output (before/after comparison shots taken while iterating on map blocks)
 /screenshots/
 
+# backup files
+*.bak
+
 # env files (can opt-in for committing if needed)
 .env*
 
