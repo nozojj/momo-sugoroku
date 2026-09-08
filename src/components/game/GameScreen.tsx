@@ -23,6 +23,7 @@ import { SettlementIntroAnnouncer } from "./SettlementIntroAnnouncer";
 import { SettlementScreen } from "./SettlementScreen";
 import { MonopolyToast } from "./MonopolyToast";
 import { LandingResultToast } from "./LandingResultToast";
+import { SkipTurnToast } from "./SkipTurnToast";
 import { MonopolyAnnounceModal } from "./MonopolyAnnounceModal";
 import { YearEventAnnounceModal } from "./YearEventAnnounceModal";
 import { TroubleCharacterAnnounceModal } from "./TroubleCharacterAnnounceModal";
@@ -56,6 +57,7 @@ export function GameScreen() {
   const pendingPropertyGroupId = useGameStore((s) => s.pendingPropertyGroupId);
   const monopolyAchievement = useGameStore((s) => s.monopolyAchievement);
   const landingResultInfo = useGameStore((s) => s.landingResultInfo);
+  const skipTurnAnnounceInfo = useGameStore((s) => s.skipTurnAnnounceInfo);
   const arrivalInfo = useGameStore((s) => s.arrivalInfo);
   const cardWarpInfo = useGameStore((s) => s.cardWarpInfo);
   const targetSelectInfo = useGameStore((s) => s.targetSelectInfo);
@@ -81,6 +83,7 @@ export function GameScreen() {
   const finishPropertyShopping = useGameStore((s) => s.finishPropertyShopping);
   const dismissMonopolyAchievement = useGameStore((s) => s.dismissMonopolyAchievement);
   const dismissLandingResult = useGameStore((s) => s.dismissLandingResult);
+  const dismissSkipTurnAnnounce = useGameStore((s) => s.dismissSkipTurnAnnounce);
   const dismissYearEventAnnounce = useGameStore((s) => s.dismissYearEventAnnounce);
   const dismissTroubleCharacterAnnounce = useGameStore((s) => s.dismissTroubleCharacterAnnounce);
   const useCard = useGameStore((s) => s.useCard);
@@ -340,6 +343,7 @@ export function GameScreen() {
           doubleArmed={pendingDoubleMove}
           onRoll={rollDice}
           revealPhase={diceRevealPhase}
+          actualMoves={status === "moving" ? totalSteps : null}
         />
         {status === "moving" && remainingMoves > 0 && (
           <p className="mt-1 text-center text-xs font-bold text-slate-600 drop-shadow-sm dark:text-slate-300">
@@ -462,6 +466,11 @@ export function GameScreen() {
           statusには依存しない。LandingResultToast側でMonopolyToastとは別のtop位置に固定配置し、
           偶発的な同時表示でも重ならないようにしている。 */}
       {landingResultInfo && <LandingResultToast info={landingResultInfo} onDismiss={dismissLandingResult} />}
+
+      {/* skipNextRoll発動でターンが飛ばされたことの非ブロッキング通知(Polish Phase 3f)。
+          landingResultInfoと同じくstatusには依存しない。ゲーム進行(advanceToNextTurn())は
+          この通知の表示/dismissタイミングとは無関係に既に完了している。 */}
+      {skipTurnAnnounceInfo && <SkipTurnToast info={skipTurnAnnounceInfo} onDismiss={dismissSkipTurnAnnounce} />}
 
       {/* 年度イベント(「今年の湘南」)の告知。monopolyAchievementと同じくstatusには依存しない
           一時通知で、新しいGameStatusは増やさない。ゲーム開始時(1年目)・決算後に新年度へ

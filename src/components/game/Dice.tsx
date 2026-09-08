@@ -29,13 +29,38 @@ interface DiceProps {
   onRoll: () => void;
   /** Polish Phase 3a: ロール演出フェーズ(上記参照)。GameScreen.tsxから渡される。 */
   revealPhase: DiceRevealPhase;
+  /**
+   * Polish Phase 3f: 今回のロールで実際に移動するマス数(halveDiceNextRoll/doubleMove等の
+   * 修飾を適用済みの値)。gameStore.ts側のdiceResultは常に修飾前の出目合計のまま(既存の
+   * ゲームロジック・他フックが依存する不変条件のため変更しない)なので、この値は
+   * GameScreen.tsx側でuseMoveTotalSteps()が既にキャプチャしているremainingMoves初期値
+   * (=diceRoll.tsのresolveDiceRoll()が返すresultそのもの)をそのまま渡すだけでよい。
+   * 未指定/diceResultと同値ならnullと同じ扱いにし、従来通り「◯マス移動中…」の一段表示のまま
+   * にする(通常ロールの見た目を一切変えないため)。修飾で値が変わっている場合だけ
+   * 「出目 → 実際の移動マス数」の2段表示にする。ログ用のmodifierSuffix(diceRoll.ts)の文字列を
+   * そのままUIへ流用せず、この数値だけを表示に使う。
+   */
+  actualMoves?: number | null;
 }
 
 function randomFace(): number {
   return 1 + Math.floor(Math.random() * 6);
 }
 
-export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArmed, onRoll, revealPhase }: DiceProps) {
+export function Dice({
+  diceResult,
+  diceFaces,
+  diceCount = 1,
+  canRoll,
+  doubleArmed,
+  onRoll,
+  revealPhase,
+  actualMoves,
+}: DiceProps) {
+  // 修飾(halveDiceNextRoll等)で出目と実際の移動マス数が食い違っているときだけ非nullになる。
+  // 「6マス移動中…」と表示しつつ実際は3マスしか進まない、という誤情報を防ぐための値で、
+  // 一致している通常ロールでは常にnullのまま(=表示は従来と変わらない)。
+  const hasMoveMismatch = actualMoves != null && diceResult != null && actualMoves !== diceResult;
   // フェイクロール中だけ表示するランダムな面(演出専用のローカルstate。ゲーム結果には
   // 一切影響しない)。diceCount個ぶんまとめて持つことで、急行系カード(diceCount>1)でも
   // 全ての面が独立してパラパラ切り替わって見える。
@@ -100,7 +125,9 @@ export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArme
             : isRolling
               ? "サイコロを振っています…"
               : diceResult
-                ? `${diceResult}マス移動中…`
+                ? hasMoveMismatch
+                  ? `${diceResult} → ${actualMoves}マス移動中…`
+                  : `${diceResult}マス移動中…`
                 : "-"}
         </span>
       </div>
@@ -136,7 +163,9 @@ export function Dice({ diceResult, diceFaces, diceCount = 1, canRoll, doubleArme
           : isRolling
             ? `サイコロ${diceCount}個を振っています…`
             : rolled
-              ? `${rolled.join("+")}=${diceResult} マス移動中…`
+              ? hasMoveMismatch
+                ? `${rolled.join("+")}=${diceResult} → ${actualMoves}マス移動中…`
+                : `${rolled.join("+")}=${diceResult} マス移動中…`
               : "-"}
       </span>
     </div>

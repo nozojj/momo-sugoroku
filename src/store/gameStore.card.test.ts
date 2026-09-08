@@ -467,6 +467,43 @@ describe("デバフの消費: skipNextRoll(advanceToNextTurn()内、endTurn経�
     expect(s.status).toBe("rolling");
     expect(s.players[1].activeDebuffs).toHaveLength(0); // 消費済み
     expect(lastLogMessage()).toContain("お休みです");
+    // Polish Phase 3f: 無言でスキップされるのではなく、非ブロッキング通知(skipTurnAnnounceInfo)が
+    // スキップされた本人(P2)の情報で立つ。
+    expect(s.skipTurnAnnounceInfo).toMatchObject({
+      playerId: s.players[1].id,
+      playerName: "P2",
+      cardName: "お休みカード",
+    });
+
+    useGameStore.getState().dismissSkipTurnAnnounce();
+    expect(useGameStore.getState().skipTurnAnnounceInfo).toBeNull();
+  });
+
+  it("誰もスキップされない通常の手番送りではskipTurnAnnounceInfoはnullのまま", () => {
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["P1", "P2", "P3"], 1);
+    useGameStore.setState((s) => ({
+      players: s.players.map((p) => ({ ...p, currentNodeId: NORMAL_LANDING_START, moveHistory: [NORMAL_LANDING_START] })),
+      destinationNodeId: DESTINATION,
+      status: "rolling",
+    }));
+
+    mockSingleDiceFace(1);
+    useGameStore.getState().rollDice();
+    let guard = 0;
+    while (useGameStore.getState().status === "moving" || useGameStore.getState().status === "selectingRoute") {
+      const s = useGameStore.getState();
+      if (s.status === "selectingRoute") {
+        const opt = s.routeOptions.find((o) => o.nodeId === NORMAL_LANDING_TARGET) ?? s.routeOptions[0];
+        useGameStore.getState().chooseRoute(opt.nodeId);
+      } else {
+        useGameStore.getState().advanceStep();
+      }
+      if (++guard > 20) throw new Error("advanceStep()が終わらない(テスト前提が崩れている可能性)");
+    }
+
+    expect(useGameStore.getState().currentPlayerIndex).toBe(1); // 通常通りP2へ進んだだけ
+    expect(useGameStore.getState().skipTurnAnnounceInfo).toBeNull();
   });
 });
 

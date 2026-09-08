@@ -155,6 +155,7 @@ export function createInitialState(
     pendingPropertyGroupId: null,
     monopolyAchievement: null,
     landingResultInfo: null,
+    skipTurnAnnounceInfo: null,
     arrivalInfo: null,
     cardWarpInfo: null,
     targetSelectInfo: null,

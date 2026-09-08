@@ -129,6 +129,9 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // 他の一時通知と違い、readmeのstale-guardパターン(hasStaleXxx)のような条件判定は不要:
     // このフィールドが「復元すべき状態」を持つことは一度も無い)。
     landingResultInfo: null,
+    // skipTurnAnnounceInfo(Polish Phase 3f)もlandingResultInfoと全く同じ理由(1セッション内
+    // でのみ意味を持つ表示専用情報)で無条件にnullへ戻す。
+    skipTurnAnnounceInfo: null,
     // 旧セーブにキー自体が無ければcurrentState(IDLE_STATE由来)の既定値がそのまま使われる。
     // currentYearEventIdは単純な??ではなくgetYearEventDef()で存在確認までする: 将来
     // yearEventDefsのidをリネーム/削除した場合でも、旧セーブが指す消えたidをそのまま

@@ -593,6 +593,20 @@ export interface LandingResultInfo {
   message: string;
 }
 
+/** 妨害系カード(skipNextRoll)によって手番がまるごと飛ばされた、という1回限りの非ブロッキング
+ *  通知(Polish Phase 3f)。landingResultInfo/monopolyAchievementと同じく特定のstatusに紐付かない
+ *  一時通知で、GameStatusは増やさない。advanceToNextTurn()(gameStore.ts)が対象プレイヤーを
+ *  実際に読み飛ばした瞬間にセットする。ターン進行自体はこの通知の表示/dismissタイミングとは
+ *  無関係に既に完了している(=表示が残っていても操作をブロックしない)。ログ用の文言
+ *  (「〜の効果でこの手番はお休みです。」)とは別に、表示側だけで完結する短い文言をこの構造化
+ *  情報から組み立てる(ログ文字列をそのままUIへ流用しない)。 */
+export interface SkipTurnAnnounceInfo {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  cardName: string;
+}
+
 /** status: "cardDraw" のときに表示する抽選演出の内容。確定済みのcardIdを持つ(まだplayer.cardIdsには未反映)。 */
 export interface CardDrawInfo {
   playerId: string;
@@ -738,6 +752,11 @@ export interface GameState {
    *  には一切影響しない。リロード時に古い通知が再表示されないよう、persistMigration.tsの
    *  mergeGameState()で無条件にnullへ戻す(1セッション内でのみ意味を持つ表示専用情報のため)。 */
   landingResultInfo: LandingResultInfo | null;
+  /** skipNextRoll発動でターンが飛ばされた、という非ブロッキング通知(Polish Phase 3f)。
+   *  SkipTurnToastが表示し終えたらdismissSkipTurnAnnounce()でnullに戻る。landingResultInfoと
+   *  同じく1セッション内でのみ意味を持つ表示専用情報のため、persistMigration.tsのmergeGameState()
+   *  で無条件にnullへ戻す。 */
+  skipTurnAnnounceInfo: SkipTurnAnnounceInfo | null;
   /** destinationArrived状態のときに表示する到着演出の内容 */
   arrivalInfo: ArrivalInfo | null;
   /** cardWarpAnnounce/cardWarpFocus状態のときに表示するワープ演出の内容 */

@@ -119,6 +119,34 @@ describe("Dice(単一ダイス、diceCount<=1)", () => {
     render(<Dice diceResult={null} canRoll doubleArmed onRoll={() => {}} revealPhase="idle" />);
     expect(screen.getByText("出目 x2 で移動!")).not.toBeNull();
   });
+
+  it("actualMoves未指定(既存呼び出し)ではdiceResultのみの表示のまま(回帰確認)", () => {
+    render(<Dice diceResult={4} canRoll={false} doubleArmed={false} onRoll={() => {}} revealPhase="idle" />);
+    expect(screen.getByText("4マス移動中…")).not.toBeNull();
+  });
+
+  it("actualMovesがdiceResultと同じ(修飾なしの通常ロール)なら従来通りの一段表示のまま(Polish Phase 3f)", () => {
+    render(
+      <Dice diceResult={4} actualMoves={4} canRoll={false} doubleArmed={false} onRoll={() => {}} revealPhase="idle" />,
+    );
+    expect(screen.getByText("4マス移動中…")).not.toBeNull();
+  });
+
+  it("actualMovesがdiceResultと異なる(halveDiceNextRoll発動)場合、出目→実際の移動マス数の両方を表示する(Polish Phase 3f)", () => {
+    render(
+      <Dice diceResult={6} actualMoves={3} canRoll={false} doubleArmed={false} onRoll={() => {}} revealPhase="idle" />,
+    );
+    expect(screen.getByText("6 → 3マス移動中…")).not.toBeNull();
+    expect(screen.queryByText("6マス移動中…")).toBeNull();
+  });
+
+  it("revealPhase:'rolling'中はactualMovesが指定されていても本当の出目/実移動量を見せない(Polish Phase 3f回帰)", () => {
+    render(
+      <Dice diceResult={6} actualMoves={3} canRoll={false} doubleArmed={false} onRoll={() => {}} revealPhase="rolling" />,
+    );
+    expect(screen.getByText("サイコロを振っています…")).not.toBeNull();
+    expect(screen.queryByText("6 → 3マス移動中…")).toBeNull();
+  });
 });
 
 describe("Dice(複数ダイス、diceCount>1、急行系カード使用中)", () => {
@@ -165,5 +193,21 @@ describe("Dice(複数ダイス、diceCount>1、急行系カード使用中)", ()
     const button = screen.getByRole("button", { name: "サイコロ2個を振る" });
     const shown = Array.from(button.querySelectorAll("span")).map((el) => el.textContent);
     expect(shown).toEqual([DICE_FACE_CHARS[3], DICE_FACE_CHARS[4]]);
+  });
+
+  it("actualMovesがdiceResultと異なる場合、内訳+合計→実際の移動マス数を表示する(Polish Phase 3f)", () => {
+    render(
+      <Dice
+        diceResult={7}
+        diceFaces={[3, 4]}
+        actualMoves={4}
+        diceCount={2}
+        canRoll={false}
+        doubleArmed={false}
+        onRoll={() => {}}
+        revealPhase="settling"
+      />,
+    );
+    expect(screen.getByText("3+4=7 → 4マス移動中…")).not.toBeNull();
   });
 });

@@ -61,6 +61,7 @@ const IDLE_STATE: GameState = {
   pendingPropertyGroupId: null,
   monopolyAchievement: null,
   landingResultInfo: null,
+  skipTurnAnnounceInfo: null,
   arrivalInfo: null,
   cardWarpInfo: null,
   targetSelectInfo: null,
@@ -102,6 +103,10 @@ export interface GameStore extends GameState {
   /** LandingResultToastの表示が終わった(自動タイムアウト)ときに呼び、通知状態をクリアする。
    *  monopolyAchievementと同じく、statusの遷移やターン進行には一切関与しない。 */
   dismissLandingResult: () => void;
+  /** SkipTurnToast(skipNextRoll発動でターンが飛ばされた通知)の表示が終わった(自動タイムアウト)
+   *  ときに呼び、通知状態をクリアする。landingResultInfo等と同じく、statusの遷移やターン進行には
+   *  一切関与しない。 */
+  dismissSkipTurnAnnounce: () => void;
   /** YearEventAnnounceModal(「今年の湘南」演出)の表示が終わったときに呼び、通知状態をクリアする */
   dismissYearEventAnnounce: () => void;
   /** TroubleCharacterAnnounceModal(妨害キャラの登場/交代/悪さ通知)の表示が終わったときに呼び、
@@ -343,6 +348,12 @@ export const useGameStore = create<GameStore>()(
           troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"];
           troubleCharacterPendingMischiefAnnounceInfo: GameState["troubleCharacterPendingMischiefAnnounceInfo"];
         } | null = null;
+        // skipNextRollで実際にお休みにしたプレイヤーの非ブロッキング通知(Polish Phase 3f)。
+        // このループ内で複数人連続してスキップされた場合(理論上ほぼ発生しない)は最後の1人分だけ
+        // 残る(landingResultInfo等と同じく単一枠の通知のため)。誰もスキップされなければnullのまま
+        // で、その場合は既存のskipTurnAnnounceInfo(前回分、まだ自動消滅していない場合)を
+        // このset()では上書きしない(下記set()参照)。
+        let skipTurnAnnounceUpdate: GameState["skipTurnAnnounceInfo"] = null;
 
         for (let i = 0; i < players.length; i++) {
           const nextIndex = (index + 1) % players.length;
@@ -462,6 +473,12 @@ export const useGameStore = create<GameStore>()(
             activeDebuffs: p.activeDebuffs.filter((d) => d.id !== skip.id),
           }));
           log = [...log, { id: makeLogId(), turn, message: `${candidate.name}さんは「${skip.sourceCardName}」の効果でこの手番はお休みです。` }];
+          skipTurnAnnounceUpdate = {
+            playerId: candidate.id,
+            playerName: candidate.name,
+            playerColor: candidate.color,
+            cardName: skip.sourceCardName,
+          };
         }
 
         set({
@@ -475,6 +492,9 @@ export const useGameStore = create<GameStore>()(
           log,
           ...yearEventUpdate,
           ...troubleCharacterEventUpdate,
+          // 今回スキップが発生しなかった場合、既存のskipTurnAnnounceInfo(前回分)をここでは
+          // 書き換えない(troubleCharacterEventUpdate等と同じ「起きた時だけ差し込む」方針)。
+          ...(skipTurnAnnounceUpdate ? { skipTurnAnnounceInfo: skipTurnAnnounceUpdate } : {}),
         });
       }
 
@@ -976,6 +996,8 @@ export const useGameStore = create<GameStore>()(
         dismissMonopolyAchievement: () => set({ monopolyAchievement: null }),
 
         dismissLandingResult: () => set({ landingResultInfo: null }),
+
+        dismissSkipTurnAnnounce: () => set({ skipTurnAnnounceInfo: null }),
 
         dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
 
