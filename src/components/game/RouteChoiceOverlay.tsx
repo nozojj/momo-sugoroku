@@ -76,7 +76,7 @@ export function RouteChoiceOverlay({
         key={opt.nodeId}
         type="button"
         onClick={() => onSelectRoute(opt.nodeId)}
-        className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-300 bg-white/90 px-2.5 py-1.5 text-amber-800 shadow-sm active:scale-95 dark:bg-slate-800 dark:text-amber-200"
+        className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-300 bg-white/90 px-2.5 py-1.5 text-amber-800 shadow-sm transition active:scale-95 dark:bg-slate-800 dark:text-amber-200"
       >
         <span className="text-base font-black leading-none">
           {arrow} {label}
@@ -102,7 +102,7 @@ export function RouteChoiceOverlay({
       {/* P6-2: 背景をやや透過させ(旧95%→56%)、パネルの下に隠れがちな分岐edge/ノードが
           はっきり透けて見えるようにする(ボタン自体は個別に不透明な背景を持つため文字の
           可読性はそのまま)。 */}
-      <div className="pointer-events-auto max-w-sm rounded-xl border border-amber-300 bg-amber-50/56 p-2.5 shadow-lg backdrop-blur-sm dark:bg-amber-950/50 sm:max-w-md">
+      <div className="animate-route-panel-in pointer-events-auto max-w-sm rounded-xl border border-amber-300 bg-amber-50/56 p-2.5 shadow-lg backdrop-blur-sm dark:bg-amber-950/50 sm:max-w-md">
         <p className="mb-1.5 text-center text-sm font-bold text-amber-700 dark:text-amber-300">
           分岐点です。進む道を選んでください(地図をタップしてもOK)
         </p>
@@ -113,7 +113,7 @@ export function RouteChoiceOverlay({
           <button
             type="button"
             onClick={onStepBack}
-            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 border-l-4 border-l-amber-100 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm active:scale-95 dark:border-slate-500 dark:border-l-amber-100/40 dark:bg-slate-800 dark:text-slate-200"
+            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-400 border-l-4 border-l-amber-100 bg-slate-100 px-2.5 py-1.5 text-slate-700 shadow-sm transition active:scale-95 dark:border-slate-500 dark:border-l-amber-100/40 dark:bg-slate-800 dark:text-slate-200"
           >
             <span className="text-base font-black leading-none">← 戻る</span>
             <span className="text-[10px] font-medium opacity-80">({backNodeName}へ)</span>

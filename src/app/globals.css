@@ -844,6 +844,28 @@ body {
   background: radial-gradient(ellipse at center, transparent 45%, rgba(15, 23, 42, 0.3) 100%);
 }
 
+/* Polish Phase 3g: RouteChoiceOverlay(分岐選択パネル)専用の軽量な出現演出。既存
+   animate-arrival-pop(開始scale(0.4)からポップイン)は、確定表示のみで即操作を要求しない
+   カード/トースト向けに作られており、開始直後は見た目の面積が縮んだ状態になる。
+   RouteChoiceOverlayは表示された瞬間から方向ボタンを正確にタップできる必要があるため、
+   スケールを一切動かさず、opacityとtranslateYだけで「ふわっと現れる」ごく控えめな演出に
+   留める(ヒット領域は常に等倍のまま)。移動中に何度も表示されるUIのため、他の一発
+   animationより短い150〜200msに収め、「演出を見せる」より「操作感を邪魔しない」ことを
+   優先した。 */
+@keyframes route-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-route-panel-in {
+  animation: route-panel-in 180ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-arrival-pop,
   .animate-character-bounce,
@@ -877,6 +899,9 @@ body {
      同じくここに列挙する(アニメーションを止めても内容自体は読める)。 */
   .animate-landing-result-toast,
   .animate-money-flash,
+  /* Polish Phase 3g: RouteChoiceOverlayの出現演出。opacity/translateYだけの一発animationで、
+     止めても分岐パネルの内容(方向ボタン等)はそのまま即表示されるだけなので情報は失われない。 */
+  .animate-route-panel-in,
   /* P7-2: 選択可能マス・選択可能edge(Board.tsx)の両方がこのクラスを使う。アニメーションだけ
      止めれば、要素側に既に付いているopacityのインライン属性が基底値として表示され続けるため、
      「選択可能である」こと自体は静的な強調として残る(情報は失われない)。 */
