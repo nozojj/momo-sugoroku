@@ -15,6 +15,34 @@ import { ARRIVAL_LAST_MS, DEPART_MS } from "@/lib/game/moveTempo";
 import { DICE_FAKE_ROLL_MS, DICE_SETTLE_MS } from "./useDiceRevealPhase";
 import { GameScreen } from "./GameScreen";
 
+// 既知のflaky問題(フルスイート実行時のみ本テストが稀にタイムアウト/状態不整合で失敗する。
+// 単体実行では常に成功)の根本原因調査の結果判明した対処。
+//
+// 調査で切り分けた事実:
+// - 単体実行/軽い組み合わせでは常に成功、テスト全体で多数のファイルが並行実行される
+//   (デフォルトの`forks`プールで複数ワーカープロセスが同時に走る)ときだけ失敗する。
+// - `--no-file-parallelism`や`--maxWorkers`を下げるとフルスイートでも安定して成功する
+//   (=別ファイルの状態がリークしているのではなく、並行実行によるCPU競合で説明がつく)。
+// - `forks`プールは各テストファイルを別OSプロセスで実行するため、他ファイルのfake timer/
+//   mock/localStorage/DOM等がプロセスをまたいでこのテストへ状態として漏れることは
+//   構造上あり得ない(モジュール変数・グローバルなイベントリスナー等のリーク説は検証の上で
+//   否定できる)。
+// - hydration完了・GameScreenの初回レンダー(status:"rolling")までは常に正常に完了しており、
+//   失敗はその後のvi.advanceTimersByTimeAsync()呼び出し(実時間で計測すると要求した仮想msと
+//   同程度〜それ以上の実時間がかかることがある)以降でのみ発生する。
+//
+// Board.tsx(598ノード分のSVGを毎回フル描画する重いコンポーネント)を実物のままGameScreen配下で
+// マウントしていたことが、この重い再レンダーコストの発生源だった。このテストが検証したいのは
+// サイコロ演出と移動タイミングの同期(store側のstatus/diceResult/moveHistory)だけで、Boardが
+// 実際に何を描画するかは一切見ていない。フルスイートで他のテストファイル(別プロセス)が
+// 同時にCPUを使っている状況では、vi.advanceTimersByTimeAsync()のたびに発生するBoardの実
+// 再レンダーにかかる実CPU時間が伸び、既定の5000msの実時間テストタイムアウトを稀に超過して
+// いた(vi.useFakeTimers()は仮想時間の経過を制御するだけで、実際のレンダリングにかかる実CPU
+// 時間までは制御できないため)。Boardを軽量スタブに差し替えることで、この関係のない実描画
+// コストをこのテストから完全に取り除く(store側のロジック・GameScreen自体は一切変更していない。
+// GameScreen.moveTempo.test.tsx/GameScreen.landingResult.test.tsxも同じ理由で同じ対処をした)。
+vi.mock("./Board", () => ({ Board: () => null }));
+
 // Polish Phase 3b: 最初の1マスのstep intervalは、出目(totalSteps)によって
 // DEPART_MS(totalSteps>2)〜ARRIVAL_LAST_MS(totalSteps<=1)まで変わりうる(moveTempo.ts参照)。
 // このテストでは実際の出目を固定していないため、どちらのティアになっても確実に

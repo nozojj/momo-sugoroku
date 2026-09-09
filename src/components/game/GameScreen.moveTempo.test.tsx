@@ -25,6 +25,17 @@ import { DICE_FAKE_ROLL_MS, DICE_SETTLE_MS } from "./useDiceRevealPhase";
 import { LANDING_SETTLE_MS } from "./useLandingSettlePhase";
 import { GameScreen } from "./GameScreen";
 
+// GameScreen.diceReveal.test.tsxと同じ既知のflaky問題(フルスイート実行時のみ稀にタイムアウト/
+// 状態不整合)の根本原因調査で判明した対処: このテストが検証したいのはサイコロ演出〜車移動の
+// タイミング同期(store側のstatus/moveHistory)だけで、Board.tsx(598ノード分のSVGを毎回フル
+// 描画する重いコンポーネント)が実際に何を描画するかは一切見ていない。フルスイートで多数の
+// テストファイルが並行実行される際、vi.advanceTimersByTimeAsync()のたびに発生するBoardの実
+// 再レンダーがCPU負荷の影響を受けやすく、既定の5000msの実時間テストタイムアウトを稀に超過して
+// いた(vi.useFakeTimers()で仮想時間は制御できても、実際のレンダリングにかかる実CPU時間までは
+// 制御できないため)。Boardを軽量スタブに差し替えることで、この関係のない実描画コストを
+// このテストから完全に取り除く(store側のロジック・GameScreen自体は一切変更していない)。
+vi.mock("./Board", () => ({ Board: () => null }));
+
 // Polish Phase 3c: 着地tick(remainingMoves===0)の待ち時間は、旧来の固定460msから
 // 「最後の1マスの視覚transitionが完了する時間(ARRIVAL_LAST_MSから算出) + 着地settle
 // (LANDING_SETTLE_MS)」へ変わった。目的地到着ではない通常マスを前提にしたテスト用の合計値。

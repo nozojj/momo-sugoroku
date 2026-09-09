@@ -12,6 +12,16 @@ import { useGameStore } from "@/store/gameStore";
 import { GameScreen } from "./GameScreen";
 import type { LandingResultInfo } from "@/types/game";
 
+// GameScreen.diceReveal.test.tsxと同じ既知のflaky問題(フルスイート実行時のみ稀にタイムアウト/
+// 状態不整合)の根本原因調査で判明した対処: このテストが検証したいのはlandingResultInfoの
+// クリア挙動(store側のstatus/landingResultInfo)だけで、Board.tsx(598ノード分のSVGを毎回
+// フル描画する重いコンポーネント)が実際に何を描画するかは一切見ていない。フルスイートで多数の
+// テストファイルが並行実行される際、Boardの実再レンダーがCPU負荷の影響を受けやすく、既定の
+// 5000msの実時間テストタイムアウトを稀に超過しうる。Boardを軽量スタブに差し替えることで、
+// この関係のない実描画コストをこのテストから完全に取り除く(store側のロジック・GameScreen
+// 自体は一切変更していない)。
+vi.mock("./Board", () => ({ Board: () => null }));
+
 function stubMatchMedia(matches: boolean): void {
   window.matchMedia = ((query: string) => ({
     matches,
