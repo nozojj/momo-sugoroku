@@ -9,8 +9,25 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import { CarToken } from "./CarToken";
 
+/** usePrefersReducedMotion()のためだけの最小スタブ(GameOverModal.test.tsx/
+ *  FinalRaceSequence.test.tsxと同じもの)。既定はfalse(通常設定)。 */
+function stubMatchMedia(matches: boolean): void {
+  window.matchMedia = ((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+stubMatchMedia(false);
+
 afterEach(() => {
   cleanup();
+  stubMatchMedia(false); // reduced-motionテストが上書きした場合に備え、既定値へ戻す
 });
 
 describe("CarToken: normalモードはcolorIndexに応じた本番webp画像を描画する", () => {
@@ -402,5 +419,118 @@ describe("CarToken: curve lean(Polish Phase 3d「カーブ時の車体リアク�
       </svg>,
     );
     expect(container.querySelector(".animate-curve-lean")).not.toBeNull();
+  });
+});
+
+describe("CarToken: prefers-reduced-motion(通常移動アニメーションのreduced-motion対応)", () => {
+  afterEach(() => {
+    stubMatchMedia(false);
+  });
+
+  it("reduced-motion時は位置transitionがnoneになる(スライドせず即座に位置更新、instant相当の見た目)", () => {
+    stubMatchMedia(true);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: none");
+    // 位置(transform)自体は通常どおり反映される(情報は失われない、動きだけを削る)。
+    expect(rootG?.getAttribute("style")).toContain("translate(0px, -22px)");
+  });
+
+  it("通常設定(reduced-motionオフ)では位置transitionが従来どおり付く(回帰確認)", () => {
+    stubMatchMedia(false);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} movementDurationMs={270} />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: transform 270ms cubic-bezier(0.4, 0, 0.2, 1)");
+  });
+
+  it("reduced-motion時は方向転換してもcurve lean(animate-curve-lean)が付かない", () => {
+    stubMatchMedia(true);
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).toBeNull();
+  });
+
+  it("通常設定(reduced-motionオフ)では方向転換でcurve leanが従来どおり付く(回帰確認)", () => {
+    stubMatchMedia(false);
+    const { container, rerender } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    rerender(
+      <svg>
+        <CarToken x={10} y={10} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-curve-lean")).not.toBeNull();
+  });
+
+  it("reduced-motion時はlandingSettle=trueでもanimate-landing-settleが付かない", () => {
+    stubMatchMedia(true);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} landingSettle />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-landing-settle")).toBeNull();
+  });
+
+  it("通常設定(reduced-motionオフ)ではlandingSettle=trueでanimate-landing-settleが従来どおり付く(回帰確認)", () => {
+    stubMatchMedia(false);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} landingSettle />
+      </svg>,
+    );
+    expect(container.querySelector(".animate-landing-settle")).not.toBeNull();
+  });
+
+  it("reduced-motion時でも手番リング(animate-ping-slow)・車体・ラベル等、情報を伝える表示自体は消えない(モーションだけを削る)", () => {
+    stubMatchMedia(true);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn colorIndex={0} landingSettle />
+      </svg>,
+    );
+    expect(container.querySelector("circle.animate-ping-slow")).not.toBeNull();
+    expect(container.querySelector("image")).not.toBeNull();
+    expect(container.querySelector("text")?.textContent).toBe("🚗");
+  });
+
+  it("reduced-motion時でもinstant=trueとの組み合わせで挙動が壊れない(どちらもtransition:noneになる)", () => {
+    stubMatchMedia(true);
+    const { container } = render(
+      <svg>
+        <CarToken x={0} y={0} color="#e6483e" label="🚗" offsetX={0} offsetY={0} isCurrentTurn={false} colorIndex={0} instant />
+      </svg>,
+    );
+    const rootG = container.querySelector("g");
+    expect(rootG?.getAttribute("style")).toContain("transition: none");
   });
 });

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { VehicleMode } from "@/types/game";
 import { VEHICLE_PLACEHOLDER_STYLE, resolveVehicleAssetUrl } from "@/lib/game/vehicleStyle";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { useVehicleHeading } from "./useVehicleHeading";
 
 interface CarTokenProps {
@@ -59,6 +60,15 @@ export function CarToken({
   const assetUrl = resolveVehicleAssetUrl(vehicleMode, colorIndex);
   const placeholder = VEHICLE_PLACEHOLDER_STYLE[vehicleMode];
 
+  // 通常移動アニメーションのreduced-motion対応。OSの「視差効果を減らす」設定時は、
+  // 位置transition(下記)・curve lean・landing settleの3つの見た目のモーションだけを
+  // 抑制する(車の位置自体・表示内容・ゲーム進行タイミングは一切変えない。位置更新の
+  // タイミングはGameScreen.tsx側のsetTimeoutで決まり、このtransition/animationの
+  // 有無・完了とは無関係なため、抑制しても移動テンポは変わらない)。他の演出系コンポーネント
+  // (FinalRaceSequence.tsx/CharacterAnnouncer.tsx等)と同じ、usePrefersReducedMotion()を
+  // 直接読んで該当クラス/transitionを付けない、という既存の設計方針をそのまま踏襲する。
+  const reduceMotion = usePrefersReducedMotion();
+
   // Polish Phase 3d: 「進行方向が変化したstepだけ車体をカーブ方向へ軽く傾ける」curve lean。
   // 調査結果により、normal本番画像(3/4パース)は進行方向そのものへ360°rotateする方式に
   // 向かないため採用しない。代わりにoffsetX/offsetY適用前のx/y(=マス座標そのもの)だけを
@@ -66,10 +76,10 @@ export function CarToken({
   // instant(ワープ)中の不自然な傾きを避ける。normal/expressどちらのvehicleModeでも同じ
   // 演出を適用する(vehicleMode自体はこのhookに渡さないため、切替で挙動が変わらない)。
   const { leanDeg, stepKey } = useVehicleHeading(x, y);
-  // instant(瞬間移動)中はcurve leanのアニメーションも表示しない(位置transitionを
-  // 無効化するinstantと同じ「カットで見せる」方針。teleport先との間には道路上の
-  // 進行方向という意味が無いため、直前の値を引きずって不自然に傾かせない)。
-  const curveLeanActive = !instant && leanDeg !== 0;
+  // instant(瞬間移動)中・reduced-motion中はcurve leanのアニメーションも表示しない
+  // (位置transitionを無効化するinstantと同じ「カットで見せる」方針。teleport先との間には
+  // 道路上の進行方向という意味が無いため、直前の値を引きずって不自然に傾かせない)。
+  const curveLeanActive = !instant && !reduceMotion && leanDeg !== 0;
   // durationはmovementDurationMs(Phase3bの現在のテンポ)にそのまま同期させる
   // (globals.cssの.animate-curve-leanが持つデフォルトdurationをインラインで上書きする)。
   const curveLeanStyle: CSSProperties | undefined = curveLeanActive
@@ -80,7 +90,10 @@ export function CarToken({
     <g
       style={{
         transform: `translate(${x + offsetX}px, ${y - 22 + offsetY}px)`,
-        transition: instant ? "none" : `transform ${movementDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+        // reduced-motion時は各マスへ即座に位置を更新する(スライドさせない)。位置が
+        // 変化するタイミング自体(setTimeoutの間隔)は変更しないため、「何マスずつ・
+        // どのタイミングで進むか」という移動結果は従来通り(見た目の滑らかさだけを削る)。
+        transition: instant || reduceMotion ? "none" : `transform ${movementDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
       {isCurrentTurn && (
@@ -117,9 +130,11 @@ export function CarToken({
         {/* 車体。Polish Phase 3c: landingSettle=trueの間だけanimate-landing-settleを付与する。
             このg自体は位置transitionを持たない(親<g>の役割)ため、scaleアニメーションと
             position transitionが同一要素で衝突することはない(CarToken.tsx既存の
-            wrapper/inner分離方針をそのまま踏襲)。 */}
+            wrapper/inner分離方針をそのまま踏襲)。reduced-motion時はこの一発scale
+            アニメーションも付与しない(landingSettle自体のtrue/falseはGameScreen.tsx側の
+            タイミング制御のままで変えない。見た目のクラス付与だけを止める)。 */}
         <g
-          className={landingSettle ? "animate-landing-settle" : ""}
+          className={landingSettle && !reduceMotion ? "animate-landing-settle" : ""}
           style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
         >
           {assetUrl ? (
