@@ -57,6 +57,17 @@ export function sceneForStatus(status: GameStatus): BgmSceneId {
  * 変化しないため、effect自体が再発火せずbgmManager.setScene()も呼ばれない
  * (CPUターンの高速なstatus遷移でBGMが不必要に再スタートすることを構造的に防ぐ)。
  *
+ * yearEventAnnounceInfo(「今年の湘南」年度イベント発表演出、YearEventAnnounceModal)は
+ * GameStatusとは独立した一時通知(GameStatusを増やさない設計、types/game.ts参照)なので、
+ * sceneForStatus()の1分岐にはできない。代わりにここでyearEventAnnounceInfoの有無を見て、
+ * 非nullの間だけ"yearEvent"シーンへ上書きする。非null化するのは常にstatus:"rolling"
+ * (="gameplay"シーン)への遷移と同じset()呼び出し内(gameStore.ts createInitialState/
+ * advanceToNextTurn参照)なので、dismissYearEventAnnounce()でnullに戻れば
+ * sceneForStatus(status)は自然に"gameplay"を指し、通常BGMへ復帰する。
+ * yearEventAnnounceInfoは同じオブジェクトである間は同一の"yearEvent"文字列を返し続けるため、
+ * (Reactの再レンダーやCharacterAnnouncer内部の行送り等では)effectは再発火せず、
+ * bgmManager.setScene()の冪等性と合わせて多重再生・頭出しの繰り返しは起きない。
+ *
  * GameScreen.tsxの早期return(waiting/settlement/destinationArrived)より前で呼び出す
  * ことで、画面差し替えをまたいでもこのフック自体は生存し続ける(GameScreen関数自体は
  * page.tsxから一度きりマウントされる単一コンポーネントで、内部の早期returnはGameScreen
@@ -64,7 +75,8 @@ export function sceneForStatus(status: GameStatus): BgmSceneId {
  */
 export function useBgmController(): void {
   const status = useGameStore((s) => s.status);
-  const scene = sceneForStatus(status);
+  const yearEventAnnounceInfo = useGameStore((s) => s.yearEventAnnounceInfo);
+  const scene: BgmSceneId = yearEventAnnounceInfo ? "yearEvent" : sceneForStatus(status);
 
   useEffect(() => {
     bgmManager.setScene(scene);

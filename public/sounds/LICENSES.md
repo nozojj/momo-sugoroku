@@ -57,6 +57,18 @@ License/terms: DOVA-SYNDROMEの利用規約および作者個別条件に従う�
 
 License/terms: https://peritune.com/about/ に記載のCC BY 4.0(2026年3月より前に公開された楽曲に適用される条件)に従う。
 
+## 第三者配布素材(BGMer)
+
+以下の1曲は**このリポジトリの管理者による自作ではなく**、BGMer(https://bgmer.net/)で配布されている第三者の楽曲をダウンロードして`public/sounds/`へ組み込んだものである。音源自体を素材として再配布する目的ではなく、本ゲームのBGMとして組み込んで使用している(コード上でBGMerへ直接アクセスしたり、BGMerのURLからストリーミング再生したりすることはなく、常にローカルに同梱した`/sounds/bgm_news_event.mp3`を再生する)。
+
+利用規約(https://bgmer.net/terms)によれば、個人利用・商用利用ともに無料で利用可能(ゲームへの利用も可)、クレジット表記は必須ではなく、利用報告も不要、アレンジ・改変も可能。著作権・原盤権はBGMer側が保持し、楽曲を自分の作品であると偽る行為、および楽曲を許可なくそのまま販売する行為は禁止されている。その他の条件は同規約に従う。
+
+| ファイル | 導入 | Original title | Composer | Source | Source page | Usage | sample rate | channels | bitrate | duration |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bgm_news_event.mp3` | Polish Phase (2026-09-09) | ニュースをお伝えします | BGMer | BGMer | https://bgmer.net/music/037 | yearEvent(「今年の湘南」年度イベント発表演出)BGM | 48000Hz | 2 (stereo) | 192kbps (CBR) | 9.552s |
+
+License/terms: https://bgmer.net/terms に記載の利用規約(個人・商用利用無料、クレジット表記任意、利用報告不要、改変可、著作権・原盤権はBGMer保持、自作を偽る行為・無断でのそのままの販売は禁止)に従う。
+
 ## 旧ファイルの削除記録
 
 | ファイル | 経緯 |
@@ -64,4 +76,4 @@ License/terms: https://peritune.com/about/ に記載のCC BY 4.0(2026年3月よ�
 | `monopoly_group.mp3` | 2026-08-13追加時点で入手元・ライセンスの記録が一切残っておらず、リポジトリ内(コミットメッセージ・README・ファイルメタデータ)のいずれからも確認できなかった(P10-4調査時点)。Phase10/P10-4-3で`monopoly_group.wav`(自作・手続き的生成)へ正式に置き換え、コード上の参照が完全になくなったことを確認したうえで**削除済み**。 |
 | `bgm_title.wav` / `bgm_gameplay.wav` | P11-2で`scripts/generate-bgm.mjs`により自作・手続き的生成したBGM(コミット前の未コミット段階)。試聴の結果、方針をDOVA-SYNDROME配布の第三者楽曲(上記`bgm_title.mp3`/`bgm_gameplay.mp3`)へ変更したため正式に不採用とし、生成スクリプト`scripts/generate-bgm.mjs`・専用テスト`scripts/generate-bgm.test.ts`とあわせて**削除済み**(いずれも未コミットのままの差し替えのため、コミット履歴には残らない)。 |
 
-すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。BGM(title/gameplay)はP11-2でDOVA-SYNDROME配布の第三者楽曲を採用し、P11-4-1でdestinationCelebration(DOVA-SYNDROME配布)・settlement(PeriTune配布)の2曲を、P11-4-2でgameOver(DOVA-SYNDROME配布)を追加し、5シーン全てのBGMが揃った。
+すべてのSE(14種)がP10-4-1〜P10-4-4の手続き的生成で揃ったため、CC0素材での補完は不要になった。BGM(title/gameplay)はP11-2でDOVA-SYNDROME配布の第三者楽曲を採用し、P11-4-1でdestinationCelebration(DOVA-SYNDROME配布)・settlement(PeriTune配布)の2曲を、P11-4-2でgameOver(DOVA-SYNDROME配布)を追加し、5シーン全てのBGMが揃った。Polish PhaseでyearEvent(「今年の湘南」年度イベント発表演出、BGMer配布)を追加し、6シーン全てのBGMが揃った。

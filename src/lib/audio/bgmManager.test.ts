@@ -221,15 +221,16 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     vi.unstubAllGlobals();
   });
 
-  it("BGM_TRACK_SRCがtitle/gameplay/destinationCelebration/settlement/gameOverの5シーン全てをMP3パスで登録している", () => {
+  it("BGM_TRACK_SRCがtitle/gameplay/destinationCelebration/settlement/gameOver/yearEventの6シーン全てをMP3パスで登録している", () => {
     expect(BGM_TRACK_SRC.title).toBe("/sounds/bgm_title.mp3");
     expect(BGM_TRACK_SRC.gameplay).toBe("/sounds/bgm_gameplay.mp3");
     expect(BGM_TRACK_SRC.destinationCelebration).toBe("/sounds/bgm_destination.mp3");
     expect(BGM_TRACK_SRC.settlement).toBe("/sounds/bgm_settlement.mp3");
     expect(BGM_TRACK_SRC.gameOver).toBe("/sounds/bgm_gameover.mp3");
+    expect(BGM_TRACK_SRC.yearEvent).toBe("/sounds/bgm_news_event.mp3");
   });
 
-  it("P11-4-2時点ではtitle/gameplay/destinationCelebration/settlement/gameOverの5シーン全てがBGM_TRACK_SRCに登録されており、いずれのsceneへ切り替えても例外を投げずAudio要素を生成する", () => {
+  it("title/gameplay/destinationCelebration/settlement/gameOver/yearEventの6シーン全てがBGM_TRACK_SRCに登録されており、いずれのsceneへ切り替えても例外を投げずAudio要素を生成する", () => {
     const manager = createBgmManager(); // 引数省略=bgmTracks.tsの実際のBGM_TRACK_SRCを使う
 
     expect(() => {
@@ -238,6 +239,7 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
       manager.setScene("destinationCelebration");
       manager.setScene("settlement");
       manager.setScene("gameOver");
+      manager.setScene("yearEvent");
     }).not.toThrow();
 
     const titleInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_title"));
@@ -245,6 +247,7 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     const destinationInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_destination"));
     const settlementInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_settlement"));
     const gameOverInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_gameover"));
+    const yearEventInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_news_event"));
     expect(titleInstances).toHaveLength(1);
     expect(titleInstances[0].src).toBe("/sounds/bgm_title.mp3");
     expect(gameplayInstances).toHaveLength(1);
@@ -255,6 +258,58 @@ describe("bgmManager (本番のbgmTracks.tsをそのまま使った場合)", () 
     expect(settlementInstances[0].src).toBe("/sounds/bgm_settlement.mp3");
     expect(gameOverInstances).toHaveLength(1);
     expect(gameOverInstances[0].src).toBe("/sounds/bgm_gameover.mp3");
+    expect(yearEventInstances).toHaveLength(1);
+    expect(yearEventInstances[0].src).toBe("/sounds/bgm_news_event.mp3");
+  });
+
+  it("yearEvent(年度イベント発表演出)シーンへ切り替えると専用BGMが再生され、演出終了でgameplayへ戻ると元のgameplay BGMへ自然に戻る", () => {
+    const manager = createBgmManager();
+
+    manager.setScene("gameplay");
+    vi.advanceTimersByTime(1000);
+    const gameplayEl = FakeAudio.instances.find((a) => a.src.includes("bgm_gameplay"))!;
+    expect(gameplayEl.paused).toBe(false);
+
+    manager.setScene("yearEvent");
+    vi.advanceTimersByTime(1000);
+    const yearEventEl = FakeAudio.instances.find((a) => a.src.includes("bgm_news_event"))!;
+    expect(yearEventEl.paused).toBe(false);
+    expect(gameplayEl.pause).toHaveBeenCalled(); // 前のgameplay BGMは止まっている(多重再生しない)
+
+    manager.setScene("gameplay");
+    vi.advanceTimersByTime(1000);
+    expect(yearEventEl.pause).toHaveBeenCalled();
+    // gameplayへ戻る際、既存のgameplay用Audio要素を使い回さず新規に生成し直す(bgmManager.tsの
+    // 既存設計どおり)。2つ目のgameplayインスタンスも同じく再生開始していることを確認する。
+    const gameplayInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_gameplay"));
+    expect(gameplayInstances).toHaveLength(2);
+    expect(gameplayInstances[1].paused).toBe(false);
+  });
+
+  it("BGM無効時にyearEventシーンへ切り替えても再生されない", () => {
+    useAudioSettingsStore.setState({ bgmEnabled: false });
+    const manager = createBgmManager();
+
+    manager.setScene("yearEvent");
+    vi.advanceTimersByTime(1000);
+
+    const yearEventEl = FakeAudio.instances.find((a) => a.src.includes("bgm_news_event"));
+    expect(yearEventEl).toBeDefined();
+    expect(yearEventEl!.play).not.toHaveBeenCalled();
+  });
+
+  it("同じyearEventシーンへの連続setScene(演出中の再レンダー相当)では二重再生しない", () => {
+    const manager = createBgmManager();
+
+    manager.setScene("yearEvent");
+    vi.advanceTimersByTime(1000);
+    manager.setScene("yearEvent");
+    manager.setScene("yearEvent");
+    vi.advanceTimersByTime(1000);
+
+    const yearEventInstances = FakeAudio.instances.filter((a) => a.src.includes("bgm_news_event"));
+    expect(yearEventInstances).toHaveLength(1);
+    expect(yearEventInstances[0].play).toHaveBeenCalledTimes(1);
   });
 });
 

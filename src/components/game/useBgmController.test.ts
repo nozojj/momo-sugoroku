@@ -66,6 +66,10 @@ describe("useBgmController", () => {
     setSceneMock.mockClear();
     useGameStore.getState().resetGame();
     useGameStore.getState().startGame(["P1"], 1);
+    // startGame()はcreateInitialState()により1年目のyearEventAnnounceInfoを非nullでセットする
+    // (types/game.ts参照)。このdescribe内の既存テストは純粋にstatus→sceneの対応だけを見たいので、
+    // ここで既定の演出通知を消し、yearEventAnnounceInfo自体の挙動は下のdescribeで個別に検証する。
+    useGameStore.getState().dismissYearEventAnnounce();
   });
 
   afterEach(() => {
@@ -116,5 +120,57 @@ describe("useBgmController", () => {
     setState({ status: "finished" });
     expect(setSceneMock).toHaveBeenCalledTimes(1);
     expect(setSceneMock).toHaveBeenCalledWith("gameOver");
+  });
+});
+
+// yearEventAnnounceInfo(「今年の湘南」年度イベント発表演出、YearEventAnnounceModal)専用BGM
+// (Polish Phase、bgm_news_event.mp3)の自動テスト。yearEventAnnounceInfoはGameStatusとは
+// 独立した一時通知のため、sceneForStatusの網羅性テストとは別のdescribeで検証する。
+describe("useBgmController: yearEventAnnounceInfo", () => {
+  beforeEach(() => {
+    setSceneMock.mockClear();
+    useGameStore.getState().resetGame();
+    useGameStore.getState().startGame(["P1"], 1);
+    useGameStore.getState().dismissYearEventAnnounce();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("yearEventAnnounceInfoが非nullの間はstatusに関わらず'yearEvent'シーンになる", () => {
+    setState({ status: "rolling", yearEventAnnounceInfo: { year: 2, eventId: "heatwave" } });
+    renderHook(() => useBgmController());
+
+    expect(setSceneMock).toHaveBeenCalledWith("yearEvent");
+  });
+
+  it("発表演出の開始でsetSceneが'yearEvent'へ切り替わり、終了(dismiss)で元のstatusに対応するsceneへ戻る", () => {
+    setState({ status: "rolling" });
+    renderHook(() => useBgmController());
+    setSceneMock.mockClear();
+
+    setState({ yearEventAnnounceInfo: { year: 2, eventId: "heatwave" } });
+    expect(setSceneMock).toHaveBeenCalledTimes(1);
+    expect(setSceneMock).toHaveBeenCalledWith("yearEvent");
+
+    setSceneMock.mockClear();
+    act(() => {
+      useGameStore.getState().dismissYearEventAnnounce();
+    });
+    expect(setSceneMock).toHaveBeenCalledTimes(1);
+    expect(setSceneMock).toHaveBeenCalledWith("gameplay"); // dismiss時点のstatus("rolling")に対応するscene
+  });
+
+  it("演出中の再レンダー(yearEventAnnounceInfoの参照が変わらない限り)ではsetSceneが再度呼ばれない", () => {
+    const info = { year: 2, eventId: "heatwave" };
+    setState({ status: "rolling", yearEventAnnounceInfo: info });
+    const { rerender } = renderHook(() => useBgmController());
+    setSceneMock.mockClear();
+
+    rerender();
+    rerender();
+    expect(setSceneMock).not.toHaveBeenCalled();
   });
 });

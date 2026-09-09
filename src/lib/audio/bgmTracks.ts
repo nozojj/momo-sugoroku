@@ -21,14 +21,21 @@
  * 明るくコミカルで湘南すごろく全体の親しみやすい雰囲気に合う後者の方向性から選定した。
  * 出典・ライセンスの詳細はpublic/sounds/LICENSES.md参照。
  *
+ * Polish PhaseでyearEvent(「今年の湘南」年度イベント発表演出、YearEventAnnounceModal)専用の
+ * 6シーン目を追加した。yearEventAnnounceInfoはGameStatusとは独立した一時通知(GameStatusを
+ * 増やさない設計、types/game.ts参照)のため、他5シーンのようなsceneForStatus()の1分岐では
+ * 表現できず、useBgmController.ts側でyearEventAnnounceInfoの有無を見て上書きする形を取る
+ * (このファイル自体にはsceneの決定ロジックを持たせない、既存方針を維持)。
+ * 出典・ライセンスの詳細はpublic/sounds/LICENSES.md参照。
+ *
  * soundEffects.tsは「音源が無いidを先に登録してもよい(soundManager.tsのplaySE()が404を
  * 静かに無視するため)」という方針だが、BGMは1トラックあたりの再生時間が長く、シーン切替の
  * たびに存在しないパスへ毎回リクエストが飛ぶことになるため、より安全側に倒す。
  * BGM_TRACK_SRCをPartial<Record<...>>にして「実際に登録されているsceneだけ再生を試みる」
- * 設計を採用している(現時点では5シーン全て登録済みだが、将来シーンが増えた場合も同じ設計を
+ * 設計を採用している(現時点では6シーン全て登録済みだが、将来シーンが増えた場合も同じ設計を
  * 維持する)。
  */
-export type BgmSceneId = "title" | "gameplay" | "destinationCelebration" | "settlement" | "gameOver";
+export type BgmSceneId = "title" | "gameplay" | "destinationCelebration" | "settlement" | "gameOver" | "yearEvent";
 
 export const BGM_TRACK_SRC: Partial<Record<BgmSceneId, string>> = {
   title: "/sounds/bgm_title.mp3",
@@ -36,4 +43,5 @@ export const BGM_TRACK_SRC: Partial<Record<BgmSceneId, string>> = {
   destinationCelebration: "/sounds/bgm_destination.mp3",
   settlement: "/sounds/bgm_settlement.mp3",
   gameOver: "/sounds/bgm_gameover.mp3",
+  yearEvent: "/sounds/bgm_news_event.mp3",
 };
