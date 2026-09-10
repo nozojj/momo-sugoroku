@@ -780,6 +780,15 @@ export interface GameState {
    *  独立した一時的な通知情報(GameStatusは増やさない)。YearEventAnnounceModalが表示し終えたら
    *  dismissYearEventAnnounce()でnullに戻る。 */
   yearEventAnnounceInfo: YearEventAnnounceInfo | null;
+  /** Phase4: yearEventAnnounceInfoとtroubleCharacterAnnounceInfoはどちらも全画面の
+   *  CharacterAnnouncerを使う独立した一時通知で、同時に非nullになると片方がもう片方を
+   *  覆い隠してしまう(GameScreen.tsxはこの2つを独立した条件でそれぞれ描画するため)。
+   *  troubleCharacterAnnounceInfoが既に表示中(非null)の間に新しくyearEventAnnounceInfoを
+   *  立てようとした場合、ここへ一旦保留し、troubleCharacterAnnounceInfo側が表示し終わって
+   *  dismissTroubleCharacterAnnounce()が呼ばれた瞬間にyearEventAnnounceInfoへ昇格させる
+   *  (troubleCharacterPendingMischiefAnnounceInfoと全く同じ「pending 1件だけ保持→昇格」
+   *  パターンをyearEvent側にも適用しただけで、新しいキューシステムは作らない)。 */
+  pendingYearEventAnnounceInfo: YearEventAnnounceInfo | null;
   /** 妨害キャラ(仮称)の現在の所有者プレイヤーID。ゲーム開始時はnull(未登場)。最初に誰かが
    *  目的地へ到着したタイミングで初めて割り当てられる。Player側にはフラグを持たせず、
    *  この単一IDだけで所有状態を管理する(destinationNodeIdと同じ設計)。 */
@@ -811,6 +820,16 @@ export interface GameState {
    *  troubleCharacterAnnounceInfoへ昇格させてnullに戻し、nullなら従来通りtroubleCharacter
    *  AnnounceInfoをそのままnullにする(mischief単独発生時は従来通り一度も使われない)。 */
   troubleCharacterPendingMischiefAnnounceInfo: Extract<TroubleCharacterAnnounceInfo, { kind: "mischief" }> | null;
+  /** Phase4: pendingYearEventAnnounceInfoと対になる、逆方向の保留枠。yearEventAnnounceInfoが
+   *  既に表示中(非null)の間に新しくtroubleCharacterAnnounceInfoを立てようとした場合
+   *  (登場/所有者交代/悪さ/変身のいずれの経路でも)、ここへ一旦保留し、yearEventAnnounceInfo側が
+   *  表示し終わってdismissYearEventAnnounce()が呼ばれた瞬間にtroubleCharacterAnnounceInfoへ
+   *  昇格させる。troubleCharacterPendingMischiefAnnounceInfo(transform→mischiefの内部連続表示用)
+   *  とは役割が異なる別フィールド: あちらは妨害キャラ内部の2段階表示、こちらはyearEvent側との
+   *  外部競合の解決用で、両方が同時に絡んでも(変身+mischiefがyearEvent中に確定した場合)
+   *  troubleCharacterPendingMischiefAnnounceInfoは変更前と同じ扱いのまま、ここには
+   *  「今回表示すべきだった最初の1件(transform)」だけが入る。 */
+  pendingTroubleCharacterAnnounceInfo: TroubleCharacterAnnounceInfo | null;
   /** 年度ごとの総資産スナップショットの履歴(資産推移グラフ用)。決算のたびに1件追加される。 */
   netWorthHistory: NetWorthHistoryEntry[];
   log: LogEntry[];

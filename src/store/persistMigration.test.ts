@@ -405,6 +405,48 @@ describe("mergeGameState(): troubleCharacterPendingMischiefAnnounceInfo のフ�
   });
 });
 
+// Phase4: pendingYearEventAnnounceInfo/pendingTroubleCharacterAnnounceInfoも、上の
+// troubleCharacterPendingMischiefAnnounceInfoと全く同じ「一時通知、stale-guard不要」方針で
+// 持ち越す。旧セーブ(このフィールド追加前)を読み込んでもクラッシュせず、単に保留中の演出が
+// 復元されないだけの状態に安全にフォールバックすることを確認する。
+describe("mergeGameState(): pendingYearEventAnnounceInfo/pendingTroubleCharacterAnnounceInfo のフォールバック(非ブロッキング通知)", () => {
+  it("どちらかが保留されたまま保存されたセーブは、そのまま復元される", () => {
+    const currentState = {
+      ...useGameStore.getState(),
+      yearEventAnnounceInfo: null,
+      pendingYearEventAnnounceInfo: null,
+      troubleCharacterAnnounceInfo: null,
+      pendingTroubleCharacterAnnounceInfo: null,
+    };
+    const pendingYearEvent = { year: 2, eventId: "heatwave" };
+    const pendingTroubleCharacter = { kind: "mischief" as const, playerId: "p1", playerName: "プレイヤー1", mischiefKind: "money" as const, message: "なにかが起きた" };
+    const persisted = {
+      mapId: defaultMapId,
+      yearEventAnnounceInfo: pendingYearEvent,
+      pendingTroubleCharacterAnnounceInfo: pendingTroubleCharacter,
+    };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.yearEventAnnounceInfo).toEqual(pendingYearEvent);
+    expect(merged.pendingTroubleCharacterAnnounceInfo).toEqual(pendingTroubleCharacter);
+  });
+
+  it("キー自体が存在しない旧セーブ(Phase4追加前)は、currentState側の値(既定null)へフォールバックする(操作不能にならない)", () => {
+    const currentState = {
+      ...useGameStore.getState(),
+      pendingYearEventAnnounceInfo: null,
+      pendingTroubleCharacterAnnounceInfo: null,
+    };
+    const persisted = { mapId: defaultMapId };
+
+    const merged = mergeGameState(persisted, currentState);
+
+    expect(merged.pendingYearEventAnnounceInfo).toBeNull();
+    expect(merged.pendingTroubleCharacterAnnounceInfo).toBeNull();
+  });
+});
+
 describe("mergeGameState(): yearEventAnnounceInfo のフォールバック", () => {
   it("演出表示中(非null)のまま保存されたセーブは、そのまま復元される(statusには依存しない一時通知のため)", () => {
     const currentState = { ...useGameStore.getState(), yearEventAnnounceInfo: null };

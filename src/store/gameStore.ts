@@ -71,11 +71,13 @@ const IDLE_STATE: GameState = {
   settlementInfo: null,
   currentYearEventId: "",
   yearEventAnnounceInfo: null,
+  pendingYearEventAnnounceInfo: null,
   troubleCharacterOwnerId: null,
   troubleCharacterFormId: null,
   troubleCharacterPossessionCount: null,
   troubleCharacterAnnounceInfo: null,
   troubleCharacterPendingMischiefAnnounceInfo: null,
+  pendingTroubleCharacterAnnounceInfo: null,
   netWorthHistory: [],
   log: [],
   winnerIds: null,
@@ -163,6 +165,31 @@ function blockedByPendingDiceModifier(state: GameState): boolean {
   return state.pendingDoubleMove || state.pendingDiceCount > 1;
 }
 
+/**
+ * Phase4: yearEventAnnounceInfoとtroubleCharacterAnnounceInfoは、どちらも全画面の
+ * CharacterAnnouncerを使う独立した一時通知(GameScreen.tsx参照)。どちらかが既に表示中の間に
+ * もう片方を立てようとすると、同時マウントで片方がもう片方を覆い隠してしまう。
+ * 「先に表示中の側を優先し、後から発生した側は一旦保留してdismiss時に昇格させる」という
+ * 単純なルールで解決する: 既存のtroubleCharacterPendingMischiefAnnounceInfo(transform→
+ * mischiefの内部連続表示)と全く同じ「pending 1件だけ保持→昇格」パターンを、yearEvent↔
+ * troubleCharacterの外部競合にもそのまま適用するだけで、新しいキューシステムは作らない。
+ * どちらのヘルパーも「表示するかpendingへ回すか」だけを決め、効果(お金・デバフ・年度倍率等)の
+ * 確定タイミングには一切関与しない(呼び出し側が別途、従来通り確定させたうえでこれを使う)。
+ */
+function resolveYearEventAnnounce(
+  info: NonNullable<GameState["yearEventAnnounceInfo"]>,
+  troubleCharacterAnnounceActive: boolean,
+): Partial<Pick<GameState, "yearEventAnnounceInfo" | "pendingYearEventAnnounceInfo">> {
+  return troubleCharacterAnnounceActive ? { pendingYearEventAnnounceInfo: info } : { yearEventAnnounceInfo: info };
+}
+
+function resolveTroubleCharacterAnnounce(
+  info: NonNullable<GameState["troubleCharacterAnnounceInfo"]>,
+  yearEventAnnounceActive: boolean,
+): Partial<Pick<GameState, "troubleCharacterAnnounceInfo" | "pendingTroubleCharacterAnnounceInfo">> {
+  return yearEventAnnounceActive ? { pendingTroubleCharacterAnnounceInfo: info } : { troubleCharacterAnnounceInfo: info };
+}
+
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => {
@@ -195,11 +222,13 @@ export const useGameStore = create<GameStore>()(
                   // まとめることで「owner有り・form/count無し」という中間状態を1フレームも作らない。
                   troubleCharacterFormId: TROUBLE_CHARACTER_BASE_FORM_ID,
                   troubleCharacterPossessionCount: 0,
-                  troubleCharacterAnnounceInfo: {
-                    kind: "appeared" as const,
-                    ownerId,
-                    ownerName: owner.name,
-                  },
+                  // Phase4: yearEventAnnounceInfoが表示中なら、この登場告知は一旦保留する
+                  // (resolveTroubleCharacterAnnounce()参照)。所有者の割り当て自体はここで確定済みで、
+                  // 表示タイミングだけが変わる。
+                  ...resolveTroubleCharacterAnnounce(
+                    { kind: "appeared" as const, ownerId, ownerName: owner.name },
+                    state.yearEventAnnounceInfo !== null,
+                  ),
                 };
               })()
             : {};
@@ -235,13 +264,19 @@ export const useGameStore = create<GameStore>()(
           troubleCharacterOwnerId: result.newOwnerId,
           troubleCharacterFormId: TROUBLE_CHARACTER_BASE_FORM_ID,
           troubleCharacterPossessionCount: 0,
-          troubleCharacterAnnounceInfo: {
-            kind: "handoff",
-            fromPlayerId: result.fromPlayerId,
-            fromPlayerName: fromPlayer.name,
-            toPlayerId: result.toPlayerId,
-            toPlayerName: mover.name,
-          },
+          // Phase4: yearEventAnnounceInfoが表示中なら、この交代告知は一旦保留する
+          // (resolveTroubleCharacterAnnounce()参照)。所有者交代自体はここで確定済みで、
+          // 表示タイミングだけが変わる。
+          ...resolveTroubleCharacterAnnounce(
+            {
+              kind: "handoff",
+              fromPlayerId: result.fromPlayerId,
+              fromPlayerName: fromPlayer.name,
+              toPlayerId: result.toPlayerId,
+              toPlayerName: mover.name,
+            },
+            state.yearEventAnnounceInfo !== null,
+          ),
           log: pushLog(state, `妨害キャラが${fromPlayer.name}さんから${mover.name}さんへ移った!`),
         });
       }
@@ -335,7 +370,15 @@ export const useGameStore = create<GameStore>()(
         // 別途担当する。詳細はそちらのコメント参照)。ゲーム終了(nextTurn > totalTurns)の
         // 分岐はturn=nextTurnへ到達する前にreturnするため、「次年度が存在しない」最終年度末には
         // ここは実行されない。
-        let yearEventUpdate: { currentYearEventId: string; yearEventAnnounceInfo: GameState["yearEventAnnounceInfo"] } | null = null;
+        let yearEventUpdate: {
+          currentYearEventId: string;
+          yearEventAnnounceInfo?: GameState["yearEventAnnounceInfo"];
+          pendingYearEventAnnounceInfo?: GameState["pendingYearEventAnnounceInfo"];
+        } | null = null;
+        // Phase4: yearEventUpdateが今回yearEventAnnounceInfoを実際に表示する側になった
+        // (=resolveYearEventAnnounce()がpendingへ回さなかった)かどうか。下のtroubleCharacter側の
+        // 判定(yearEventが今まさに画面を占有するか)に使う。
+        let yearEventBecameVisible = false;
         // 妨害キャラ(仮称)の「悪さ」(および形態変化判定・憑依カウント更新、S-3c)は、実際に今回
         // 行動するプレイヤーが確定した瞬間(下のif (!skip)の内側)にだけ判定する。
         // advanceToNextTurn()は手番交代のたびに1回しか呼ばれないため、ここで発生させれば
@@ -345,7 +388,8 @@ export const useGameStore = create<GameStore>()(
         let troubleCharacterEventUpdate: {
           troubleCharacterFormId: GameState["troubleCharacterFormId"];
           troubleCharacterPossessionCount: GameState["troubleCharacterPossessionCount"];
-          troubleCharacterAnnounceInfo: GameState["troubleCharacterAnnounceInfo"];
+          troubleCharacterAnnounceInfo?: GameState["troubleCharacterAnnounceInfo"];
+          pendingTroubleCharacterAnnounceInfo?: GameState["pendingTroubleCharacterAnnounceInfo"];
           troubleCharacterPendingMischiefAnnounceInfo: GameState["troubleCharacterPendingMischiefAnnounceInfo"];
         } | null = null;
         // skipNextRollで実際にお休みにしたプレイヤーの非ブロッキング通知(Polish Phase 3f)。
@@ -376,7 +420,15 @@ export const useGameStore = create<GameStore>()(
           if (nextIndex === 0 && getCalendar(turn).isYearStart) {
             const yearEvent = drawYearEvent();
             const year = getCalendar(turn).year;
-            yearEventUpdate = { currentYearEventId: yearEvent.id, yearEventAnnounceInfo: { year, eventId: yearEvent.id } };
+            // Phase4: troubleCharacterAnnounceInfoが既に表示中(例えば直前のcheckTroubleCharacterHandoff()で
+            // 交代告知が立ったばかり)なら、この年度告知は一旦保留する(resolveYearEventAnnounce()参照)。
+            // currentYearEventIdは表示タイミングと無関係に確定させる(年度倍率は即座に効かせる)。
+            const troubleCharacterActive = state.troubleCharacterAnnounceInfo !== null;
+            yearEventUpdate = {
+              currentYearEventId: yearEvent.id,
+              ...resolveYearEventAnnounce({ year, eventId: yearEvent.id }, troubleCharacterActive),
+            };
+            yearEventBecameVisible = !troubleCharacterActive;
             log = [...log, { id: makeLogId(), turn, message: `${year}年目が始まりました。今年の湘南は「${yearEvent.icon} ${yearEvent.label}」です。` }];
           }
 
@@ -451,19 +503,20 @@ export const useGameStore = create<GameStore>()(
               // troubleCharacterAnnounceInfoへ昇格させる。変身しなかった場合は従来通り
               // mischiefAnnounceInfoをそのままtroubleCharacterAnnounceInfoへ入れ、pending側は
               // 必ずnullにしておく(前ターンの値が残らないよう、このset()内で毎回確定させる)。
-              troubleCharacterEventUpdate = decision.transformed
-                ? {
-                    troubleCharacterFormId: nextFormId,
-                    troubleCharacterPossessionCount: baseCount + 1,
-                    troubleCharacterAnnounceInfo: { kind: "transform", fromFormId: currentFormId, toFormId: nextFormId },
-                    troubleCharacterPendingMischiefAnnounceInfo: mischiefAnnounceInfo,
-                  }
-                : {
-                    troubleCharacterFormId: nextFormId,
-                    troubleCharacterPossessionCount: baseCount + 1,
-                    troubleCharacterAnnounceInfo: mischiefAnnounceInfo,
-                    troubleCharacterPendingMischiefAnnounceInfo: null,
-                  };
+              // このtroubleCharacterPendingMischiefAnnounceInfo自体は表示タイミングと無関係に
+              // 確定させ(妨害キャラ内部の2段階表示の予約)、Phase4のyearEvent競合ガード
+              // (resolveTroubleCharacterAnnounce())は「transform/mischiefのうち最初に見せる方」
+              // だけに適用する。
+              const firstAnnounceInfo: NonNullable<GameState["troubleCharacterAnnounceInfo"]> = decision.transformed
+                ? { kind: "transform", fromFormId: currentFormId, toFormId: nextFormId }
+                : mischiefAnnounceInfo;
+              const yearEventActive = state.yearEventAnnounceInfo !== null || yearEventBecameVisible;
+              troubleCharacterEventUpdate = {
+                troubleCharacterFormId: nextFormId,
+                troubleCharacterPossessionCount: baseCount + 1,
+                troubleCharacterPendingMischiefAnnounceInfo: decision.transformed ? mischiefAnnounceInfo : null,
+                ...resolveTroubleCharacterAnnounce(firstAnnounceInfo, yearEventActive),
+              };
             }
             break;
           }
@@ -999,16 +1052,33 @@ export const useGameStore = create<GameStore>()(
 
         dismissSkipTurnAnnounce: () => set({ skipTurnAnnounceInfo: null }),
 
-        dismissYearEventAnnounce: () => set({ yearEventAnnounceInfo: null }),
+        // Phase4: 保留中のtroubleCharacter通知(pendingTroubleCharacterAnnounceInfo)があれば、
+        // それをtroubleCharacterAnnounceInfoへ昇格させて続けて表示する(resolveTroubleCharacterAnnounce()と
+        // 対になる昇格処理)。保留が無ければ従来通りyearEventAnnounceInfoをそのままnullへ戻すだけ。
+        dismissYearEventAnnounce: () => {
+          const pending = get().pendingTroubleCharacterAnnounceInfo;
+          if (pending) {
+            set({ yearEventAnnounceInfo: null, troubleCharacterAnnounceInfo: pending, pendingTroubleCharacterAnnounceInfo: null });
+            return;
+          }
+          set({ yearEventAnnounceInfo: null });
+        },
 
         // S-3f-2: 保留中のmischief通知(troubleCharacterPendingMischiefAnnounceInfo)があれば、
         // それをtroubleCharacterAnnounceInfoへ昇格させて表示を引き継ぐ(transform→mischiefの
-        // 連続表示)。保留が無ければ(mischief単独発生・appeared・handoffの従来ケース)、
-        // 従来通りtroubleCharacterAnnounceInfoをそのままnullへ戻すだけ。
+        // 連続表示)。これを妨害キャラ内部の連続表示として最優先で扱う。それが無ければ、Phase4で
+        // 追加した保留中のyearEvent通知(pendingYearEventAnnounceInfo)があればそちらへ昇格する。
+        // どちらも無ければ(mischief単独発生・appeared・handoffの従来ケース)、従来通り
+        // troubleCharacterAnnounceInfoをそのままnullへ戻すだけ。
         dismissTroubleCharacterAnnounce: () => {
-          const pending = get().troubleCharacterPendingMischiefAnnounceInfo;
-          if (pending) {
-            set({ troubleCharacterAnnounceInfo: pending, troubleCharacterPendingMischiefAnnounceInfo: null });
+          const pendingMischief = get().troubleCharacterPendingMischiefAnnounceInfo;
+          if (pendingMischief) {
+            set({ troubleCharacterAnnounceInfo: pendingMischief, troubleCharacterPendingMischiefAnnounceInfo: null });
+            return;
+          }
+          const pendingYearEvent = get().pendingYearEventAnnounceInfo;
+          if (pendingYearEvent) {
+            set({ troubleCharacterAnnounceInfo: null, yearEventAnnounceInfo: pendingYearEvent, pendingYearEventAnnounceInfo: null });
             return;
           }
           set({ troubleCharacterAnnounceInfo: null });

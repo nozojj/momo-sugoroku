@@ -165,6 +165,9 @@ export function createInitialState(
     settlementInfo: null,
     currentYearEventId: yearEvent.id,
     yearEventAnnounceInfo: { year: 1, eventId: yearEvent.id },
+    // Phase4: ゲーム開始時点ではtroubleCharacterAnnounceInfoは(妨害キャラ自体が未登場のため)
+    // 必ずnullなので、上のyearEventAnnounceInfoと衝突する余地が無く、保留枠も常にnullで始まる。
+    pendingYearEventAnnounceInfo: null,
     // 妨害キャラ(仮称)はゲーム開始時には存在しない。最初に誰かが目的地へ到着したタイミングで
     // 初めて割り当てられる(gameStore.tsのcheckDestinationArrival()参照)。
     troubleCharacterOwnerId: null,
@@ -174,6 +177,7 @@ export function createInitialState(
     troubleCharacterPossessionCount: null,
     troubleCharacterAnnounceInfo: null,
     troubleCharacterPendingMischiefAnnounceInfo: null,
+    pendingTroubleCharacterAnnounceInfo: null,
     netWorthHistory: [],
     log: [
       {

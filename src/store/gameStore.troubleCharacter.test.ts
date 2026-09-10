@@ -22,6 +22,11 @@ const OTHER_HUB = "hub_chigasaki";
 function startTwoPlayerGame(controllers: ["human" | "cpu", "human" | "cpu"] = ["human", "human"]): void {
   useGameStore.getState().resetGame();
   useGameStore.getState().startGame(["P1", "P2"], 1, controllers);
+  // startGame()は1年目のyearEventAnnounceInfoを非nullでセットする(types/game.ts参照)。
+  // 実際のプレイでは、この初回告知はここまで進む前にプレイヤーが必ず見終えている前提のため、
+  // このファイルの各テスト(妨害キャラの通知検証)がPhase4のyearEvent競合ガード
+  // (resolveTroubleCharacterAnnounce())に無関係に巻き込まれないよう、ここで解消しておく。
+  useGameStore.getState().dismissYearEventAnnounce();
   const map = getMap(MAP_ID);
   const distance = shortestDistance(map, START_3_AWAY, DESTINATION, []);
   if (distance !== EXPECTED_DISTANCE) {

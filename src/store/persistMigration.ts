@@ -143,6 +143,10 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // 依存しない一時通知なので演出が再度出るだけで操作不能にはならない(cardWarpInfo等と違い
     // stale-status防御は不要)。念のためundefined(旧セーブにキー自体が無い場合)だけ吸収する。
     yearEventAnnounceInfo: state.yearEventAnnounceInfo ?? currentState.yearEventAnnounceInfo,
+    // pendingYearEventAnnounceInfo(Phase4)も同じ「一時通知、stale-guard不要」方針。欠落していれば
+    // (このフィールド追加前の旧セーブ、キー自体が無い)単に保留中の年度告知が復元されないだけで、
+    // 操作不能にはならない(currentState由来のnullへ自然にフォールバックする)。
+    pendingYearEventAnnounceInfo: state.pendingYearEventAnnounceInfo ?? currentState.pendingYearEventAnnounceInfo,
     troubleCharacterOwnerId: resolvedTroubleCharacterOwnerId,
     troubleCharacterFormId: resolvedTroubleCharacterFormId,
     troubleCharacterPossessionCount: resolvedTroubleCharacterPossessionCount,
@@ -155,6 +159,10 @@ export function mergeGameState(persisted: unknown, currentState: GameStore): Gam
     // (このフィールド追加前、キー自体が無い)はcurrentState由来のnullへ自然にフォールバックする。
     troubleCharacterPendingMischiefAnnounceInfo:
       state.troubleCharacterPendingMischiefAnnounceInfo ?? currentState.troubleCharacterPendingMischiefAnnounceInfo,
+    // pendingTroubleCharacterAnnounceInfo(Phase4)も同じ方針。欠落していれば単に保留中の
+    // 妨害キャラ通知が復元されないだけで、操作不能にはならない。
+    pendingTroubleCharacterAnnounceInfo:
+      state.pendingTroubleCharacterAnnounceInfo ?? currentState.pendingTroubleCharacterAnnounceInfo,
     netWorthHistory: state.netWorthHistory ?? currentState.netWorthHistory,
     pendingDiceCount: state.pendingDiceCount ?? currentState.pendingDiceCount,
     activeVehicleMode: state.activeVehicleMode ?? currentState.activeVehicleMode,
